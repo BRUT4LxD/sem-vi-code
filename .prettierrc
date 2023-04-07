@@ -1,0 +1,13 @@
+{
+  "overrides": [
+    {
+      "files": ["*.py"],
+      "options": {
+        "tabWidth": 4,
+        "singleQuote": true,
+        "trailingComma": "all",
+        "plugins": ["prettier-plugin-python"]
+      }
+    }
+  ]
+}
