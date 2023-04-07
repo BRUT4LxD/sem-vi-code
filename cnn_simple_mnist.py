@@ -16,7 +16,6 @@ print(f'Using device: {device}')
 batch_size = 4
 num_epochs = 5
 learning_rate = 0.001
-image_size = 28
 MODEL_SAVE_PATH = './models/cnn-mnist2.pth'
 LOAD_PRETRAINED = False
 
