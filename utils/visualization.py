@@ -4,10 +4,10 @@ import numpy as np
 
 
 @torch.no_grad()
-def visualize(test_model, test_loader, batch_size, classes, device='gpu'):
+def simple_visualize(test_model, test_loader, batch_size, classes, device='gpu'):
     batch_cnt = 0
     for images, labels in test_loader:
-        if batch_cnt > 5:
+        if batch_cnt > 1:
             break
         batch_cnt += 1
         images = images.to(device)

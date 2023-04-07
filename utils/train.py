@@ -1,4 +1,7 @@
-def simple_train(model, loss_fn, optimizer, train_loader, num_epochs=5, device='gpu'):
+from utils.io import save_model
+
+
+def simple_train(model, loss_fn, optimizer, train_loader, num_epochs=5, device='gpu', SAVE_MODEL_PATH=None):
     n_total_steps = len(train_loader)
     for epoch in range(num_epochs):
         for i, (images, labels) in enumerate(train_loader):
@@ -10,7 +13,7 @@ def simple_train(model, loss_fn, optimizer, train_loader, num_epochs=5, device='
             loss = loss_fn(outputs, labels)
 
             optimizer.zero_grad()
-            loss.backward() 
+            loss.backward()
             optimizer.step()
 
             if (i + 1) % 2000 == 0:
@@ -19,4 +22,5 @@ def simple_train(model, loss_fn, optimizer, train_loader, num_epochs=5, device='
 
     print('Finished training')
 
-
+    if SAVE_MODEL_PATH is not None:
+        save_model(model, SAVE_MODEL_PATH)
