@@ -1,7 +1,7 @@
 import torch
 
 
-@torch.no_grad
+@torch.no_grad()
 def validation(model, test_loader, batch_size, classes, device='gpu'):
     n_correct = 0
     n_samples = 0

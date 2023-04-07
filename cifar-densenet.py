@@ -6,12 +6,14 @@ import torchvision.transforms as transforms
 import matplotlib.pyplot as plt
 import numpy as np
 from architectures.densenet import DenseNetCifar
+from utils.io import save_model
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 batch_size = 4
 num_epochs = 5
 learning_rate = 0.001
+SAVE_MODEL_PATH = 'models/densenetcifar10.pth'
 
 transform = transforms.Compose(
     [
@@ -85,3 +87,6 @@ with torch.no_grad():
     for i in range(10):
         acc = 100.0 * n_class_correct[i] / n_class_samples[i]
         print(f'accuracy of {classes[i]}: {acc}%')
+
+
+save_model(model, SAVE_MODEL_PATH)
