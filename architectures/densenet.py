@@ -103,14 +103,12 @@ def DenseNet161():
     return DenseNet(Bottleneck, [6, 12, 36, 24], growth_rate=48)
 
 
-def densenet_cifar():
+def DenseNetCifar():
     return DenseNet(Bottleneck, [6, 12, 24, 16], growth_rate=12)
 
 
 def test():
-    net = densenet_cifar()
+    net = DenseNetCifar()
     x = torch.randn(1, 3, 32, 32)
     y = net(x)
     print(y)
-
-# test()

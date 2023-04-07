@@ -17,7 +17,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # Hyper-parameters 
 input_size = 784 # 28x28
-hidden_size = 500 
+hidden_size = 500  
 num_classes = 10
 num_epochs = 1
 batch_size = 64
@@ -65,13 +65,13 @@ class NeuralNet(nn.Module):
         self.l1 = nn.Linear(input_size, hidden_size) 
         self.relu = nn.ReLU()
         self.l2 = nn.Linear(hidden_size, num_classes)  
-    
+     
     def forward(self, x):
         out = self.l1(x)
         out = self.relu(out)
         out = self.l2(out)
         # no activation and no softmax at the end
-        return out
+        return out 
 
 model = NeuralNet(input_size, hidden_size, num_classes).to(device)
 

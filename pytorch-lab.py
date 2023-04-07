@@ -1,4 +1,4 @@
-import torch;
+import torch
 
 
 x = torch.tensor(2)
