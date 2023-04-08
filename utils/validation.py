@@ -7,16 +7,22 @@ def simple_validation(model, test_loader, batch_size, classes, device='gpu'):
     n_samples = 0
     n_class_correct = [0 for i in range(10)]
     n_class_samples = [0 for i in range(10)]
+    cnt = 0
     for images, labels in test_loader:
         images = images.to(device)
         labels = labels.to(device)
         outputs = model(images)
 
+        if cnt > 980:
+            print(f'{cnt}: {labels}')
+            print(f'{cnt}: {outputs}')
+
+        cnt += 1
         _, predictions = torch.max(outputs, 1)
         n_samples += labels.size(0)
         n_correct += (predictions == labels).sum().item()
 
-        for i in range(batch_size):
+        for i in range(len(labels)):
             label = labels[i]
             pred = predictions[i]
             if (label == pred):

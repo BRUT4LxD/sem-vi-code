@@ -1,12 +1,9 @@
-import torch
+from utils.dataset_loader import load_imagenette
+from torchvision import transforms
+import pathlib
 
+# list all directories in the current directory
+dirs = [x.name for x in pathlib.Path(
+    './data/imagenette/train').iterdir() if x.is_dir()]
 
-x = torch.tensor(2)
-y = torch.tensor(3)
-
-w = torch.tensor(1.0, requires_grad=True)
-
-y_hat = w * x
-loss = (y_hat - y)**2
-loss.backward()
-print(w.grad)
+print(dirs)
