@@ -56,7 +56,7 @@ def attack(model, test_loader, epsilon):
     loader_cnt = 0
     criterion = nn.CrossEntropyLoss()
 
-    print(f'Running attack for epsilon: {epsilon}')
+    print(f'Running FGSM attack for epsilon: {epsilon}')
     for images, labels in test_loader:
         if loader_cnt % 1000 == 0:
             print(f'attacked: {loader_cnt}')
