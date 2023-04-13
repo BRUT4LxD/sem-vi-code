@@ -46,7 +46,8 @@ def _precision(output, target):
     pred = torch.argmax(output, dim=1)
     tp = (pred & target).sum().item()
     fp = (pred & ~target).sum().item()
-    prec = tp / (tp + fp)
+    x = (tp + fp) if (tp + fp) != 0 else 1
+    prec = tp / x
     return prec
 
 
@@ -55,7 +56,8 @@ def _recall(output, target):
     pred = torch.argmax(output, dim=1)
     tp = (pred & target).sum().item()
     fn = (~pred & target).sum().item()
-    rec = tp / (tp + fn)
+    x = (tp + fn) if (tp + fn) != 0 else 1
+    rec = tp / x
     return rec
 
 
@@ -63,7 +65,8 @@ def _recall(output, target):
 def _f1_score(output, target):
     prec = _precision(output, target)
     rec = _recall(output, target)
-    f1 = 2 * (prec * rec) / (prec + rec)
+    x = (prec + rec) if (prec + rec) != 0 else 1
+    f1 = 2 * (prec * rec) / x
     return f1
 
 
@@ -72,9 +75,10 @@ def evaluate_model(model: torch.nn.Module, data_loader: torch.utils.data.DataLoa
     model.eval()
     acc, prec, rec, f1 = 0, 0, 0, 0
     total = 0
+    device = next(model.parameters()).device
 
     for images, labels in tqdm(data_loader):
-        images, labels = images.cuda(), labels.cuda()
+        images, labels = images.to(device), labels.to(device)
         outputs = model(images)
         acc += _accuracy(outputs, labels)
         prec += _precision(outputs, labels)

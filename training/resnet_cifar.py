@@ -15,7 +15,7 @@ learning_rate = 0.001
 SAVE_MODEL_PATH = 'models/resnet50cifar.pt'
 LOAD_PRETRAINED = False
 
-train_loader, test_loader = load_CIFAR10()
+train_loader, test_loader = load_CIFAR10(train_subset_size=10000)
 model_instance = ResNet50()
 
 model = load_model(model_instance,

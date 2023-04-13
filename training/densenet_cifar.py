@@ -38,3 +38,5 @@ simple_validation(model=model,
                   batch_size=batch_size,
                   classes=cifar_classes,
                   device=device)
+
+

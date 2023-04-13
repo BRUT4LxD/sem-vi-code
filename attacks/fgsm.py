@@ -1,57 +1,63 @@
 import torch
 import torch.nn as nn
-from attacks.attack import Attack, AttackResult
-from tqdm import tqdm
-from typing import List
+
+from attacks.attack import Attack
 
 
 class FGSM(Attack):
+    r"""
+    FGSM in the paper 'Explaining and harnessing adversarial examples'
+    [https://arxiv.org/abs/1412.6572]
 
-    def __init__(self, model: torch.nn.Module, eps=8/255):
+    Distance Measure : Linf
+
+    Arguments:
+        model (nn.Module): model to attack.
+        eps (float): maximum perturbation. (Default: 8/255)
+
+    Shape:
+        - images: :math:`(N, C, H, W)` where `N = number of batches`, `C = number of channels`,        `H = height` and `W = width`. It must have a range [0, 1].
+        - labels: :math:`(N)` where each value :math:`y_i` is :math:`0 \leq y_i \leq` `number of labels`.
+        - output: :math:`(N, C, H, W)`.
+
+    Examples::
+        >>> attack = torchattacks.FGSM(model, eps=8/255)
+        >>> adv_images = attack(images, labels)
+
+    """
+
+    def __init__(self, model, eps=8/255):
         super().__init__("FGSM", model)
         self.eps = eps
+        self.supported_mode = ['default', 'targeted']
 
-    def attack(self, model: torch.nn.Module, data_loader: torch.utils.data.DataLoader) -> List[AttackResult]:
+    def forward(self, images, labels):
+        r"""
+        Overridden.
         """
-        Generates adversarial examples using the FGSM attack and evaluates the model on them.
 
-        Parameters:
-        model (nn.Module): the pre-trained PyTorch model to be attacked
-        test_loader (DataLoader): the data loader for the test set
-        epsilon (float): the magnitude of the perturbation (0 <= epsilon <= 1)
-        """
-        adv_examples: AttackResult = []
-        loss_fn = nn.CrossEntropyLoss()
+        images = images.clone().detach().to(self.device)
+        labels = labels.clone().detach().to(self.device)
 
-        print(f'Running FGSM attack for epsilon: {self.eps}')
-        for images, labels in tqdm(data_loader):
+        if self.targeted:
+            target_labels = self.get_target_label(images, labels)
 
-            images, labels = images.to(self.device), labels.to(self.device)
-            images.requires_grad = True
-            init_pred = model(images)
-            _, init_predicted = torch.max(init_pred, 1)
+        loss = nn.CrossEntropyLoss()
 
-            # If the initial prediction is wrong, continue
-            if init_predicted != labels:
-                continue
+        images.requires_grad = True
+        outputs = self.get_logits(images)
 
-            loss = loss_fn(init_pred, labels)
-            model.zero_grad()
-            loss.backward()
+        # Calculate loss
+        if self.targeted:
+            cost = -loss(outputs, target_labels)
+        else:
+            cost = loss(outputs, labels)
 
-            perturbed_images = images + self.eps * images.grad.sign()
-            perturbed_images = torch.clamp(perturbed_images, 0, 1).detach()
-            outputs = model(perturbed_images)
-            _, predicted = torch.max(outputs, 1)
+        # Update adversarial images
+        grad = torch.autograd.grad(cost, images,
+                                   retain_graph=False, create_graph=False)[0]
 
-            match_vector = predicted == labels
-            for i in range(len(labels)):
-                adv_ex = None
-                if match_vector[i] == False and len(adv_examples) < self.num_of_adv_examples:
-                    adv_ex = perturbed_images[i].squeeze(
-                    ).detach().cpu().numpy()
+        adv_images = images + self.eps*grad.sign()
+        adv_images = torch.clamp(adv_images, min=0, max=1).detach()
 
-                res = AttackResult(init_predicted[i], predicted[i], adv_ex)
-                adv_examples.append(res)
-
-        return adv_examples
+        return adv_images

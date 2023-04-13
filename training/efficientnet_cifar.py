@@ -9,7 +9,7 @@ from utils.validation import simple_validation
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-batch_size = 4
+batch_size = 64
 num_epochs = 5
 learning_rate = 0.001
 MODEL_SAVE_PATH = 'models/efficientnetb0cifar.pt'
