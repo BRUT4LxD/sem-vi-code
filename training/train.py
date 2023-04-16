@@ -1,4 +1,4 @@
-from utils.io import save_model
+from data_eng.io import save_model
 
 
 def simple_train(model, loss_fn, optimizer, train_loader, num_epochs=5, device='gpu', SAVE_MODEL_PATH=None):

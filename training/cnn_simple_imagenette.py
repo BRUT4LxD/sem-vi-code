@@ -1,11 +1,10 @@
 import torch
 import torch.nn as nn
 from architectures.sample_conv import ConvNetImageNet
-from utils.dataset_loader import load_imagenette
-from utils.io import load_model
-from utils.train import simple_train
-from utils.validation import simple_validation
-from utils.visualization import simple_visualize
+from data_eng.dataset_loader import load_imagenette
+from data_eng.io import load_model
+from training.train import simple_train
+from evaluation.validation import simple_validation
 from constants.model_classes import imagenette_classes
 
 # device config
@@ -36,5 +35,5 @@ simple_train(model=model,
              device=device,
              SAVE_MODEL_PATH=MODEL_SAVE_PATH)
 
-simple_validation(model, test_loader, batch_size, imagenette_classes, device=device)
-
+simple_validation(model, test_loader, batch_size,
+                  imagenette_classes, device=device)

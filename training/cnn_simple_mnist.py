@@ -1,11 +1,11 @@
 import torch
 import torch.nn as nn
 from architectures.sample_conv import ConvNetMNIST
-from utils.dataset_loader import load_MNIST
-from utils.io import load_model
-from utils.train import simple_train
-from utils.validation import simple_validation
-from utils.visualization import simple_visualize
+from data_eng.dataset_loader import load_MNIST
+from data_eng.io import load_model
+from training.train import simple_train
+from evaluation.validation import simple_validation
+from evaluation.visualization import simple_visualize
 from constants.model_classes import mnist_classes
 
 # device config

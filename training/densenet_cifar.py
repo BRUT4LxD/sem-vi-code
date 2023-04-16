@@ -1,11 +1,11 @@
 import torch
 import torch.nn as nn
 from architectures.densenet import DenseNetCifar
-from utils.dataset_loader import load_CIFAR10
+from data_eng.dataset_loader import load_CIFAR10
 from constants.model_classes import cifar_classes
-from utils.io import load_model
-from utils.train import simple_train
-from utils.validation import simple_validation
+from data_eng.io import load_model
+from training.train import simple_train
+from evaluation.validation import simple_validation
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -38,5 +38,3 @@ simple_validation(model=model,
                   batch_size=batch_size,
                   classes=cifar_classes,
                   device=device)
-
-

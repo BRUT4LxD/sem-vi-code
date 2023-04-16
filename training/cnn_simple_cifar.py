@@ -2,11 +2,11 @@ import torch
 import torch.nn as nn
 
 from architectures.sample_conv import ConvNetCIFAR
-from utils.dataset_loader import load_CIFAR10
-from utils.io import load_model
-from utils.train import simple_train
-from utils.validation import simple_validation
+from data_eng.dataset_loader import load_CIFAR10
+from data_eng.io import load_model
+from training.train import simple_train
 from constants.model_classes import cifar_classes
+from evaluation.validation import simple_validation
 
 # device config
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')

@@ -2,8 +2,7 @@ import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 import torch
 from torch.utils.data import DataLoader, Subset
-
-from utils.transforms import cifar_transformer, imagenette_transformer, mnist_transformer
+from data_eng.transforms import mnist_transformer, cifar_transformer, imagenette_transformer
 
 
 def _get_data_loaders(train_dataset, test_dataset, batch_size=1, train_subset_size=-1, test_subset_size=-1):

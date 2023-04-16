@@ -2,7 +2,7 @@ import torch
 
 
 @torch.no_grad()
-def simple_validation(model, test_loader, batch_size, classes, device='gpu'):
+def simple_validation(model, test_loader, classes, device='gpu'):
     n_correct = 0
     n_samples = 0
     n_class_correct = [0 for i in range(10)]

@@ -9,6 +9,8 @@ from collections.abc import Iterable
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 
+from domain.attack_result import AttackResult
+
 
 def wrapper_method(func):
     def wrapper_func(self, *args, **kwargs):
@@ -17,17 +19,6 @@ def wrapper_method(func):
             eval("atk."+func.__name__+"(*args, **kwargs)")
         return result
     return wrapper_func
-
-
-class AttackResult():
-    def __init__(self, actual, predicted, adv_example, targeted=False):
-        self.actual = actual
-        self.predicted = predicted
-        self.adv = adv_example
-        self.targeted = targeted
-
-    def __str__(self) -> str:
-        return f"Actual: {self.actual}, Predicted: {self.predicted}"
 
 
 class Attack_MN(object):

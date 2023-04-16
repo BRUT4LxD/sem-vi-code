@@ -1,8 +1,10 @@
 from typing import List
-from attacks.attack_mn import Attack_MN, AttackResult
+from attacks.attack_mn import Attack_MN
 import torch
 import torch.nn as nn
 from tqdm import tqdm
+
+from domain.attack_result import AttackResult
 
 
 class PGD_MN(Attack_MN):

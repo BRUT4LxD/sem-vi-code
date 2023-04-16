@@ -1,13 +1,10 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-import torchvision.transforms as transforms
 from architectures.vgg import VGG
-from utils.dataset_loader import load_CIFAR10
-from utils.io import save_model
+from data_eng.dataset_loader import load_CIFAR10
 from constants.model_classes import cifar_classes
-from utils.train import simple_train
-from utils.validation import simple_validation
+from training.train import simple_train
+from evaluation.validation import simple_validation
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 

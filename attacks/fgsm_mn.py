@@ -2,7 +2,8 @@ import torch
 import torch.nn as nn
 from tqdm import tqdm
 from typing import List
-from attacks.attack_mn import Attack_MN, AttackResult
+from attacks.attack_mn import Attack_MN
+from domain.attack_result import AttackResult
 
 
 class FGSM_MN(Attack_MN):

@@ -1,11 +1,11 @@
 import torch
 import torch.nn as nn
 from architectures.resnet import ResNet18
-from utils.dataset_loader import load_imagenette
+from data_eng.dataset_loader import load_imagenette
 from constants.model_classes import imagenette_classes
-from utils.io import load_model
-from utils.train import simple_train
-from utils.validation import simple_validation
+from data_eng.io import load_model
+from training.train import simple_train
+from evaluation.validation import simple_validation
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
