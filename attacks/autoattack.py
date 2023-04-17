@@ -2,10 +2,10 @@ import time
 
 from attacks.attack import Attack
 from ..wrappers.multiattack import MultiAttack
-from .apgd import APGD
-from .apgdt import APGDT
-from .fab import FAB
-from .square import Square
+from .white_box.apgd import APGD
+from .white_box.apgdt import APGDT
+from .white_box.fab import FAB
+from .white_box.square import Square
 
 
 class AutoAttack(Attack):
