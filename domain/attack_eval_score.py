@@ -9,4 +9,4 @@ class AttackEvaluationScore():
         self.conf_matrix = conf_matrix
 
     def __str__(self) -> str:
-        return f"Accuracy: {self.acc}, Precision: {self.prec}, Recall: {self.rec}, F1: {self.f1}"
+        return f"Accuracy: {self.acc}%, Precision: {self.prec}%, Recall: {self.rec}%, F1: {self.f1}%"
