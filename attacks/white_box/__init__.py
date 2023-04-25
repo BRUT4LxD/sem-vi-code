@@ -20,15 +20,49 @@ from .pgd import PGD
 from .pgdl2 import PGDL2
 from .pgdrs import PGDRS
 from .pgdrsl2 import PGDRSL2
-from .pixle import Pixle
 from .rfgsm import RFGSM
 from .sinifgsm import SINIFGSM
 from .sparsefool import SparseFool
 from .spsa import SPSA
-from .square import Square
 from .tifgsm import TIFGSM
 from .tpgd import TPGD
 from .upgd import UPGD
 from .vanila import VANILA
 from .vmifgsm import VMIFGSM
 from .vnifgsm import VNIFGSM
+
+
+def get_all_white_box_attack(model):
+    return [
+        APGD(model),
+        APGDT(model),
+        BIM(model),
+        CW(model),
+        DeepFool(model),
+        DIFGSM(model),
+        EADEN(model),
+        EADL1(model),
+        EOTPGD(model),
+        FAB(model),
+        FFGSM(model),
+        FGSM(model),
+        GN(model),
+        Jitter(model),
+        JSMA(model),
+        MIFGSM(model),
+        NIFGSM(model),
+        OnePixel(model),
+        PGD(model),
+        PGDL2(model),
+        PGDRS(model),
+        PGDRSL2(model),
+        RFGSM(model),
+        SINIFGSM(model),
+        SparseFool(model),
+        SPSA(model),
+        # TIFGSM(model),
+        TPGD(model),
+        UPGD(model),
+        VANILA(model),
+        VMIFGSM(model),
+    ]

@@ -1,4 +1,7 @@
+from typing import List
 import torch
+
+from domain.attack_eval_score import AttackEvaluationScore
 
 
 @torch.no_grad()
