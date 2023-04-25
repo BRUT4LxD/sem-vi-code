@@ -4,7 +4,6 @@ import torch
 from domain.attack_eval_score import AttackEvaluationScore
 from domain.attack_result import AttackResult
 
-
 class MultiattackResult():
   def __init__(self,
                eval_scores: List['AttackEvaluationScore'],
