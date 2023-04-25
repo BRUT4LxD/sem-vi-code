@@ -13,6 +13,7 @@ import datetime
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 from attacks.white_box import PGD, FGSM, FFGSM, OnePixel, get_all_white_box_attack
+from attacks.black_box import get_all_black_box_attack
 from domain.attack_result import AttackResult
 import math
 
@@ -23,10 +24,10 @@ MODEL_SAVE_PATH = './models/cnn-mnist.pt'
 
 model = load_model(ConvNetMNIST().to(device), MODEL_SAVE_PATH)
 
-_, test_loader = load_MNIST(batch_size=10)
+_, test_loader = load_MNIST(batch_size=100)
 
 multiattack_result = multiattack(
-    get_all_white_box_attack(model), test_loader, device)
+    get_all_black_box_attack(model), test_loader, device)
 
 plot_attacked_images(multiattack_result.attack_results,
                      multiattack_result.adv_images, multiattack_result.eval_scores)
