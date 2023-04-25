@@ -2,7 +2,7 @@ import numpy as np
 
 
 class AttackEvaluationScore():
-    def __init__(self, acc: float, prec: float, rec: float, f1: float, conf_matrix: np.ndarray, attack_name: str = None, time: int = None, n_samples: int = None):
+    def __init__(self, acc: float, prec: float, rec: float, f1: float, conf_matrix: np.ndarray, attack_name: str = None, time: float = None, n_samples: int = None):
         self.acc = acc
         self.prec = prec
         self.rec = rec
@@ -20,8 +20,10 @@ class AttackEvaluationScore():
     def __str__(self) -> str:
 
         model_name = f'{self.attack_name}' if self.attack_name is not None else ""
-        n_samples = f'n_samples: {self.n_samples}' if self.n_samples is not None else ""
-        score = f'acc: {self.acc}% prec: {self.prec}% rec: {self.rec}% f1: {self.f1}%'
-        time = f'time: {self.time}ms' if self.time is not None else ""
+        acc = f'acc: {self.acc}% '
+        prec = f'prec: {self.prec}% '
+        rec = f'rec: {self.rec}% '
+        f1 = f'f1: {self.f1}% '
+        time = f'time: {format(self.time*1000/self.n_samples, ".2f")}ms/img' if self.time is not None else ""
 
-        return f"{model_name:12}{n_samples:12s}{score:12s}{time:12s}"
+        return f"{model_name:12}{acc:12s}{prec:12s}{rec:12s}{f1:12s}{time:12s}"

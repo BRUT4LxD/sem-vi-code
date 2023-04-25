@@ -23,12 +23,10 @@ MODEL_SAVE_PATH = './models/cnn-mnist.pt'
 
 model = load_model(ConvNetMNIST().to(device), MODEL_SAVE_PATH)
 
-_, test_loader = load_MNIST(batch_size=100)
-
-# multiattack_result = multiattack([PGD(model), FGSM(model), FFGSM(model),
-#                                   OnePixel(model)], test_loader, device)
+_, test_loader = load_MNIST(batch_size=10)
 
 multiattack_result = multiattack(
     get_all_white_box_attack(model), test_loader, device)
 
-plot_attacked_images(multiattack_result.attack_results, multiattack_result.adv_images, multiattack_result.eval_scores)
+plot_attacked_images(multiattack_result.attack_results,
+                     multiattack_result.adv_images, multiattack_result.eval_scores)
