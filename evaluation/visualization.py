@@ -5,6 +5,7 @@ import numpy as np
 
 from domain.attack_eval_score import AttackEvaluationScore
 from domain.attack_result import AttackResult
+from domain.multiattack_result import MultiattackResult
 
 
 @torch.no_grad()
@@ -51,7 +52,10 @@ def plot_adversarial_examples(examples, attack_params):
 
 
 @torch.no_grad()
-def plot_attacked_images(attack_results: List[List[AttackResult]], adv_images: torch.Tensor, eval_scores: List[AttackEvaluationScore]):
+def plot_multiattacked_images(multiattack_results: MultiattackResult, classes_names: List[str], rgb=True):
+    attack_results = multiattack_results.attack_results
+    eval_scores = multiattack_results.eval_scores
+
     num_of_attacks = len(attack_results)
     num_of_columns = 0
     for i in range(num_of_attacks):
@@ -64,7 +68,7 @@ def plot_attacked_images(attack_results: List[List[AttackResult]], adv_images: t
 
     for i in range(num_of_attacks):
         fig, axes = plt.subplots(
-            nrows=1, ncols=num_of_columns, figsize=(15, 10))
+            nrows=3, ncols=num_of_columns, figsize=(15, 10))
         img_cnt = 0
         for j in range(len(attack_results[i])):
             if img_cnt >= num_of_columns:
@@ -72,12 +76,43 @@ def plot_attacked_images(attack_results: List[List[AttackResult]], adv_images: t
             res = attack_results[i][j]
             if res.actual == res.predicted:
                 continue
-            ax = axes[img_cnt]
+            ax = axes[0][img_cnt]
             ax.set_xticks([])
             ax.set_yticks([])
-            ax.set_title("{} -> {}".format(res.actual, res.predicted))
-            ax.imshow(adv_images[i][j][0].detach(
-            ).cpu(), cmap="gray", interpolation='none')
+            ax.set_title(
+                "{} -> {}".format(classes_names[res.actual], classes_names[res.predicted]))
+            if rgb:
+                img = res.src_image.permute(1, 2, 0).detach().cpu()
+                ax.imshow(img, interpolation='none')
+            else:
+                img = res.src_image[0].detach().cpu()
+                ax.imshow(img, cmap='gray', interpolation='none')
+
+            ax = axes[1][img_cnt]
+            ax.set_xticks([])
+            ax.set_yticks([])
+            if rgb:
+                img = res.src_image.permute(1, 2, 0).detach().cpu(
+                ) - res.adv_image.permute(1, 2, 0).detach().cpu()
+                img = img.abs()
+                img = torch.where(img == 0, torch.ones_like(img), img)
+                ax.imshow(img, interpolation='none')
+            else:
+                img = res.adv_image[0].detach().cpu(
+                ) - res.src_image[0].detach().cpu()
+                img = img.abs()
+                img = torch.where(img == 0, torch.ones_like(img), img)
+                ax.imshow(img, cmap='gray', interpolation='none')
+
+            ax = axes[2][img_cnt]
+            ax.set_xticks([])
+            ax.set_yticks([])
+            if rgb:
+                img = res.adv_image.permute(1, 2, 0).detach().cpu()
+                ax.imshow(img, interpolation='none')
+            else:
+                img = res.adv_image[0].detach().cpu()
+                ax.imshow(img, cmap='gray', interpolation='none')
             img_cnt += 1
 
         fig.suptitle(eval_scores[i], fontsize=14)

@@ -40,22 +40,27 @@ def single_attack(attack: Attack, test_loader: DataLoader, device='cuda', iterat
 def multiattack(attacks: List[Attack], test_loader: DataLoader, device='cuda') -> MultiattackResult:
     evaluation_scores: List['AttackEvaluationScore'] = []
     attack_results: List['AttackResult'] = []
-    adv_images_list: List[torch.Tensor] = []
 
     print("PROCESSING ATTACKS...")
-    for attack in tqdm(attacks):
+    pbar = tqdm(attacks)
+    for attack in pbar:
+        torch.cuda.empty_cache()
+        pbar.set_description(f'ATTACK_NAME {attack.attack:12s}')
         num_classes = get_model_num_classes(attack.model)
         images, labels = next(iter(test_loader))
-        images = images.to(device)
-        labels = labels.to(device)
+        images, labels = images.to(device), labels.to(device)
+        images, labels = _remove_missclassified(
+            attack.model, images, labels, device)
+        if labels[0].item() == 0:
+            continue
+
         start = time.time()
         adv_images = attack(images, labels)
         end = time.time()
         attack_res = AttackResult.create_from_adv_image(
-            attack.model, adv_images, labels)
+            attack.model, adv_images, images, labels)
         ev = evaluate_attack(attack_res, num_classes)
         ev.set_after_attack(attack.attack, end-start, labels.shape[0])
-        adv_images_list.append(adv_images)
         attack_results.append(attack_res)
         evaluation_scores.append(ev)
 
@@ -64,4 +69,12 @@ def multiattack(attacks: List[Attack], test_loader: DataLoader, device='cuda') -
     for ev in evaluation_scores:
         print(ev)
 
-    return MultiattackResult(evaluation_scores, attack_results, torch.stack(adv_images_list, dim=0))
+    return MultiattackResult(evaluation_scores, attack_results)
+
+
+def _remove_missclassified(model: torch.nn.Module, images: torch.Tensor, labels: torch.Tensor, device: str) -> torch.Tensor:
+    outputs = model(images)
+    _, predictions = torch.max(outputs, 1)
+    images = images[predictions == labels].to(device)
+    labels = labels[predictions == labels].to(device)
+    return images, labels

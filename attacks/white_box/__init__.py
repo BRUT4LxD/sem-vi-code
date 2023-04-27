@@ -31,7 +31,7 @@ from .vanila import VANILA
 from .vmifgsm import VMIFGSM
 from .vnifgsm import VNIFGSM
 
-
+# heavy attacks were commented out
 def get_all_white_box_attack(model):
     return [
         APGD(model),
@@ -48,7 +48,7 @@ def get_all_white_box_attack(model):
         FGSM(model),
         GN(model),
         Jitter(model),
-        JSMA(model),
+        # JSMA(model),
         MIFGSM(model),
         NIFGSM(model),
         OnePixel(model),
@@ -58,9 +58,9 @@ def get_all_white_box_attack(model):
         PGDRSL2(model),
         RFGSM(model),
         SINIFGSM(model),
-        SparseFool(model),
-        SPSA(model),
-        # TIFGSM(model),
+        # SparseFool(model),
+        # SPSA(model),
+        TIFGSM(model),
         TPGD(model),
         UPGD(model),
         VANILA(model),
