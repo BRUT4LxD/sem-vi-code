@@ -60,7 +60,7 @@ class AttackEvaluationScore():
         Returns:
             str: A string representation of the evaluation scores.
         """
-        
+
         model_name = f'{self.attack_name}' if self.attack_name is not None else ""
         acc = f'acc: {self.acc}% '
         prec = f'prec: {self.prec}% '

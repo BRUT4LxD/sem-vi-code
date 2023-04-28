@@ -5,7 +5,7 @@ from data_eng.dataset_loader import load_imagenette
 from data_eng.io import load_model
 from training.train import simple_train
 from evaluation.validation import simple_validation
-from constants.model_classes import imagenette_classes
+from config.model_classes import imagenette_classes
 
 # device config
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')

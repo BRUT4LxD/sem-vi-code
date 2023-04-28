@@ -104,24 +104,24 @@ class ResNet(nn.Module):
         return out
 
 
-def ResNet18():
-    return ResNet(BasicBlock, [2, 2, 2, 2])
+class ResNet18(ResNet):
+    def __init__(self, num_classes=10):
+        super(ResNet18, self).__init__(BasicBlock, [2, 2, 2, 2], num_classes)
 
 
-def ResNet34():
-    return ResNet(BasicBlock, [3, 4, 6, 3])
+class ResNet50(ResNet):
+    def __init__(self, num_classes=10):
+        super(ResNet50, self).__init__(BasicBlock, [3, 4, 6, 3], num_classes)
 
 
-def ResNet50():
-    return ResNet(Bottleneck, [3, 4, 6, 3])
+class ResNet101(ResNet):
+    def __init__(self, num_classes=10):
+        super(ResNet101, self).__init__(BasicBlock, [3, 4, 23, 3], num_classes)
 
 
-def ResNet101():
-    return ResNet(Bottleneck, [3, 4, 23, 3])
-
-
-def ResNet152():
-    return ResNet(Bottleneck, [3, 8, 36, 3])
+class ResNet152(ResNet):
+    def __init__(self, num_classes=10):
+        super(ResNet152, self).__init__(BasicBlock, [3, 8, 36, 3], num_classes)
 
 
 def test():

@@ -1,6 +1,7 @@
 import torchvision.datasets as datasets
-from torch.utils.data import DataLoader, Subset
+from torch.utils.data import DataLoader, Subset, SubsetRandomSampler
 from data_eng.transforms import mnist_transformer, cifar_transformer, imagenette_transformer
+import torch
 
 
 def _get_data_loaders(train_dataset, test_dataset, batch_size=1, train_subset_size=-1, test_subset_size=-1):

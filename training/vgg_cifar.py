@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from architectures.vgg import VGG
 from data_eng.dataset_loader import load_CIFAR10
-from constants.model_classes import cifar_classes
+from config.model_classes import cifar_classes
 from training.train import simple_train
 from evaluation.validation import simple_validation
 
