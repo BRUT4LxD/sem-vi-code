@@ -1,5 +1,6 @@
 from typing import List
 import torch
+from tqdm import tqdm
 
 from domain.attack_eval_score import AttackEvaluationScore
 
@@ -11,7 +12,7 @@ def simple_validation(model, test_loader, classes, device='gpu'):
     n_class_correct = [0 for i in range(10)]
     n_class_samples = [0 for i in range(10)]
 
-    for images, labels in test_loader:
+    for images, labels in tqdm(test_loader):
         images = images.to(device)
         labels = labels.to(device)
         outputs = model(images)

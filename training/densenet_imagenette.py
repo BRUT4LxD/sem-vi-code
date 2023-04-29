@@ -13,12 +13,9 @@ def train_all_densenet(num_epochs=20):
     models = [DenseNet121(), DenseNet161(), DenseNet169(), DenseNet201()]
     paths = ['models/densenet121imagenette.pt', 'models/densenet161imagenette.pt',
              'models/densenet169imagenette.pt', 'models/densenet201imagenette.pt']
-    batch_sizes = [128, 64, 64, 32]
-    i = -1
+    batch_sizes = [64, 64, 64, 32]
+
     for model, path, batch_size in zip(models, paths, batch_sizes):
-        i += 1
-        if i == 0:
-            continue
         train_loader, test_loader = load_imagenette(batch_size=batch_size)
         torch.cuda.empty_cache()
         model.to(device)

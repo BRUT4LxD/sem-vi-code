@@ -13,7 +13,7 @@ def train_all_mobilenet(num_epochs=20):
     learning_rate = 0.001
     models = [MobileNetV2()]
     paths = ['models/mobilenetv2imagenette.pt']
-    batch_sizes = [128]
+    batch_sizes = [32]
     for model, path, batch_size in zip(models, paths, batch_sizes):
         train_loader, test_loader = load_imagenette(batch_size=batch_size)
         torch.cuda.empty_cache()

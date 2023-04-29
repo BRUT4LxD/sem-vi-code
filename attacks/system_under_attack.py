@@ -37,7 +37,7 @@ def single_attack(attack: Attack, test_loader: DataLoader, device='cuda', iterat
         del adv_images, attack_res
 
 
-def multiattack(attacks: List[Attack], test_loader: DataLoader, device='cuda', print_results=True) -> MultiattackResult:
+def multiattack(attacks: List[Attack], test_loader: DataLoader, device='cuda', print_results=True, iterations=10) -> MultiattackResult:
     evaluation_scores: List['AttackEvaluationScore'] = []
     attack_results: List[List['AttackResult']] = []
 
@@ -51,7 +51,11 @@ def multiattack(attacks: List[Attack], test_loader: DataLoader, device='cuda', p
         num_classes = get_model_num_classes(attack.model)
         att_time = 0
 
+        itx = 0
         for images, labels in test_loader:
+            if itx >= iterations:
+                break
+            itx += 1
             images, labels = images.to(device), labels.to(device)
             images, labels = _remove_missclassified(
                 attack.model, images, labels, device)
@@ -64,13 +68,10 @@ def multiattack(attacks: List[Attack], test_loader: DataLoader, device='cuda', p
             att_time += end-start
             attack_res = AttackResult.create_from_adv_image(
                 attack.model, adv_images, images, labels, attack.model_name, attack.attack)
-            adv_images, images, labels = adv_images.detach(
-            ).cpu(), images.detach().cpu(), labels.detach().cpu()
+            del adv_images, images, labels
             attack_results[it].extend(attack_res)
 
         ev = evaluate_attack(attack_results[it], num_classes)
-        print(f'time {att_time}')
-        print(f'attack results len {len(attack_results[it])}')
         ev.set_after_attack(attack.attack, att_time, len(attack_results[it]))
         evaluation_scores.append(ev)
 
@@ -84,10 +85,8 @@ def multiattack(attacks: List[Attack], test_loader: DataLoader, device='cuda', p
 
 
 def _remove_missclassified(model: torch.nn.Module, images: torch.Tensor, labels: torch.Tensor, device: str) -> torch.Tensor:
-    print(f'image shape: {images.shape} labels shape: {labels.shape}')
     outputs = model(images)
     _, predictions = torch.max(outputs, 1)
-    print(f'labels: {labels} predictions: {predictions}')
     images = images[predictions == labels].to(device)
     labels = labels[predictions == labels].to(device)
     return images, labels

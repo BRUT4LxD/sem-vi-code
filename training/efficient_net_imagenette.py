@@ -12,7 +12,7 @@ def train_all_efficient_net(num_epochs=20):
     learning_rate = 0.001
     models = [EfficientNetB0()]
     paths = ['models/efficientnetb0imagenette.pt']
-    batch_sizes = [32]
+    batch_sizes = [8]
     for model, path, batch_size in zip(models, paths, batch_sizes):
         train_loader, test_loader = load_imagenette(batch_size=batch_size)
         torch.cuda.empty_cache()
@@ -33,3 +33,4 @@ def train_all_efficient_net(num_epochs=20):
                           device=device)
 
         del train_loader, test_loader, model, criterion, optimizer
+

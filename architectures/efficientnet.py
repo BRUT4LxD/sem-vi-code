@@ -109,13 +109,13 @@ class EfficientNet(nn.Module):
         super(EfficientNet, self).__init__()
         self.cfg = cfg
         self.conv1 = nn.Conv2d(3,
-                               32,
+                               224,
                                kernel_size=3,
-                               stride=7,
+                               stride=1,
                                padding=1,
                                bias=False)
-        self.bn1 = nn.BatchNorm2d(32)
-        self.layers = self._make_layers(in_channels=32)
+        self.bn1 = nn.BatchNorm2d(224)
+        self.layers = self._make_layers(in_channels=224)
         self.linear = nn.Linear(cfg['out_channels'][-1], num_classes)
 
     def _make_layers(self, in_channels):

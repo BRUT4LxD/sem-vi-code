@@ -13,11 +13,12 @@ def train_all_resnet(num_epochs=20):
     models = [ResNet18(), ResNet50(), ResNet101(), ResNet152()]
     paths = ['models/resnet18imagenette.pt', 'models/resnet50imagenette.pt',
              'models/resnet101imagenette.pt', 'models/resnet152imagenette.pt']
-    batch_sizes = [128, 64, 64, 32]
+    batch_sizes = [64, 64, 64, 32]
 
     learning_rate = 0.001
     for model, path, batch_size in zip(models, paths, batch_sizes):
         torch.cuda.empty_cache()
+        model.to(device)
         train_loader, test_loader = load_imagenette(batch_size=batch_size)
         criterion = nn.CrossEntropyLoss()
         optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)

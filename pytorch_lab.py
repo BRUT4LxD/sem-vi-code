@@ -10,6 +10,7 @@ from torchvision import transforms
 import torch
 from data_eng.io import load_model
 from evaluation.metrics import evaluate_attack, evaluate_model
+from evaluation.validation import simple_validation
 from evaluation.visualization import plot_multiattacked_images, simple_visualize
 from config.model_classes import mnist_classes, imagenette_classes
 import datetime
@@ -23,6 +24,7 @@ from training import train_all_archs_for_imagenette
 
 from training.efficient_net_imagenette import train_all_efficient_net
 from training.mobilenet_v2_imagenette import train_all_mobilenet
+from training.resnet_imagenette import train_all_resnet
 from training.vgg_imagenette import train_all_vgg
 import torchvision.datasets as datasets
 from torch.utils.data import DataLoader, SubsetRandomSampler
@@ -30,8 +32,6 @@ import torchvision.transforms as transforms
 
 # device config
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-train_all_archs_for_imagenette(epochs=30)
 
 transform = transforms.Compose(
     [
@@ -43,10 +43,12 @@ transform = transforms.Compose(
 
 _, test_loader = load_imagenette(transform=transform, batch_size=5)
 
+train_all_mobilenet(50)
+
 for config in get_imagenette_pretrained_models():
     model = config.model.to(device)
     multiattack_result = multiattack(
-        [FGSM(model)], test_loader, device, print_results=False)
+        get_all_white_box_attack(model), test_loader, device, print_results=False)
 
     plot_multiattacked_images(
         multiattack_result, imagenette_classes, save_visualization=True, visualize=False)

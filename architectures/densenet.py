@@ -42,7 +42,7 @@ class DenseNet(nn.Module):
 
         num_planes = 2*growth_rate
         self.conv1 = nn.Conv2d(
-            3, num_planes, kernel_size=3, padding=1, stride=7, bias=False)
+            3, num_planes, kernel_size=3, padding=1, stride=2, bias=False)
 
         self.dense1 = self._make_dense_layers(block, num_planes, nblocks[0])
         num_planes += nblocks[0]*growth_rate
@@ -77,6 +77,7 @@ class DenseNet(nn.Module):
 
     def forward(self, x):
         out = self.conv1(x)
+        out = F.max_pool2d(out, 3, stride=3, padding=1)
         out = self.trans1(self.dense1(out))
         out = self.trans2(self.dense2(out))
         out = self.trans3(self.dense3(out))
