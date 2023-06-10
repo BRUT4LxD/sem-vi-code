@@ -1,14 +1,19 @@
 import numpy as np
 import itertools
+from architectures.efficientnet import EfficientNetB0
+from architectures.mobilenetv2 import MobileNetV2
 from architectures.resnet import ResNet18, ResNet50, ResNet101, ResNet152
 from architectures.densenet import DenseNet121, DenseNet161, DenseNet169, DenseNet201
 from architectures.sample_conv import ConvNetMNIST, ConvNetCIFAR
+from architectures.vgg import VGG11, VGG13, VGG16, VGG19
 from attacks.system_under_attack import multiattack, single_attack
+from attacks.white_box.vanila import VANILA
 from config.imagenette_models import get_imagenette_pretrained_models
 from data_eng.dataset_loader import load_MNIST, load_imagenette, load_CIFAR10
 from torchvision import transforms
 import torch
 from data_eng.io import load_model
+from domain.model_config import ModelConfig
 from evaluation.metrics import evaluate_attack, evaluate_model
 from evaluation.validation import simple_validation
 from evaluation.visualization import plot_multiattacked_images, simple_visualize
@@ -41,14 +46,22 @@ transform = transforms.Compose(
     ]
 )
 
-_, test_loader = load_imagenette(transform=transform, batch_size=5)
+_, test_loader = load_imagenette(transform=transform, batch_size=1)
 
-train_all_mobilenet(50)
+model_configs = get_imagenette_pretrained_models()
+model_configs = [
+    ModelConfig(MobileNetV2(), 'models/mobilenetv2imagenette.pt', True),
+    ModelConfig(VGG11(), 'models/vgg11imagenette.pt', True),
+    ModelConfig(VGG13(), 'models/vgg13imagenette.pt', True),
+    ModelConfig(VGG16(), 'models/vgg16imagenette.pt', True),
+    ModelConfig(VGG19(), 'models/vgg19imagenette.pt', True),
+]
 
-for config in get_imagenette_pretrained_models():
+for config in model_configs:
     model = config.model.to(device)
+    attacks = get_all_white_box_attack(model)
     multiattack_result = multiattack(
-        get_all_white_box_attack(model), test_loader, device, print_results=False)
+        attacks, test_loader, device, print_results=False, iterations=200, save_results=True)
 
     plot_multiattacked_images(
         multiattack_result, imagenette_classes, save_visualization=True, visualize=False)

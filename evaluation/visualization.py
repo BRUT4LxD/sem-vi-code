@@ -126,7 +126,7 @@ def plot_multiattacked_images(multiattack_results: MultiattackResult, classes_na
         if visualize:
             plt.show()
 
-        if save_visualization:
+        if save_visualization and len(attack_results[i]) > 0:
 
             # assuming that all attacks are from the same model
             folder_path = f"./results/visualization/{attack_results[i][0].model_name}"

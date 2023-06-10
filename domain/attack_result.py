@@ -24,7 +24,7 @@ class AttackResult():
         attack_results: List[AttackResult] = []
         model.eval()
         outputs = model(adv_images)
-        _, predicted_labels = torch.max(outputs.data, 1) 
+        _, predicted_labels = torch.max(outputs.data, 1)
 
         for i, (predicted_label, source_label) in enumerate(zip(predicted_labels, source_label)):
             attack_results.append(AttackResult(

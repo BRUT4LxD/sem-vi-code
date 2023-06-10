@@ -4,7 +4,7 @@ from attacks.attack import Attack
 from domain.attack_eval_score import AttackEvaluationScore
 from domain.attack_result import AttackResult
 from domain.multiattack_result import MultiattackResult
-from evaluation.metrics import evaluate_attack
+from evaluation.metrics import calculate_attack_distance_score, evaluate_attack
 import torch
 from torch.nn import Module
 from torch.utils.data.dataloader import DataLoader
@@ -37,13 +37,13 @@ def single_attack(attack: Attack, test_loader: DataLoader, device='cuda', iterat
         del adv_images, attack_res
 
 
-def multiattack(attacks: List[Attack], test_loader: DataLoader, device='cuda', print_results=True, iterations=10) -> MultiattackResult:
+def multiattack(attacks: List[Attack], test_loader: DataLoader, device='cuda', print_results=True, iterations=10, save_results=False) -> MultiattackResult:
     evaluation_scores: List['AttackEvaluationScore'] = []
     attack_results: List[List['AttackResult']] = []
 
-    pbar = tqdm(attacks)
+    pbar = tqdm(total=len(attacks) * iterations)
     it = -1
-    for attack in pbar:
+    for attack in attacks:
         it += 1
         attack_results.append([])
         torch.cuda.empty_cache()
@@ -52,24 +52,31 @@ def multiattack(attacks: List[Attack], test_loader: DataLoader, device='cuda', p
         att_time = 0
 
         itx = 0
-        for images, labels in test_loader:
-            if itx >= iterations:
-                break
-            itx += 1
-            images, labels = images.to(device), labels.to(device)
-            images, labels = _remove_missclassified(
-                attack.model, images, labels, device)
-            if labels.numel() == 0:
-                continue
+        try:
+            for images, labels in test_loader:
+                pbar.update(1)
+                if itx >= iterations:
+                    break
+                itx += 1
+                images, labels = images.to(device), labels.to(device)
+                images, labels = _remove_missclassified(
+                    attack.model, images, labels, device)
+                if labels.numel() == 0:
+                    continue
 
-            start = time.time()
-            adv_images = attack(images, labels)
-            end = time.time()
-            att_time += end-start
-            attack_res = AttackResult.create_from_adv_image(
-                attack.model, adv_images, images, labels, attack.model_name, attack.attack)
-            del adv_images, images, labels
-            attack_results[it].extend(attack_res)
+                start = time.time()
+                adv_images = attack(images, labels)
+                end = time.time()
+                att_time += end-start
+                attack_res = AttackResult.create_from_adv_image(
+                    attack.model, adv_images, images, labels, attack.model_name, attack.attack)
+                del adv_images, images, labels
+                attack_results[it].extend(attack_res)
+        except RuntimeError as e:
+            if 'out of memory' in str(e):
+                print(
+                    f'WARNING: ran out of memory, skipping attack for model: {attack.model_name} and attack: {attack.attack}')
+                continue
 
         ev = evaluate_attack(attack_results[it], num_classes)
         ev.set_after_attack(attack.attack, att_time, len(attack_results[it]))
@@ -80,6 +87,12 @@ def multiattack(attacks: List[Attack], test_loader: DataLoader, device='cuda', p
         print(f'SAMPLES: {ev.n_samples}\n')
         for ev in evaluation_scores:
             print(ev)
+
+    if save_results:
+        folder_path = f"./results"
+        with open(f'{folder_path}/{attack.model_name}.txt', 'w') as file:
+            for eval_score in evaluation_scores:
+                file.write(str(eval_score) + '\n')
 
     return MultiattackResult(evaluation_scores, attack_results)
 

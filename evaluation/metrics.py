@@ -2,23 +2,24 @@ from typing import List
 import torch
 from tqdm import tqdm
 import numpy as np
+from domain.attack_distance_score import AttackDistanceScore
 
 from domain.attack_eval_score import AttackEvaluationScore
 from domain.attack_result import AttackResult
 
 
 @torch.no_grad()
-def l1_distance(image1, image2):
+def l1_distance(image1: torch.Tensor, image2: torch.Tensor):
     return torch.norm(image1 - image2, p=1)
 
 
 @torch.no_grad()
-def l2_distance(image1, image2):
+def l2_distance(image1: torch.Tensor, image2: torch.Tensor):
     return torch.norm(image1 - image2, p=2)
 
 
 @torch.no_grad()
-def linf_distance(image1, image2):
+def linf_distance(image1: torch.Tensor, image2: torch.Tensor):
     return torch.norm(image1 - image2, p=float('inf'))
 
 
@@ -82,7 +83,32 @@ def evaluate_model(model: torch.nn.Module, data_loader: torch.utils.data.DataLoa
 
 
 @torch.no_grad()
+def calculate_attack_distance_score(attack_results: List[AttackResult]) -> AttackDistanceScore:
+    l1 = 0.0
+    l2 = 0.0
+    lInf = 0.0
+    n = len(attack_results)
+
+    if n == 0:
+        return AttackDistanceScore(l1, l2, lInf)
+
+    for result in attack_results:
+        l1 += l1_distance(result.src_image, result.adv_image)
+        l2 += l2_distance(result.src_image, result.adv_image)
+        lInf += linf_distance(result.src_image, result.adv_image)
+
+    l1 = l1 / n
+    l2 = l2 / n
+    lInf = lInf / n
+
+    return AttackDistanceScore(l1.item(), l2.item(), lInf.item())
+
+
+@torch.no_grad()
 def evaluate_attack(attack_results: List[AttackResult], num_classes: int) -> AttackEvaluationScore:
+    if len(attack_results) == 0:
+        return AttackEvaluationScore(0.0, 0.0, 0.0, 0.0, np.zeros((num_classes, num_classes), dtype=np.int32), AttackDistanceScore(0.0, 0.0, 0.0))
+
     actual = [result.actual for result in attack_results]
     predicted = [result.predicted for result in attack_results]
 
@@ -93,7 +119,6 @@ def evaluate_attack(attack_results: List[AttackResult], num_classes: int) -> Att
 
     accuracy = np.trace(conf_matrix) / np.sum(conf_matrix)
 
-    # calculate precision, recall, and f1 score for each class
     precision = []
     recall = []
     f1_score = []
@@ -111,9 +136,10 @@ def evaluate_attack(attack_results: List[AttackResult], num_classes: int) -> Att
         recall.append(recall_i)
         f1_score.append(f1_score_i)
 
-    acc = (accuracy * 100).round(2)
-    prec = np.mean(np.array(precision) * 100).round(2)
-    rec = np.mean(np.array(recall) * 100).round(2)
-    f1 = np.mean(np.array(f1_score) * 100).round(2)
+    acc = (accuracy * 100)
+    prec = np.mean(np.array(precision) * 100)
+    rec = np.mean(np.array(recall) * 100)
+    f1 = np.mean(np.array(f1_score) * 100)
+    distances = calculate_attack_distance_score(attack_results)
 
-    return AttackEvaluationScore(acc, prec, rec, f1, conf_matrix)
+    return AttackEvaluationScore(acc, prec, rec, f1, conf_matrix, distances)
