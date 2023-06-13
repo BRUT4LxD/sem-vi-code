@@ -4,7 +4,7 @@ import torch
 import torch.nn.functional as F
 
 from attacks.attack import Attack
-from utils.math.differential_evolution import differential_evolution
+from shared.math.differential_evolution import differential_evolution
 
 
 class OnePixel(Attack):

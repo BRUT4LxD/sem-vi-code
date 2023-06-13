@@ -2,10 +2,12 @@ from typing import List
 import torch
 from tqdm import tqdm
 import numpy as np
+from attacks.attack import Attack
 from domain.attack_distance_score import AttackDistanceScore
 
 from domain.attack_eval_score import AttackEvaluationScore
 from domain.attack_result import AttackResult
+from domain.model_config import ModelConfig
 
 
 @torch.no_grad()
@@ -21,6 +23,12 @@ def l2_distance(image1: torch.Tensor, image2: torch.Tensor):
 @torch.no_grad()
 def linf_distance(image1: torch.Tensor, image2: torch.Tensor):
     return torch.norm(image1 - image2, p=float('inf'))
+
+
+@torch.no_grad()
+def calculate_attack_power(image1: torch.Tensor, image2: torch.Tensor):
+    diff = image1 != image2
+    return diff.all(dim=-1).int().sum()
 
 
 @torch.no_grad()
@@ -87,6 +95,7 @@ def calculate_attack_distance_score(attack_results: List[AttackResult]) -> Attac
     l1 = 0.0
     l2 = 0.0
     lInf = 0.0
+    power = 0.0
     n = len(attack_results)
 
     if n == 0:
@@ -96,12 +105,14 @@ def calculate_attack_distance_score(attack_results: List[AttackResult]) -> Attac
         l1 += l1_distance(result.src_image, result.adv_image)
         l2 += l2_distance(result.src_image, result.adv_image)
         lInf += linf_distance(result.src_image, result.adv_image)
+        power += calculate_attack_power(result.src_image, result.adv_image)
 
     l1 = l1 / n
     l2 = l2 / n
     lInf = lInf / n
+    power = power / n
 
-    return AttackDistanceScore(l1.item(), l2.item(), lInf.item())
+    return AttackDistanceScore(l1.item(), l2.item(), lInf.item(), power.item())
 
 
 @torch.no_grad()

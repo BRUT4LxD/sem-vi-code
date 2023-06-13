@@ -27,7 +27,6 @@ from .spsa import SPSA
 from .tifgsm import TIFGSM
 from .tpgd import TPGD
 from .upgd import UPGD
-from .vanila import VANILA
 from .vmifgsm import VMIFGSM
 from .vnifgsm import VNIFGSM
 
@@ -63,6 +62,5 @@ def get_all_white_box_attack(model):
         TIFGSM(model),
         TPGD(model),
         UPGD(model),
-        VANILA(model),
         VMIFGSM(model),
     ]
