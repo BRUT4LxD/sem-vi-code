@@ -72,4 +72,4 @@ class AttackEvaluationScore():
         time = f'time: {format(self.time*1000/self.n_samples, ".2f")}ms/img ' if self.time and self.n_samples > 0 is not None else ""
         n_samples = f'n_samples: {self.n_samples}' if self.n_samples is not None else ""
 
-        return f"{model_name:12s}{acc:13s}{prec:13s}{rec:13s}{f1:13s}{self.distance_score}{time:20s}{n_samples:13s}"
+        return f"{model_name:12s}{acc:13s}{prec:13s}{rec:13s}{f1:13s}{self.distance_score}{time:25s}{n_samples:13s}"

@@ -10,7 +10,15 @@ from architectures.sample_conv import ConvNetMNIST, ConvNetCIFAR
 from architectures.vgg import VGG11, VGG13, VGG16, VGG19
 from attacks import get_all_attacks
 from attacks.system_under_attack import multiattack, single_attack, transferability_attack
-from attacks.white_box.vanila import VANILA
+from attacks.white_box.pgdrs import PGDRS
+from attacks.white_box.pgdrsl2 import PGDRSL2
+from attacks.white_box.rfgsm import RFGSM
+from attacks.white_box.sinifgsm import SINIFGSM
+from attacks.white_box.spsa import SPSA
+from attacks.white_box.tifgsm import TIFGSM
+from attacks.white_box.tpgd import TPGD
+from attacks.white_box.upgd import UPGD
+from attacks.white_box.vmifgsm import VMIFGSM
 from config.imagenette_models import get_imagenette_pretrained_models
 from config.yolo_models import YOLOv5Models
 from data_eng.dataset_loader import load_MNIST, load_imagenette, load_CIFAR10
@@ -52,19 +60,20 @@ transform = transforms.Compose(
 
 _, test_loader = load_imagenette(transform=transform, batch_size=1)
 
-model_configs = get_imagenette_pretrained_models()
-trans_models = [model_config.model.to(device)
-                for model_config in model_configs]
-
+model_configs = [
+    ModelConfig(EfficientNetB0(),
+        'models/efficientnetb0imagenette.pt', True),
+]
 
 for config in model_configs:
     model = config.model.to(device)
-    attacks = get_all_black_box_attack(model)
-    multiattack_result = multiattack(
-        attacks, test_loader, device, print_results=False, iterations=200, save_results=True)
+    attacks = get_all_attacks(model)
 
-    # plot_multiattacked_images(
-    #     multiattack_result, imagenette_classes, save_visualization=True, visualize=False)
+    multiattack_result = multiattack(
+        attacks, test_loader, device, print_results=True, iterations=200, save_results=True)
+
+    plot_multiattacked_images(
+        multiattack_result, imagenette_classes, save_visualization=True, visualize=False)
 
     del model, multiattack_result
 

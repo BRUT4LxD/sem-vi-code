@@ -28,7 +28,8 @@ def linf_distance(image1: torch.Tensor, image2: torch.Tensor):
 @torch.no_grad()
 def calculate_attack_power(image1: torch.Tensor, image2: torch.Tensor):
     diff = image1 != image2
-    return diff.all(dim=-1).int().sum()
+    pwr = diff.int().sum()
+    return pwr
 
 
 @torch.no_grad()
@@ -99,7 +100,7 @@ def calculate_attack_distance_score(attack_results: List[AttackResult]) -> Attac
     n = len(attack_results)
 
     if n == 0:
-        return AttackDistanceScore(l1, l2, lInf)
+        return AttackDistanceScore(l1, l2, lInf, power)
 
     for result in attack_results:
         l1 += l1_distance(result.src_image, result.adv_image)
@@ -118,7 +119,7 @@ def calculate_attack_distance_score(attack_results: List[AttackResult]) -> Attac
 @torch.no_grad()
 def evaluate_attack(attack_results: List[AttackResult], num_classes: int) -> AttackEvaluationScore:
     if len(attack_results) == 0:
-        return AttackEvaluationScore(0.0, 0.0, 0.0, 0.0, np.zeros((num_classes, num_classes), dtype=np.int32), AttackDistanceScore(0.0, 0.0, 0.0))
+        return AttackEvaluationScore(0.0, 0.0, 0.0, 0.0, np.zeros((num_classes, num_classes), dtype=np.int32), AttackDistanceScore(0.0, 0.0, 0.0, 0.0))
 
     actual = [result.actual for result in attack_results]
     predicted = [result.predicted for result in attack_results]

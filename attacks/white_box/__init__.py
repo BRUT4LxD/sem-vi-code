@@ -58,7 +58,7 @@ def get_all_white_box_attack(model):
         RFGSM(model),
         SINIFGSM(model),
         # SparseFool(model),
-        # SPSA(model),
+        SPSA(model),
         TIFGSM(model),
         TPGD(model),
         UPGD(model),
