@@ -32,5 +32,8 @@ def simple_validation(model, test_loader, classes, device='gpu'):
     print(f'accuracy = {acc}%')
 
     for i in range(10):
+        if n_class_samples[i] == 0:
+            print(f'accuracy of {classes[i]}: not enough samples')
+            continue
         acc = 100.0 * n_class_correct[i] / n_class_samples[i]
         print(f'accuracy of {classes[i]}: {acc}%')

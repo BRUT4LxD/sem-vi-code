@@ -3,6 +3,7 @@ import torch
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+import gc
 
 from domain.attack_eval_score import AttackEvaluationScore
 from domain.attack_result import AttackResult
@@ -53,86 +54,72 @@ def plot_adversarial_examples(examples, attack_params):
 
 
 @torch.no_grad()
-def plot_multiattacked_images(multiattack_results: MultiattackResult, classes_names: List[str], rgb=True, save_visualization=False, visualize=True):
+def plot_multiattacked_images(multiattack_results, classes_names, rgb=True, save_visualization=False, visualize=True):
     attack_results = multiattack_results.attack_results
     eval_scores = multiattack_results.eval_scores
 
-    num_of_attacks = len(attack_results)
-    num_of_columns = 0
-    for i in range(num_of_attacks):
-        cols = 0
-        for j in range(len(attack_results[i])):
-            if attack_results[i][j].actual != attack_results[i][j].predicted:
-                cols += 1
+    def plot_image(ax, img, cmap=None):
+        """Helper function to plot an image on an axis."""
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.imshow(img, cmap=cmap, interpolation='none')
+        del ax
 
-        num_of_columns = min(max(num_of_columns, cols), 5)
+    def process_images_and_plot(i, img_cnt, attack_data):
+        """Handles the processing of images and plotting on axes."""
+        ax = axes[0, img_cnt]
+        ax.set_title(f"{classes_names[attack_data.actual]} -> {classes_names[attack_data.predicted]}")
+        img = (attack_data.src_image.permute(1, 2, 0) if rgb else attack_data.src_image[0]).detach().cpu()
+        plot_image(ax, img, cmap=None if rgb else 'gray')
 
-    if num_of_columns == 0:
+        ax = axes[1, img_cnt]
+        diff_img = torch.abs(attack_data.src_image - attack_data.adv_image).detach().cpu()
+        diff_img = (diff_img.permute(1, 2, 0) if rgb else diff_img[0])
+        plot_image(ax, diff_img, cmap=None if rgb else 'gray')
+
+        ax = axes[2, img_cnt]
+        adv_img = (attack_data.adv_image.permute(1, 2, 0) if rgb else attack_data.adv_image[0]).detach().cpu()
+        plot_image(ax, adv_img, cmap=None if rgb else 'gray')
+
+        del ax, img, diff_img, adv_img
+
+    max_columns = min(max(len(a) for a in attack_results), 5)
+
+    if max_columns == 0:
         return
 
-    for i in range(num_of_attacks):
-        fig, axes = plt.subplots(
-            nrows=3, ncols=5, figsize=(15, 10))
+    for i in range(len(attack_results)):
+        fig, axes = plt.subplots(nrows=3, ncols=5, figsize=(15, 10))
         img_cnt = 0
-        for j in range(len(attack_results[i])):
-            if img_cnt >= num_of_columns:
-                break
-            res = attack_results[i][j]
-            if res.actual == res.predicted:
+        for attack_data in attack_results[i]:
+            if img_cnt >= max_columns or attack_data.actual == attack_data.predicted:
                 continue
 
-            ax = axes[0, img_cnt]
-            ax.set_xticks([])
-            ax.set_yticks([])
-            ax.set_title(
-                f"{classes_names[res.actual]} -> {classes_names[res.predicted]}")
-            if rgb:
-                img = res.src_image.permute(1, 2, 0).detach().cpu()
-                ax.imshow(img, interpolation='none')
-            else:
-                img = res.src_image[0].detach().cpu()
-                ax.imshow(img, cmap='gray', interpolation='none')
-
-            ax = axes[1, img_cnt]
-            ax.set_xticks([])
-            ax.set_yticks([])
-            if rgb:
-                img = res.src_image.permute(1, 2, 0).detach().cpu(
-                ) - res.adv_image.permute(1, 2, 0).detach().cpu()
-                img = img.abs()
-                img = torch.where(img == 0, torch.ones_like(img), img)
-                ax.imshow(img, interpolation='none')
-            else:
-                img = res.adv_image[0].detach().cpu(
-                ) - res.src_image[0].detach().cpu()
-                img = img.abs()
-                img = torch.where(img == 0, torch.ones_like(img), img)
-                ax.imshow(img, cmap='gray', interpolation='none')
-
-            ax = axes[2, img_cnt]
-            ax.set_xticks([])
-            ax.set_yticks([])
-            if rgb:
-                img = res.adv_image.permute(1, 2, 0).detach().cpu()
-                ax.imshow(img, interpolation='none')
-            else:
-                img = res.adv_image[0].detach().cpu()
-                ax.imshow(img, cmap='gray', interpolation='none')
-
+            process_images_and_plot(i, img_cnt, attack_data)
             img_cnt += 1
+
+            # Remove any reference to tensors to free up GPU memory
+            del attack_data.src_image
+            del attack_data.adv_image
+            torch.cuda.empty_cache()
 
         fig.suptitle(eval_scores[i], fontsize=14)
         plt.tight_layout()
+
         if visualize:
             plt.show()
 
         if save_visualization and len(attack_results[i]) > 0:
+            save_path = f"./results/visualization/{attack_results[i][0].model_name}"
+            os.makedirs(save_path, exist_ok=True)
+            fig.savefig(f'{save_path}/{attack_results[i][0].model_name}_{eval_scores[i].attack_name}.png')
 
-            # assuming that all attacks are from the same model
-            folder_path = f"./results/visualization/{attack_results[i][0].model_name}"
+        # Cleanup to avoid potential memory leaks
+        plt.close(fig)
+        gc.collect()
 
-            if not os.path.exists(folder_path):
-                os.makedirs(folder_path)
+    # Addtionally, cleanup the entire list of attack results
+    del attack_results, eval_scores
+    torch.cuda.empty_cache()
+    gc.collect()
 
-            fig.savefig(
-                f'{folder_path}/{attack_results[i][0].model_name}_{eval_scores[i].attack_name}.png')

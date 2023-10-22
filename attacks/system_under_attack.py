@@ -1,7 +1,9 @@
+from collections import defaultdict
 import os
 import time
 from typing import List
 from attacks.attack import Attack
+from data_eng.dataset_loader import DatasetLoader, load_imagenette
 from domain.attack_eval_score import AttackEvaluationScore
 from domain.attack_result import AttackResult
 from domain.model_config import ModelConfig
@@ -11,6 +13,7 @@ import torch
 from torch.nn import Module
 from torch.utils.data.dataloader import DataLoader
 from tqdm import tqdm
+from torchvision.utils import save_image
 
 from shared.model_utils import get_model_num_classes
 
@@ -56,6 +59,7 @@ def multiattack(attacks: List[Attack], test_loader: DataLoader, device='cuda', p
         itx = 0
         try:
             for images, labels in test_loader:
+                cnt += 1
                 pbar.update(1)
                 if itx >= iterations:
                     break
@@ -66,12 +70,12 @@ def multiattack(attacks: List[Attack], test_loader: DataLoader, device='cuda', p
                 if labels.numel() == 0:
                     continue
 
+                not_miss += 1
                 start = time.time()
                 adv_images = attack(images, labels)
                 end = time.time()
                 att_time += end-start
-                attack_res = AttackResult.create_from_adv_image(
-                    attack.model, adv_images, images, labels, attack.model_name, attack.attack)
+                attack_res = AttackResult.create_from_adv_image(attack.model, adv_images, images, labels, attack.model_name, attack.attack)
                 del adv_images, images, labels
                 attack_results[it].extend(attack_res)
         except RuntimeError as e:
@@ -97,7 +101,6 @@ def multiattack(attacks: List[Attack], test_loader: DataLoader, device='cuda', p
         with open(f'{folder_path}/{attack.model_name}.txt', 'w') as file:
             for eval_score in evaluation_scores:
                 file.write(str(eval_score) + '\n')
-
     return MultiattackResult(evaluation_scores, attack_results)
 
 
@@ -205,6 +208,57 @@ def transferability_attack(
 def _remove_missclassified(model: torch.nn.Module, images: torch.Tensor, labels: torch.Tensor, device: str) -> torch.Tensor:
     outputs = model(images)
     _, predictions = torch.max(outputs, 1)
+    n_correct = (predictions == labels).sum().item()
+    print(f'Correctly classified: {n_correct}')
     images = images[predictions == labels].clone().to(device)
     labels = labels[predictions == labels].clone().to(device)
     return images, labels
+
+def attack_images(attack: Attack, datasetName: str, images_to_attack=100):
+
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    attack.model.to(device)
+    save_path = f"./data/attacked_{datasetName}/{attack.model.__class__.__name__}/{attack.attack}"
+    _, dataset = load_imagenette(shuffle=False)
+
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+
+    # map for storing the counts of successful attacks for each class
+    successful_attacks = defaultdict(int)
+
+    cnt = 0
+    not_miss = 0
+    for images, labels in dataset:
+        if successful_attacks[labels[0]] >= images_to_attack:
+            continue
+
+        cnt += 1
+        images, labels = images.to(device), labels.to(device)
+
+        images, labels = _remove_missclassified(attack.model, images, labels, device)
+        if labels.numel() == 0:
+            continue
+
+        not_miss += 1
+        adv_images = attack(images, labels)
+        adv_images = adv_images.to(device)
+        outputs = attack.model(adv_images)
+        _, predicted_labels = torch.max(outputs.data, 1)
+        for i in range(len(adv_images)):
+            label = labels[i].item()
+            print("label", label)
+            if predicted_labels[i] != labels[i] and successful_attacks[label] < images_to_attack:
+                successful_attacks[label] += 1
+                path = f'{save_path}/{label}'
+                if not os.path.exists(save_path):
+                    os.makedirs(save_path)
+
+                ss = f'{path}/{successful_attacks[label]}.png'
+                print("printing to ", ss)
+                save_image(adv_images[i], ss)
+
+        del adv_images, images, labels
+    print("cnt", cnt)
+    print("not_miss", not_miss)
+
