@@ -27,8 +27,9 @@ import torch
 from data_eng.io import load_model
 from data_eng.pretrained_model_downloader import PretrainedModelDownloader
 from domain.model_config import ModelConfig
+from domain.model_names import ModelNames
 from evaluation.metrics import evaluate_attack, evaluate_model
-from evaluation.validation import simple_validation
+from evaluation.validation import Validation
 from evaluation.visualization import plot_multiattacked_images, simple_visualize
 from config.model_classes import mnist_classes, imagenette_classes
 import datetime
@@ -59,31 +60,23 @@ transform = transforms.Compose(
     ]
 )
 
-PretrainedModelDownloader
+_, test_loader = load_imagenette(transform=transform, batch_size=1, test_subset_size=500, shuffle=True)
 
-_, test_loader = load_imagenette(transform=transform, batch_size=1)
+# model_configs = get_imagenette_pretrained_models()
 
-model_configs = get_imagenette_pretrained_models()
 
-# transfer_train_efficient_net(num_epochs=4)
-
-for model_config in model_configs:
-    model = model_config.model
-    model = model.to(device)
-    print(model.__class__.__name__)
-    simple_validation(model, test_loader, imagenette_classes, device=device)
-# attack_images(FGSM(model), DatasetType.IMAGENETTE, images_to_attack=1)
+Validation.validate_model_by_name(ModelNames.resnet50, test_loader, imagenette_classes, device=device)
 
 torch.cuda.empty_cache()
 
-for config in model_configs:
-    model = config.model.to(device)
-    attacks = get_all_attacks(model)
+# for config in model_configs:
+#     model = config.model.to(device)
+#     attacks = get_all_attacks(model)
 
-    multiattack_result = multiattack(
-        attacks, test_loader, device, print_results=True, iterations=5, save_results=True)
+#     multiattack_result = multiattack(
+#         attacks, test_loader, device, print_results=True, iterations=5, save_results=True)
 
-    plot_multiattacked_images(
-        multiattack_result, imagenette_classes, save_visualization=True, visualize=False)
+#     plot_multiattacked_images(
+#         multiattack_result, imagenette_classes, save_visualization=True, visualize=False)
 
-    del model, multiattack_result
+#     del model, multiattack_result

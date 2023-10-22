@@ -4,8 +4,8 @@ from architectures.resnet import ResNet101, ResNet152, ResNet18, ResNet50
 from data_eng.dataset_loader import load_imagenette
 from config.model_classes import imagenette_classes
 from data_eng.io import load_model
+from evaluation.validation import Validation
 from training.train import simple_train
-from evaluation.validation import simple_validation
 
 
 def train_all_resnet(num_epochs=20):
@@ -30,7 +30,7 @@ def train_all_resnet(num_epochs=20):
                      device=device,
                      SAVE_MODEL_PATH=path)
 
-        simple_validation(model=model,
+        Validation.simple_validation(model=model,
                           test_loader=test_loader,
                           classes=imagenette_classes,
                           device=device)
@@ -47,7 +47,7 @@ def validate_all_resnet():
         print(path)
         try:
             model = load_model(model, path).to(device)
-            simple_validation(model=model,
+            Validation.simple_validation(model=model,
                               test_loader=test_loader,
                               classes=imagenette_classes,
                               device=device)

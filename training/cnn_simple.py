@@ -4,9 +4,9 @@ from architectures.sample_conv import ConvNetCIFAR, ConvNetImageNet, ConvNetMNIS
 
 from data_eng.dataset_loader import DatasetLoader, DatasetType
 from data_eng.io import load_model
+from evaluation.validation import Validation
 from training.train import simple_train
 from config.model_classes import cifar_classes
-from evaluation.validation import simple_validation
 
 class CNNSimpleModels(object):
 
@@ -38,5 +38,5 @@ class CNNSimpleTrainer:
                 device=device,
                 SAVE_MODEL_PATH=model_save_path)
 
-    simple_validation(model, test_loader, batch_size, cifar_classes, device=device)
+    Validation.simple_validation(model, test_loader, batch_size, cifar_classes, device=device)
 

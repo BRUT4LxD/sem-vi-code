@@ -4,7 +4,7 @@ from architectures.sample_conv import ConvNetImageNet
 from data_eng.dataset_loader import load_imagenette
 from data_eng.io import load_model
 from training.train import simple_train
-from evaluation.validation import simple_validation
+from evaluation.validation import Validation
 from config.model_classes import imagenette_classes
 
 # device config
@@ -35,5 +35,5 @@ simple_train(model=model,
              device=device,
              SAVE_MODEL_PATH=MODEL_SAVE_PATH)
 
-simple_validation(model, test_loader, batch_size,
+Validation.simple_validation(model, test_loader, batch_size,
                   imagenette_classes, device=device)

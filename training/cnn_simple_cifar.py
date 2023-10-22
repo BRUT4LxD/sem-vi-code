@@ -4,9 +4,9 @@ import torch.nn as nn
 from architectures.sample_conv import ConvNetCIFAR
 from data_eng.dataset_loader import load_CIFAR10
 from data_eng.io import load_model
+from evaluation.validation import Validation
 from training.train import simple_train
 from config.model_classes import cifar_classes
-from evaluation.validation import simple_validation
 
 # device config
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -35,4 +35,4 @@ simple_train(model=model,
              device=device,
              SAVE_MODEL_PATH=MODEL_SAVE_PATH)
 
-simple_validation(model, test_loader, batch_size, cifar_classes, device=device)
+Validation.simple_validation(model, test_loader, batch_size, cifar_classes, device=device)

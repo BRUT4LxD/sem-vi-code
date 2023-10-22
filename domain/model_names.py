@@ -27,10 +27,6 @@ class ModelNames:
   efficientnet_b6 = 'efficientnet_b6'
   efficientnet_b7 = 'efficientnet_b7'
 
-  @staticmethod
-  def is_valid_model_name(self, name: str):
-    return name in self.model_names
-
   def __init__(self):
     self.model_names = [
       ModelNames.resnet18,

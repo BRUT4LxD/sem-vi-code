@@ -4,8 +4,8 @@ from architectures.resnet import ResNet50
 from data_eng.dataset_loader import load_CIFAR10
 from config.model_classes import cifar_classes
 from data_eng.io import load_model
+from evaluation.validation import Validation
 from training.train import simple_train
-from evaluation.validation import simple_validation
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -32,7 +32,7 @@ simple_train(model=model,
              device=device,
              SAVE_MODEL_PATH=SAVE_MODEL_PATH)
 
-simple_validation(model=model,
+Validation.simple_validation(model=model,
                   test_loader=test_loader,
                   batch_size=batch_size,
                   classes=cifar_classes,
