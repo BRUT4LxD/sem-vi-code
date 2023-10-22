@@ -9,7 +9,7 @@ from architectures.densenet import DenseNet121, DenseNet161, DenseNet169, DenseN
 from architectures.sample_conv import ConvNetMNIST, ConvNetCIFAR
 from architectures.vgg import VGG11, VGG13, VGG16, VGG19
 from attacks import get_all_attacks
-from attacks.system_under_attack import multiattack, single_attack, transferability_attack
+from attacks.system_under_attack import attack_images, multiattack, single_attack, transferability_attack
 from attacks.white_box.pgdrs import PGDRS
 from attacks.white_box.pgdrsl2 import PGDRSL2
 from attacks.white_box.rfgsm import RFGSM
@@ -21,10 +21,11 @@ from attacks.white_box.upgd import UPGD
 from attacks.white_box.vmifgsm import VMIFGSM
 from config.imagenette_models import get_imagenette_pretrained_models
 from config.yolo_models import YOLOv5Models
-from data_eng.dataset_loader import load_MNIST, load_imagenette, load_CIFAR10
+from data_eng.dataset_loader import DatasetType, load_MNIST, load_imagenette, load_CIFAR10
 from torchvision import transforms
 import torch
 from data_eng.io import load_model
+from data_eng.pretrained_model_downloader import PretrainedModelDownloader
 from domain.model_config import ModelConfig
 from evaluation.metrics import evaluate_attack, evaluate_model
 from evaluation.validation import simple_validation
@@ -39,7 +40,7 @@ from domain.attack_result import AttackResult
 import math
 from training import train_all_archs_for_imagenette
 
-from training.efficient_net_imagenette import train_all_efficient_net
+from training.efficient_net_imagenette import train_all_efficient_net, transfer_train_efficient_net
 from training.mobilenet_v2_imagenette import train_all_mobilenet
 from training.resnet_imagenette import train_all_resnet
 from training.vgg_imagenette import train_all_vgg
@@ -58,24 +59,34 @@ transform = transforms.Compose(
     ]
 )
 
+PretrainedModelDownloader
+
 _, test_loader = load_imagenette(transform=transform, batch_size=1)
 
-model_configs = [
-    ModelConfig(EfficientNetB0(),
-        'models/efficientnetb0imagenette.pt', True),
-]
+model_configs = get_imagenette_pretrained_models()
 
-for config in model_configs:
-    model = config.model.to(device)
-    attacks = get_all_attacks(model)
+# transfer_train_efficient_net(num_epochs=4)
 
-    multiattack_result = multiattack(
-        attacks, test_loader, device, print_results=True, iterations=200, save_results=True)
+for model_config in model_configs:
+    model = model_config.model
+    model = model.to(device)
+    print(model.__class__.__name__)
+    simple_validation(model, test_loader, imagenette_classes, device=device)
+# attack_images(FGSM(model), DatasetType.IMAGENETTE, images_to_attack=1)
 
-    plot_multiattacked_images(
-        multiattack_result, imagenette_classes, save_visualization=True, visualize=False)
+torch.cuda.empty_cache()
 
-    del model, multiattack_result
+# for config in model_configs:
+#     model = config.model.to(device)
+#     attacks = get_all_attacks(model)
+
+#     multiattack_result = multiattack(
+#         attacks, test_loader, device, print_results=True, iterations=5, save_results=True)
+
+#     plot_multiattacked_images(
+#         multiattack_result, imagenette_classes, save_visualization=True, visualize=False)
+
+#     del model, multiattack_result
 
 # model = torch.hub.load('ultralytics/yolov5',
 #                        YOLOv5Models.NANO.value, pretrained=True)
