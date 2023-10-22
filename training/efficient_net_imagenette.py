@@ -5,7 +5,7 @@ from data_eng.dataset_loader import load_imagenette
 from config.model_classes import imagenette_classes
 from domain.model_config import ModelConfig
 from evaluation.validation import Validation
-from training.train import simple_train
+from training.train import Training
 
 
 def train_all_efficient_net(num_epochs=20):
@@ -20,7 +20,7 @@ def train_all_efficient_net(num_epochs=20):
         model.to(device)
         criterion = nn.CrossEntropyLoss()
         optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-        simple_train(model=model,
+        Training.simple_train(model=model,
                      loss_fn=criterion,
                      optimizer=optimizer,
                      train_loader=train_loader,
@@ -46,7 +46,7 @@ def transfer_train_efficient_net(num_epochs=20):
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     path='models/efficientnetb0imagenette_transfer.pt'
-    simple_train(model=model,
+    Training.simple_train(model=model,
                     loss_fn=criterion,
                     optimizer=optimizer,
                     train_loader=train_loader,

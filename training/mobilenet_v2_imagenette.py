@@ -4,7 +4,7 @@ from architectures.mobilenetv2 import MobileNetV2
 from data_eng.dataset_loader import load_imagenette
 from config.model_classes import imagenette_classes
 from evaluation.validation import Validation
-from training.train import simple_train
+from training.train import Training
 
 
 def train_all_mobilenet(num_epochs=20):
@@ -20,7 +20,7 @@ def train_all_mobilenet(num_epochs=20):
         model.to(device)
         criterion = nn.CrossEntropyLoss()
         optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-        simple_train(model=model,
+        Training.simple_train(model=model,
                      loss_fn=criterion,
                      optimizer=optimizer,
                      train_loader=train_loader,

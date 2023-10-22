@@ -4,7 +4,7 @@ from architectures.vgg import VGG
 from data_eng.dataset_loader import load_CIFAR10
 from config.model_classes import cifar_classes
 from evaluation.validation import Validation
-from training.train import simple_train
+from training.train import Training
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -20,7 +20,7 @@ model = VGG(vgg_name='VGG16').to(device)
 criterion = nn.CrossEntropyLoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
-simple_train(model=model,
+Training.simple_train(model=model,
              loss_fn=criterion,
              optimizer=optimizer,
              train_loader=train_loader,

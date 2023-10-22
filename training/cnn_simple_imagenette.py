@@ -3,7 +3,7 @@ import torch.nn as nn
 from architectures.sample_conv import ConvNetImageNet
 from data_eng.dataset_loader import load_imagenette
 from data_eng.io import load_model
-from training.train import simple_train
+from training.train import Training
 from evaluation.validation import Validation
 from config.model_classes import imagenette_classes
 
@@ -27,7 +27,7 @@ model = load_model(model_instance,
 criterion = nn.CrossEntropyLoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
-simple_train(model=model,
+Training.simple_train(model=model,
              loss_fn=criterion,
              optimizer=optimizer,
              train_loader=train_loader,

@@ -4,7 +4,7 @@ from architectures.sample_conv import ConvNetMNIST
 from data_eng.dataset_loader import load_MNIST
 from data_eng.io import load_model
 from evaluation.validation import Validation
-from training.train import simple_train
+from training.train import Training
 from evaluation.visualization import simple_visualize
 from config.model_classes import mnist_classes
 
@@ -28,7 +28,7 @@ model = load_model(model_instance,
 criterion = nn.CrossEntropyLoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
-simple_train(model=model,
+Training.simple_train(model=model,
              loss_fn=criterion,
              optimizer=optimizer,
              train_loader=train_loader,

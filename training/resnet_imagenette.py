@@ -5,7 +5,7 @@ from data_eng.dataset_loader import load_imagenette
 from config.model_classes import imagenette_classes
 from data_eng.io import load_model
 from evaluation.validation import Validation
-from training.train import simple_train
+from training.train import Training
 
 
 def train_all_resnet(num_epochs=20):
@@ -22,7 +22,7 @@ def train_all_resnet(num_epochs=20):
         train_loader, test_loader = load_imagenette(batch_size=batch_size)
         criterion = nn.CrossEntropyLoss()
         optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-        simple_train(model=model,
+        Training.simple_train(model=model,
                      loss_fn=criterion,
                      optimizer=optimizer,
                      train_loader=train_loader,

@@ -64,7 +64,6 @@ _, test_loader = load_imagenette(transform=transform, batch_size=1, test_subset_
 
 # model_configs = get_imagenette_pretrained_models()
 
-
 Validation.validate_model_by_name(ModelNames.resnet50, test_loader, imagenette_classes, device=device)
 
 torch.cuda.empty_cache()

@@ -5,7 +5,7 @@ from architectures.sample_conv import ConvNetCIFAR, ConvNetImageNet, ConvNetMNIS
 from data_eng.dataset_loader import DatasetLoader, DatasetType
 from data_eng.io import load_model
 from evaluation.validation import Validation
-from training.train import simple_train
+from training.train import Training
 from config.model_classes import cifar_classes
 
 class CNNSimpleModels(object):

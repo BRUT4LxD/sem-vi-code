@@ -5,7 +5,7 @@ from architectures.sample_conv import ConvNetCIFAR
 from data_eng.dataset_loader import load_CIFAR10
 from data_eng.io import load_model
 from evaluation.validation import Validation
-from training.train import simple_train
+from training.train import Training
 from config.model_classes import cifar_classes
 
 # device config
@@ -27,7 +27,7 @@ model = load_model(model_instance,
 criterion = nn.CrossEntropyLoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
-simple_train(model=model,
+Training.simple_train(model=model,
              loss_fn=criterion,
              optimizer=optimizer,
              train_loader=train_loader,
