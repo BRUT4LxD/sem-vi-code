@@ -19,11 +19,10 @@ def get_imagenette_pretrained_models() -> List['ModelConfig']:
         ModelConfig(DenseNet161(), 'models/densenet161imagenette.pt', True),
         ModelConfig(DenseNet169(), 'models/densenet169imagenette.pt', True),
         ModelConfig(DenseNet201(), 'models/densenet201imagenette.pt', True),
-        ModelConfig(EfficientNetB0(),
-                    'models/efficientnetb0imagenette.pt', True),
+        ModelConfig(EfficientNetB0(), 'models/efficientnetb0imagenette.pt', True),
         ModelConfig(MobileNetV2(), 'models/mobilenetv2imagenette.pt', True),
         ModelConfig(VGG11(), 'models/vgg11imagenette.pt', True),
         ModelConfig(VGG13(), 'models/vgg13imagenette.pt', True),
         ModelConfig(VGG16(), 'models/vgg16imagenette.pt', True),
-        ModelConfig(VGG19(), 'models/vgg19imagenette.pt', True),
+        ModelConfig(VGG19(), 'models/vgg19imagenette.pt', True)
     ]

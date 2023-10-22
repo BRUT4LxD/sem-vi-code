@@ -70,7 +70,6 @@ def multiattack(attacks: List[Attack], test_loader: DataLoader, device='cuda', p
                 if labels.numel() == 0:
                     continue
 
-                not_miss += 1
                 start = time.time()
                 adv_images = attack(images, labels)
                 end = time.time()
@@ -208,8 +207,6 @@ def transferability_attack(
 def _remove_missclassified(model: torch.nn.Module, images: torch.Tensor, labels: torch.Tensor, device: str) -> torch.Tensor:
     outputs = model(images)
     _, predictions = torch.max(outputs, 1)
-    n_correct = (predictions == labels).sum().item()
-    print(f'Correctly classified: {n_correct}')
     images = images[predictions == labels].clone().to(device)
     labels = labels[predictions == labels].clone().to(device)
     return images, labels

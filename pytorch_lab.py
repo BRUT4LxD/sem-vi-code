@@ -76,70 +76,14 @@ for model_config in model_configs:
 
 torch.cuda.empty_cache()
 
-# for config in model_configs:
-#     model = config.model.to(device)
-#     attacks = get_all_attacks(model)
+for config in model_configs:
+    model = config.model.to(device)
+    attacks = get_all_attacks(model)
 
-#     multiattack_result = multiattack(
-#         attacks, test_loader, device, print_results=True, iterations=5, save_results=True)
+    multiattack_result = multiattack(
+        attacks, test_loader, device, print_results=True, iterations=5, save_results=True)
 
-#     plot_multiattacked_images(
-#         multiattack_result, imagenette_classes, save_visualization=True, visualize=False)
+    plot_multiattacked_images(
+        multiattack_result, imagenette_classes, save_visualization=True, visualize=False)
 
-#     del model, multiattack_result
-
-# model = torch.hub.load('ultralytics/yolov5',
-#                        YOLOv5Models.NANO.value, pretrained=True)
-
-# model = model.to(device)
-
-# multiattack_result = None
-# attack = FGSM(model)
-# att_res = None
-# i = 0
-# for images, labels in test_loader:
-#     if i == 1:
-#         break
-#     i += 1
-#     images, labels = images.to(device), labels.to(device)
-#     res = model(images)
-#     print(f'res shape: {res.shape}')
-#     print(f'res shape1: {res[0]}')
-#     print(f'res shape2: {res[0,0,:]}')
-# adv_images = attack(images, labels)
-
-# att_res = AttackResult.create_from_adv_image(
-#     attack.model, adv_images, images, labels, attack.model_name, attack.attack)
-# print(f'res: {res}')
-
-
-# plot_multiattacked_images(
-#     multiattack_result, imagenette_classes, save_visualization=True, visualize=True)
-
-
-# flat = res.view(-1, 85)
-# print(flat[0, :])
-# preds = flat[:, 5:]
-# print(f'preds: {preds.shape}')
-
-# preds = F.softmax(preds, dim=1)
-# print(f'preds: {preds.shape}')
-
-
-# for i, p in enumerate(preds):
-#     if i > 0:
-#         break
-
-#     sort_res2 = p.topk(k=5)
-#     if sort_res2.values[0] < 0.5:
-#         continue
-#     print(f'sort_res: {sort_res2.indices}')
-#     print(f'sort_res: {sort_res2.values > 0.5}')
-
-# # take top 5 preds
-# xx = preds.argsort(descending=True, dim=1)
-
-# print(xx[0, :])
-# print(xx[0, :5])
-# print(f'xx: {xx.shape}')
-# print(f'preds: {preds.shape}')
+    del model, multiattack_result
