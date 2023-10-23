@@ -33,7 +33,7 @@ class CNNSimpleTrainer:
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
-    simple_train(model, criterion, optimizer, train_loader,
+    Training.simple_train(model, criterion, optimizer, train_loader,
                 num_epochs=num_epochs,
                 device=device,
                 SAVE_MODEL_PATH=model_save_path)

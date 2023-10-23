@@ -99,3 +99,4 @@ coco_classes = [
     'hair drier',
     'toothbrsh'
 ]
+

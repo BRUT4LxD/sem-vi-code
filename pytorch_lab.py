@@ -1,53 +1,19 @@
-import time
-import numpy as np
-import torch.nn.functional as F
-import itertools
-from architectures.efficientnet import EfficientNetB0
-from architectures.mobilenetv2 import MobileNetV2
-from architectures.resnet import ResNet18, ResNet50, ResNet101, ResNet152
-from architectures.densenet import DenseNet121, DenseNet161, DenseNet169, DenseNet201
-from architectures.sample_conv import ConvNetMNIST, ConvNetCIFAR
-from architectures.vgg import VGG11, VGG13, VGG16, VGG19
-from attacks import get_all_attacks
-from attacks.system_under_attack import attack_images, multiattack, single_attack, transferability_attack
-from attacks.white_box.pgdrs import PGDRS
-from attacks.white_box.pgdrsl2 import PGDRSL2
-from attacks.white_box.rfgsm import RFGSM
-from attacks.white_box.sinifgsm import SINIFGSM
-from attacks.white_box.spsa import SPSA
-from attacks.white_box.tifgsm import TIFGSM
-from attacks.white_box.tpgd import TPGD
-from attacks.white_box.upgd import UPGD
-from attacks.white_box.vmifgsm import VMIFGSM
-from config.imagenette_models import get_imagenette_pretrained_models
-from config.yolo_models import YOLOv5Models
-from data_eng.dataset_loader import DatasetType, load_MNIST, load_imagenette, load_CIFAR10
+from data_eng.dataset_loader import load_imagenette
 from torchvision import transforms
 import torch
 from data_eng.io import load_model
 from data_eng.pretrained_model_downloader import PretrainedModelDownloader
-from domain.model_config import ModelConfig
 from domain.model_names import ModelNames
-from evaluation.metrics import evaluate_attack, evaluate_model
 from evaluation.validation import Validation
-from evaluation.visualization import plot_multiattacked_images, simple_visualize
 from config.model_classes import mnist_classes, imagenette_classes
-import datetime
-from tqdm import tqdm
-import matplotlib.pyplot as plt
-from attacks.white_box import PGD, FGSM, FFGSM, OnePixel, get_all_white_box_attack, APGD
-from attacks.black_box import get_all_black_box_attack
-from domain.attack_result import AttackResult
-import math
 from training import train_all_archs_for_imagenette
+import matplotlib.pyplot as plt
 
-from training.efficient_net_imagenette import train_all_efficient_net, transfer_train_efficient_net
-from training.mobilenet_v2_imagenette import train_all_mobilenet
-from training.resnet_imagenette import train_all_resnet
-from training.vgg_imagenette import train_all_vgg
-import torchvision.datasets as datasets
 from torch.utils.data import DataLoader, SubsetRandomSampler
 import torchvision.transforms as transforms
+from training.train import Training
+
+from training.transfer.setup_pretraining import SetupPretraining
 
 # device config
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -60,13 +26,37 @@ transform = transforms.Compose(
     ]
 )
 
-_, test_loader = load_imagenette(transform=transform, batch_size=1, test_subset_size=500, shuffle=True)
+train_loader, test_loader = load_imagenette(transform=transform, batch_size=1)
 
 # model_configs = get_imagenette_pretrained_models()
 
-Validation.validate_model_by_name(ModelNames.resnet50, test_loader, imagenette_classes, device=device)
+model = PretrainedModelDownloader.download_model(ModelNames.mobilenet_v2)
+model = SetupPretraining.setup_imagenette(model)
+model = model.to(device)
 
-torch.cuda.empty_cache()
+print(model.training)
+
+Training.train_imagenette(model=model, train_loader=train_loader, device=device, learning_rate=0.001, num_epochs=20, save_model_path='./models/transfer/mobilenet_v2_imagenette.pt')
+
+Validation.simple_validation(model=model, test_loader=test_loader, classes=imagenette_classes, device=device)
+
+resnet = PretrainedModelDownloader.download_model(ModelNames.resnet152)
+
+resnet = resnet.to(device)
+resnet.eval()
+for images, labels in test_loader:
+    images = images.to(device)
+    labels = labels.to(device)
+    outputs = resnet(images)
+    _, predictions = torch.max(outputs, 1)
+    print(predictions)
+
+    # plt.figure()
+    # plt.imshow(images[0].cpu().permute(1, 2, 0))
+    # plt.title(labels[0].item())
+    # plt.show()
+
+# torch.cuda.empty_cache()
 
 # for config in model_configs:
 #     model = config.model.to(device)
