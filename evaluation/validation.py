@@ -15,11 +15,11 @@ class Validation:
         n_class_correct = [0 for i in range(10)]
         n_class_samples = [0 for i in range(10)]
 
+        model.eval()
         for images, labels in tqdm(test_loader):
             images = images.to(device)
             labels = labels.to(device)
             outputs = model(images)
-
             _, predictions = torch.max(outputs, 1)
             n_samples += labels.size(0)
             n_correct += (predictions == labels).sum().item()
