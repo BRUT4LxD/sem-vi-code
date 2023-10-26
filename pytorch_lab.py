@@ -1,10 +1,10 @@
+from config.imagenette_classes import ImageNetteClasses
 from data_eng.dataset_loader import load_imagenette
 from torchvision import transforms
 import torch
 from data_eng.pretrained_model_downloader import PretrainedModelDownloader
 from domain.model_names import ModelNames
 from evaluation.validation import Validation
-from config.model_classes import imagenette_classes
 import matplotlib.pyplot as plt
 
 from torch.utils.data import DataLoader, SubsetRandomSampler
@@ -44,7 +44,7 @@ for model_name in all_model_names:
         model = model.to(device)
         save_model_path = f'./models/transfer/{model_name}_imagenette.pt'
         Training.train_imagenette(model=model, train_loader=train_loader, device=device, learning_rate=0.0001, num_epochs=5, save_model_path=save_model_path, model_name=model_name)
-        Validation.simple_validation(model=model, test_loader=test_loader, classes=imagenette_classes, device=device)
+        Validation.simple_validation(model=model, test_loader=test_loader, classes=ImageNetteClasses.get_classes(), device=device)
     except Exception as e:
         print(e)
         continue

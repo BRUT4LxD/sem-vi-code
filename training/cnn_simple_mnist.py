@@ -6,7 +6,7 @@ from data_eng.io import load_model
 from evaluation.validation import Validation
 from training.train import Training
 from evaluation.visualization import simple_visualize
-from config.model_classes import mnist_classes
+from config.mnist_classes import MnistClasses
 
 # device config
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -36,4 +36,4 @@ Training.simple_train(model=model,
              device=device,
              SAVE_MODEL_PATH=MODEL_SAVE_PATH)
 
-Validation.simple_validation(model, test_loader, batch_size, mnist_classes, device=device)
+Validation.simple_validation(model, test_loader, batch_size, MnistClasses.get_classes(), device=device)

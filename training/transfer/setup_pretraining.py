@@ -2,11 +2,17 @@ import torch
 
 class SetupPretraining:
   @staticmethod
-  def setup_imagenette(model: torch.nn.Module):
+  def setup_imagenette(model: torch.nn.Module, num_last_layers_to_unfreeze: int = 5):
 
-    # freeze all layers
-    for param in model.parameters():
-        param.requires_grad = False
+    # Freeze all the layers
+    for child in model.children():
+        for param in child.parameters():
+            param.requires_grad = False
+
+    # Unfreeze the last 5 layers
+    for child in list(model.children())[-num_last_layers_to_unfreeze:]:
+        for param in child.parameters():
+            param.requires_grad = True
 
     # Check the type of model and replace the last layer accordingly
     if hasattr(model, 'fc'):

@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from architectures.resnet import ResNet101, ResNet152, ResNet18, ResNet50
 from data_eng.dataset_loader import load_imagenette
-from config.model_classes import imagenette_classes
+from config.imagenette_classes import ImageNetteClasses
 from data_eng.io import load_model
 from evaluation.validation import Validation
 from training.train import Training
@@ -32,7 +32,7 @@ def train_all_resnet(num_epochs=20):
 
         Validation.simple_validation(model=model,
                           test_loader=test_loader,
-                          classes=imagenette_classes,
+                          classes=ImageNetteClasses.get_classes(),
                           device=device)
 
 
@@ -49,7 +49,7 @@ def validate_all_resnet():
             model = load_model(model, path).to(device)
             Validation.simple_validation(model=model,
                               test_loader=test_loader,
-                              classes=imagenette_classes,
+                              classes=ImageNetteClasses.get_classes(),
                               device=device)
         except Exception as e:
             print("Error", e)

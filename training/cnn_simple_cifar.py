@@ -6,7 +6,7 @@ from data_eng.dataset_loader import load_CIFAR10
 from data_eng.io import load_model
 from evaluation.validation import Validation
 from training.train import Training
-from config.model_classes import cifar_classes
+from config.cifar_classes import CifarClasses
 
 # device config
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -35,4 +35,4 @@ Training.simple_train(model=model,
              device=device,
              SAVE_MODEL_PATH=MODEL_SAVE_PATH)
 
-Validation.simple_validation(model, test_loader, batch_size, cifar_classes, device=device)
+Validation.simple_validation(model, test_loader, batch_size, CifarClasses.get_classes(), device=device)

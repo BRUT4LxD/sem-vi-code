@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from architectures.efficientnet import EfficientNetB0
 from data_eng.dataset_loader import load_CIFAR10
-from config.model_classes import cifar_classes
+from config.cifar_classes import CifarClasses
 from data_eng.io import load_model
 from evaluation.validation import Validation
 from training.train import Training
@@ -36,5 +36,5 @@ Training.simple_train(model=model,
 Validation.simple_validation(model=model,
                   test_loader=test_loader,
                   batch_size=batch_size,
-                  classes=cifar_classes,
+                  classes=CifarClasses.get_classes(),
                   device=device)

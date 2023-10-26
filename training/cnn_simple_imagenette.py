@@ -5,8 +5,8 @@ from data_eng.dataset_loader import load_imagenette
 from data_eng.io import load_model
 from training.train import Training
 from evaluation.validation import Validation
-from config.model_classes import imagenette_classes
-
+from config.imagenette_classes import ImageNetteClasses
+ 
 # device config
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f'Using device: {device}')
@@ -36,4 +36,4 @@ Training.simple_train(model=model,
              SAVE_MODEL_PATH=MODEL_SAVE_PATH)
 
 Validation.simple_validation(model, test_loader, batch_size,
-                  imagenette_classes, device=device)
+                  ImageNetteClasses.get_classes(), device=device)

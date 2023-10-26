@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from architectures.efficientnet import EfficientNetB0
 from data_eng.dataset_loader import load_imagenette
-from config.model_classes import imagenette_classes
+from config.imagenette_classes import ImageNetteClasses
 from domain.model_config import ModelConfig
 from evaluation.validation import Validation
 from training.train import Training
@@ -30,7 +30,7 @@ def train_all_efficient_net(num_epochs=20):
 
         Validation.simple_validation(model=model,
                           test_loader=test_loader,
-                          classes=imagenette_classes,
+                          classes=ImageNetteClasses.get_classes(),
                           device=device)
 
         del train_loader, test_loader, model, criterion, optimizer
@@ -56,7 +56,7 @@ def transfer_train_efficient_net(num_epochs=20):
 
     Validation.simple_validation(model=model,
                         test_loader=test_loader,
-                        classes=imagenette_classes,
+                        classes=ImageNetteClasses.get_classes(),
                         device=device)
 
     del train_loader, test_loader, model, criterion, optimizer

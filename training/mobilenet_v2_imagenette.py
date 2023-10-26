@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from architectures.mobilenetv2 import MobileNetV2
 from data_eng.dataset_loader import load_imagenette
-from config.model_classes import imagenette_classes
+from config.imagenette_classes import ImageNetteClasses
 from evaluation.validation import Validation
 from training.train import Training
 
@@ -30,7 +30,7 @@ def train_all_mobilenet(num_epochs=20):
 
         Validation.simple_validation(model=model,
                           test_loader=test_loader,
-                          classes=imagenette_classes,
+                          classes=ImageNetteClasses.get_classes(),
                           device=device)
 
         del train_loader, test_loader, model, criterion, optimizer
