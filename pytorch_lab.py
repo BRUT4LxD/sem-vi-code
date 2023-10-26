@@ -27,13 +27,27 @@ transform = transforms.Compose(
 
 train_loader, test_loader = load_imagenette(transform=transform, batch_size=1)
 
-all_models = ImageNetModels.get_all_resnet_models()
+all_model_names = ModelNames().model_names
 
-for model in all_models:
-    model = SetupPretraining.setup_imagenette(model)
-    model = model.to(device)
-    Training.train_imagenette(model=model, train_loader=train_loader, device=device, learning_rate=0.001, num_epochs=20, save_model_path='./models/transfer/mobilenet_v2_imagenette.pt')
-    Validation.simple_validation(model=model, test_loader=test_loader, classes=imagenette_classes, device=device)
+for model_name in all_model_names:
+    if model_name == ModelNames.resnet18 or model_name == ModelNames.resnet50:
+        continue
+
+    try:
+        model = ImageNetModels.get_model(model_name)
+        model = SetupPretraining.setup_imagenette(model)
+        # Unfreeze the last 5 layers
+        for child in list(model.children())[-5:]:
+            for param in child.parameters():
+                param.requires_grad = True
+
+        model = model.to(device)
+        save_model_path = f'./models/transfer/{model_name}_imagenette.pt'
+        Training.train_imagenette(model=model, train_loader=train_loader, device=device, learning_rate=0.0001, num_epochs=5, save_model_path=save_model_path, model_name=model_name)
+        Validation.simple_validation(model=model, test_loader=test_loader, classes=imagenette_classes, device=device)
+    except Exception as e:
+        print(e)
+        continue
 
 # torch.cuda.empty_cache()
 
