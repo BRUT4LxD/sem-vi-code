@@ -45,7 +45,7 @@ class Validation:
 
     @staticmethod
     @torch.no_grad()
-    def validate_imagenet_with_imagenette_classes(model: torch.nn.Module, test_loader: DataLoader, device='gpu'):
+    def validate_imagenet_with_imagenette_classes(model: torch.nn.Module, test_loader: DataLoader, device='gpu', save_path=None, print_results=True):
         imagenet_to_imagenette_class_map = ImageNetClasses.get_imagenet_to_imagenette_index_map()
         imagenette_classes = ImageNetteClasses.get_classes()
         n_correct = 0
@@ -78,11 +78,20 @@ class Validation:
                 n_class_samples[label] += 1
 
         acc = 100.0 * n_correct / n_samples
-        print(f'accuracy = {acc}%')
+        string_builder = ''
+        string_builder += f'accuracy = {acc}%' + '\n'
 
         for i in range(10):
             if n_class_samples[i] == 0:
-                print(f'accuracy of {imagenette_classes[i]}: not enough samples')
+                string_builder += f'{imagenette_classes[i]}: not enough samples' + '\n'
                 continue
             acc = 100.0 * n_class_correct[i] / n_class_samples[i]
-            print(f'accuracy of {imagenette_classes[i]}: {acc}%')
+            string_builder += f'{imagenette_classes[i]}: {acc}%' + '\n'
+
+        if print_results:
+            print(string_builder)
+
+        if save_path is not None:
+            with open(save_path, 'w') as f:
+                f.write(string_builder)
+

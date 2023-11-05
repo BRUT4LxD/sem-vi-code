@@ -20,7 +20,6 @@ from torchvision.utils import save_image
 
 from shared.model_utils import get_model_num_classes
 
-
 def single_attack(attack: Attack, test_loader: DataLoader, device='cuda', iterations: int = 1):
     model: Module = attack.model
     last_layer = list(model.children())[-1]
@@ -39,7 +38,7 @@ def single_attack(attack: Attack, test_loader: DataLoader, device='cuda', iterat
         end = time.time()
         ev = evaluate_attack(attack_res, num_classes)
         print('{}: samples: {}, {} ({} ms)'.format(attack.attack, labels.shape[0], ev,
-              int((end-start)*1000)))
+            int((end-start)*1000)))
         it += 1
 
         del adv_images, attack_res
@@ -214,13 +213,16 @@ def _remove_missclassified(model: torch.nn.Module, images: torch.Tensor, labels:
     labels = labels[predictions == labels].clone().to(device)
     return images, labels
 
-def attack_images(attack: Attack, model_name: str, images_to_attack=20):
+def attack_images(attack: Attack, model_name: str, images_to_attack=20, save_results=False):
+    save_path = f"./data/attacked_imagenette/{model_name}/{attack.attack}"
+    if(os.path.exists(save_path)):
+        return
 
     attack.model.eval()
     imagenette_to_imagenet_index_map = ImageNetteClasses.get_imagenette_to_imagenet_map_by_index()
     imagenet_to_imagenette_index_map = ImageNetClasses.get_imagenet_to_imagenette_index_map()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    save_path = f"./data/attacked_imagenette/{model_name}/{attack.attack}"
+
     _, dataset = load_imagenette(shuffle=False)
 
     # map for storing the counts of successful attacks for each class
@@ -232,15 +234,15 @@ def attack_images(attack: Attack, model_name: str, images_to_attack=20):
 
     cnt = 0
     miss_cnt = 0
-    for images, labels in dataset:
-        if successful_attacks[labels[0].item()] >= images_to_attack:
-            continue
-
-        cnt += 1
+    for images, labels in tqdm(dataset):
         for original, mapped in imagenette_to_imagenet_index_map.items():
             mask = labels == original
             labels[mask] = mapped
 
+        if successful_attacks[labels[0].item()] >= images_to_attack:
+            continue
+
+        cnt += 1
         images, labels = images.to(device), labels.to(device)
         images, labels = _remove_missclassified(attack.model, images, labels, device)
         if labels.numel() == 0:
@@ -256,12 +258,13 @@ def attack_images(attack: Attack, model_name: str, images_to_attack=20):
             if predicted_labels[i] != labels[i] and successful_attacks[label] < images_to_attack:
                 successful_attacks[label] += 1
                 pbar.update(1)
-                path = f'{save_path}/{imagenet_to_imagenette_index_map[label]}'
-                if not os.path.exists(path):
-                    os.makedirs(path)
+                if save_results:
+                    path = f'{save_path}/{imagenet_to_imagenette_index_map[label]}'
+                    if not os.path.exists(path):
+                        os.makedirs(path)
 
-                ss = f'{path}/{successful_attacks[label]}.png'
-                save_image(adv_images[i], ss)
+                    ss = f'{path}/{successful_attacks[label]}.png'
+                    save_image(adv_images[i], ss)
 
         del adv_images, images, labels
 
