@@ -34,26 +34,40 @@ transform = transforms.Compose(
 
 train_loader, test_loader = load_imagenette(transform=transform, batch_size=1)
 
-all_model_names = ModelNames().model_names
-model_name = ModelNames.resnet18
-model = ImageNetModels.get_model(model_name)
+all_model_names = ModelNames().all_model_names
+all_attack_names = AttackNames().all_attack_names
 
 # measure time for attack
 
-for model_name in all_model_names:
-    model = ImageNetModels.get_model(model_name)
-    model = model.to(device)
-    model = model.train()
-    attack = AttackFactory().get_attack(attack_name=AttackNames.DeepFool, model=model)
-    attack.model = model.to(device)
-    start = time.time()
-    images, labels = next(iter(test_loader))
-    images, labels = images.to(device), labels.to(device)
-    adv_images = attack(images, labels)
-    end = (time.time() - start) * 1000
-    print(f"({model_name}) Attack took {end} ms")
-    del model, attack, images, labels, adv_images
-    torch.cuda.empty_cache()
+for attack_name in tqdm(all_attack_names):
+    if attack_name == AttackNames().DeepFool:
+        continue
+
+    if attack_name == AttackNames().FAB:
+        continue
+
+    if attack_name == AttackNames().SparseFool:
+        continue
+
+    if attack_name == AttackNames().JSMA:
+        continue
+
+    for model_name in all_model_names:
+        model = ImageNetModels.get_model(model_name)
+        model = model.to(device)
+        attack = AttackFactory().get_attack(attack_name=attack_name, model=model)
+        try:
+            attack_images(
+                attack=attack,
+                model_name=model_name,
+                data_loader=train_loader,
+                images_to_attack=20,
+                save_results=True,
+                save_base_path="./data/attacked_imagenette_train")
+        except Exception as e:
+            print(f"Error: {e}")
+            continue
+        torch.cuda.empty_cache()
 
 
 

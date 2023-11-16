@@ -78,4 +78,4 @@ class AttackNames():
         self.Square,
     ]
 
-    self.all_attacks = self.white_box_attacks + self.black_box_attacks
+    self.all_attack_names = self.white_box_attacks + self.black_box_attacks

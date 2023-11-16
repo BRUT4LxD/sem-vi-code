@@ -6,7 +6,7 @@ class AttackFactory:
 
   @staticmethod
   def get_attack(attack_name: str, model: torch.nn.Module) -> Attack:
-    attack_names = AttackNames().all_attacks
+    attack_names = AttackNames().all_attack_names
     if attack_name not in attack_names:
       raise ValueError(f"Attack name {attack_name} not found in {attack_names}")
 
@@ -155,7 +155,7 @@ class AttackFactory:
   @staticmethod
   def get_all_attacks(model: torch.nn.Module):
     attacks = []
-    for attack_name in AttackNames().all_attacks:
+    for attack_name in AttackNames().all_attack_names:
       attacks.append(AttackFactory.get_attack(attack_name, model))
     return attacks
 
