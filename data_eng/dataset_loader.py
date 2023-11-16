@@ -1,6 +1,8 @@
 import torchvision.datasets as datasets
 from torch.utils.data import DataLoader, Subset, SubsetRandomSampler
+from attacks.attack_names import AttackNames
 from data_eng.transforms import mnist_transformer, cifar_transformer, imagenette_transformer
+from domain.model_names import ModelNames
 
 class DatasetType (object):
     CIFAR10 = 'cifar10'
@@ -25,6 +27,22 @@ class DatasetLoader:
 
         if dataset_type == DatasetType.IMAGENETTE:
             return load_imagenette(transform, batch_size=batch_size, train_subset_size=train_subset_size, test_subset_size=test_subset_size, shuffle=shuffle)
+
+    @staticmethod
+    def get_attacked_imagenette_dataset(model_name, attack_name, transform=None, batch_size=1, train_subset_size=-1, test_subset_size=-1, shuffle=True):
+        if model_name not in ModelNames().all_model_names:
+            raise Exception('Invalid model name')
+
+        if attack_name not in AttackNames().all_attack_names:
+            raise Exception('Invalid attack name')
+
+        # load attacked imagenette from folder `attacked_imagenette_train/{model_name}/{attack_name}`
+
+        train_data = datasets.ImageFolder(root=f'./data/attacked_imagenette_train/{model_name}/{attack_name}', transform=transform)
+        test_data = datasets.ImageFolder(root=f'./data/attacked_imagenette_test/{model_name}/{attack_name}', transform=transform)
+
+        return _get_data_loaders(train_data, test_data, batch_size=batch_size, train_subset_size=train_subset_size, test_subset_size=test_subset_size, shuffle=shuffle)
+
 
 def _get_data_loaders(train_dataset, test_dataset, batch_size=1, train_subset_size=-1, test_subset_size=-1, shuffle=True):
     train_loader = None

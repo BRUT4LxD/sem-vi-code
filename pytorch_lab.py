@@ -4,7 +4,7 @@ from attacks.attack_names import AttackNames
 from attacks.system_under_attack import attack_images
 from attacks.white_box.fgsm import FGSM
 from config.imagenette_classes import ImageNetteClasses
-from data_eng.dataset_loader import load_imagenette
+from data_eng.dataset_loader import DatasetLoader, load_imagenette
 from torchvision import transforms
 import torch
 from data_eng.pretrained_model_downloader import PretrainedModelDownloader
@@ -37,39 +37,13 @@ train_loader, test_loader = load_imagenette(transform=transform, batch_size=1)
 all_model_names = ModelNames().all_model_names
 all_attack_names = AttackNames().all_attack_names
 
-# measure time for attack
+model_name = all_model_names[0]
+attack_name = all_attack_names[0]
 
-for attack_name in tqdm(all_attack_names):
-    if attack_name == AttackNames().DeepFool:
-        continue
+train, test = DatasetLoader.get_attacked_imagenette_dataset(model_name=model_name, attack_name=attack_name, transform=transform)
 
-    if attack_name == AttackNames().FAB:
-        continue
-
-    if attack_name == AttackNames().SparseFool:
-        continue
-
-    if attack_name == AttackNames().JSMA:
-        continue
-
-    for model_name in all_model_names:
-        model = ImageNetModels.get_model(model_name)
-        model = model.to(device)
-        attack = AttackFactory().get_attack(attack_name=attack_name, model=model)
-        try:
-            attack_images(
-                attack=attack,
-                model_name=model_name,
-                data_loader=train_loader,
-                images_to_attack=20,
-                save_results=True,
-                save_base_path="./data/attacked_imagenette_train")
-        except Exception as e:
-            print(f"Error: {e}")
-            continue
-        torch.cuda.empty_cache()
-
-
+for images, labels in train:
+    print(labels.item())
 
 # torch.cuda.empty_cache()
 
