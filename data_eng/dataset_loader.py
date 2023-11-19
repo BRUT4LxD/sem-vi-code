@@ -29,15 +29,16 @@ class DatasetLoader:
             return load_imagenette(transform, batch_size=batch_size, train_subset_size=train_subset_size, test_subset_size=test_subset_size, shuffle=shuffle)
 
     @staticmethod
-    def get_attacked_imagenette_dataset(model_name, attack_name, transform=None, batch_size=1, train_subset_size=-1, test_subset_size=-1, shuffle=True):
+    def get_attacked_imagenette_dataset(model_name: str, attack_name: str, transform=None, batch_size=1, train_subset_size=-1, test_subset_size=-1, shuffle=True):
         if model_name not in ModelNames().all_model_names:
             raise Exception('Invalid model name')
 
         if attack_name not in AttackNames().all_attack_names:
             raise Exception('Invalid attack name')
 
+        transform = transform if transform is not None else imagenette_transformer()
+        
         # load attacked imagenette from folder `attacked_imagenette_train/{model_name}/{attack_name}`
-
         train_data = datasets.ImageFolder(root=f'./data/attacked_imagenette_train/{model_name}/{attack_name}', transform=transform)
         test_data = datasets.ImageFolder(root=f'./data/attacked_imagenette_test/{model_name}/{attack_name}', transform=transform)
 

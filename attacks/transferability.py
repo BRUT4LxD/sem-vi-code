@@ -9,6 +9,11 @@ from attacks.attack import Attack
 import torch
 from torch.utils.data.dataloader import DataLoader
 from tqdm import tqdm
+from attacks.attack_names import AttackNames
+from config.imagenet_classes import ImageNetClasses
+from config.imagenet_models import ImageNetModels
+from config.imagenette_classes import ImageNetteClasses
+from data_eng.dataset_loader import DatasetLoader
 
 from shared.model_utils import ModelUtils
 
@@ -51,8 +56,7 @@ class Transferability():
             if it >= iterations:
                 break
             images, labels = images.to(device), labels.to(device)
-            images, labels = ModelUtils.remove_missclassified(
-                attacked_model, images, labels, device)
+            images, labels = ModelUtils.remove_missclassified(attacked_model, images, labels, device)
             if labels.numel() == 0:
                 continue
 
@@ -73,15 +77,13 @@ class Transferability():
 
                     adv_output = model(adv_images)
                     _, adv_prediction = torch.max(adv_output, 1)
-                    matches = torch.where(adv_prediction == prediction, torch.tensor(
-                        0), torch.tensor(1)).tolist()
+                    matches = torch.where(adv_prediction == prediction, torch.tensor(0), torch.tensor(1)).tolist()
                     transferability[attack_name][model_name].extend(matches)
 
         # sum the results for each attack and each model and present it as a percentage
         for attack_name, models in transferability.items():
             for model_name, results in models.items():
-                transferability[attack_name][model_name] = sum(
-                    results) / len(results)
+                transferability[attack_name][model_name] = sum(results) / len(results)
 
         # make 2d array of results. Each row is a attack, each column is a model
         results = []
@@ -114,4 +116,101 @@ class Transferability():
 
         return transferability
 
-    
+
+    @staticmethod
+    def transferability(
+            attacked_model_name: str,
+            trans_models_names: List['torch.nn.Module'],
+            attack_names: List['str'],
+            save_results=False,
+            print_results=True,
+            device='gpu') -> dict:
+
+        # count the number of misclassified images for each attack and each model
+        # 1 - misclassified, 0 - classified correctly
+        # transferability = {
+        #     "att_name": {
+        #         "model_name": [0,0,1,0,1,1,0,1]
+        #     }
+        # }
+
+
+        if len(trans_models_names) == 0:
+            raise ValueError("No transferability models provided")
+
+        name_to_model = {}
+        transferability = {}
+        imagenette_to_imagenet_index_map = ImageNetteClasses.get_imagenette_to_imagenet_map_by_index()
+
+        for model_name in trans_models_names:
+            model = ImageNetModels.get_model(model_name=model_name)
+            model.to(device)
+            name_to_model[model_name] = model
+
+        for attack_name in  tqdm(attack_names):
+            for model_name in tqdm(trans_models_names):
+                try:
+                    _, test_loader = DatasetLoader.get_attacked_imagenette_dataset(model_name, attack_name)
+                except Exception as e:
+                    print(f"Failed to load attacked dataset for {model_name} and {attack_name}")
+                    print(f"Error: {e}")
+                    continue
+                model = name_to_model[model_name]
+
+                for images, labels in test_loader:
+                    for original, mapped in imagenette_to_imagenet_index_map.items():
+                        mask = labels == original
+                        labels[mask] = mapped
+
+                    images, labels = images.to(device), labels.to(device)
+
+                    if attack_name not in transferability:
+                        transferability[attack_name] = {}
+                    if model_name not in transferability[attack_name]:
+                        transferability[attack_name][model_name] = []
+
+                    output = model(images)
+                    _, prediction = torch.max(output, 1)
+
+                    matches = torch.where(labels == prediction, torch.tensor(0), torch.tensor(1)).tolist()
+                    transferability[attack_name][model_name].extend(matches)
+                    del images, labels, output, prediction, matches
+
+                del model, test_loader
+                torch.cuda.empty_cache()
+
+        # sum the results for each attack and each model and present it as a percentage
+        for attack_name, models in transferability.items():
+            for model_name, results in models.items():
+                transferability[attack_name][model_name] = sum(results) / len(results)
+
+        # make 2d array of results. Each row is a attack, each column is a model
+        results = []
+        model_names = list(transferability[attack_name].keys())
+        headers = ["Attacks"] + model_names
+        results.append(headers)
+        for attack_name, models in transferability.items():
+            results.append([attack_name])
+            for model_name, result in models.items():
+                results[-1].append(result)
+
+        if print_results:
+            print()
+            for result in results:
+                line = ""
+                for item in result:
+                    line += f'{str(item):15s}'
+                print(line)
+
+        if save_results:
+            folder_path = f"./results/transferability2"
+            if not os.path.exists(folder_path):
+                os.makedirs(folder_path)
+            with open(f'{folder_path}/{attacked_model_name.__class__.__name__}.txt', 'w') as file:
+                for result in results:
+                    line = ""
+                    for item in result:
+                        line += f'{str(item):15s}'
+                    file.write(line + '\n')
+
+        return transferability

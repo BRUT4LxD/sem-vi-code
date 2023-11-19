@@ -2,6 +2,7 @@ from attacks import get_all_attacks
 from attacks.attack_factory import AttackFactory
 from attacks.attack_names import AttackNames
 from attacks.system_under_attack import attack_images
+from attacks.transferability import Transferability
 from attacks.white_box.fgsm import FGSM
 from config.imagenette_classes import ImageNetteClasses
 from data_eng.dataset_loader import DatasetLoader, load_imagenette
@@ -40,10 +41,26 @@ all_attack_names = AttackNames().all_attack_names
 model_name = all_model_names[0]
 attack_name = all_attack_names[0]
 
-train, test = DatasetLoader.get_attacked_imagenette_dataset(model_name=model_name, attack_name=attack_name, transform=transform)
+# train, test = DatasetLoader.get_attacked_imagenette_dataset(model_name=model_name, attack_name=attack_name, transform=transform)
 
-for images, labels in train:
-    print(labels.item())
+# for images, labels in train:
+#     print(labels.item())
+
+trans_attacks = []
+
+for attack_name in all_attack_names:
+    if attack_name != AttackNames().DeepFool and attack_name != AttackNames().SparseFool and attack_name != AttackNames().FAB:
+        trans_attacks.append(attack_name)
+
+print(len(trans_attacks))
+print(trans_attacks)
+for model_name in tqdm(all_model_names):
+    Transferability.transferability(
+        attacked_model_name=model_name,
+        trans_models_names=all_model_names,
+        attack_names=trans_attacks,
+        save_results=True,
+        device=device)
 
 # torch.cuda.empty_cache()
 
