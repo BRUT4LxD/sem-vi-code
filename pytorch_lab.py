@@ -2,7 +2,6 @@ from attacks import get_all_attacks
 from attacks.attack_factory import AttackFactory
 from attacks.attack_names import AttackNames
 from attacks.simple_attacks import SimpleAttacks
-from attacks.system_under_attack import attack_images
 from attacks.transferability import Transferability
 from attacks.white_box.fgsm import FGSM
 from config.imagenette_classes import ImageNetteClasses
@@ -51,27 +50,26 @@ attack_name = all_attack_names[0]
 trans_attacks = []
 
 for attack_name in all_attack_names:
-    if attack_name != AttackNames().DeepFool and attack_name != AttackNames().SparseFool and attack_name != AttackNames().FAB:
+    if attack_name != AttackNames().DeepFool and attack_name != AttackNames().SparseFool and attack_name != AttackNames().FAB and attack_name != AttackNames().SPSA:
         trans_attacks.append(attack_name)
 
-# save_folder = './results/transferability3'
-# for model_name in all_model_names:
-#     print(f'Model: {model_name:10s} Time: {datetime.today().strftime("%H:%M:%S")}')
-#     Transferability.transferability(
-#         attacked_model_name=model_name,
-#         trans_models_names=all_model_names,
-#         attack_names=trans_attacks,
-#         save_path_folder=save_folder,
-#         device=device)
+save_folder = './results/transferability4'
+for model_name in [ModelNames.vgg13, ModelNames.vgg16, ModelNames.vgg19]:
+    print(f'Model: {model_name:10s} Time: {datetime.today().strftime("%H:%M:%S")}')
+    Transferability.transferability_attack_to_model(
+        attacked_model_name=model_name,
+        trans_models_names=all_model_names,
+        attack_names=trans_attacks,
+        save_path_folder=save_folder,
+        device=device)
 
 save_folder_trans_m2m = './results/m2mtransferability/'
 
 attks = []
 for attack_name in all_attack_names:
-    if attack_name != AttackNames().DeepFool and attack_name != AttackNames().SparseFool and attack_name != AttackNames().FAB and attack_name != AttackNames().JSMA:
         attks.append(attack_name)
 
-Transferability.transferability_model_to_model(all_model_names, attks, save_path_folder=save_folder_trans_m2m, device=device)
+# Transferability.transferability_model_to_model(all_model_names, attks, save_path_folder=save_folder_trans_m2m, device=device)
 # torch.cuda.empty_cache()
 
 # for config in model_configs:

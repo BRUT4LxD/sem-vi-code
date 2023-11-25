@@ -155,7 +155,7 @@ class Transferability():
                 model_name_pbar.set_description(f"Model: {attacked_model_name:12s}|  Attack: {attack_name:10s}|  Trasferability Model: {model_name:12s}|")
                 model_name_pbar.update(1)
                 try:
-                    _, test_loader = DatasetLoader.get_attacked_imagenette_dataset(model_name, attack_name)
+                    _, test_loader = DatasetLoader.get_attacked_imagenette_dataset(attacked_model_name, attack_name, batch_size=4)
                 except Exception as e:
                     print(f"Failed to load attacked dataset for {model_name} and {attack_name}")
                     print(f"Error: {e}")
@@ -254,11 +254,12 @@ class Transferability():
                     model_name_pbar.set_description(f"Ground model: {ground_model_name:12s}|  Attack: {attack_name:10s}|  Trasferability Model: {model_name:12s}|")
                     model_name_pbar.update(1)
                     try:
-                        _, test_loader = DatasetLoader.get_attacked_imagenette_dataset(model_name, attack_name)
+                        _, test_loader = DatasetLoader.get_attacked_imagenette_dataset(ground_model_name, attack_name)
                     except Exception as e:
                         print(f"Failed to load attacked dataset for {model_name} and {attack_name}")
                         print(f"Error: {e}")
                         continue
+
                     model = name_to_model[model_name]
                     model.to(device)
                     model.eval()
