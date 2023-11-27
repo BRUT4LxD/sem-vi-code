@@ -1,5 +1,11 @@
 import torchvision.transforms as transforms
 
+def no_transformer():
+    return transforms.Compose(
+        [
+            transforms.ToTensor()
+        ]
+    )
 
 def mnist_transformer():
     return transforms.Compose(

@@ -7,6 +7,15 @@ from config.imagenet_models import ImageNetModels
 from config.imagenette_classes import ImageNetteClasses
 from domain.attack_eval_score import AttackEvaluationScore
 
+class ValidationAccuracyResult:
+    def __init__(self, model_name: str, accuracy: float, accuracies: List['float']):
+        self.model_name = model_name
+        self.accuracy = accuracy
+        self.accuracies = [round(acc, 2) for acc in accuracies]
+
+    def __str__(self):
+        return f'{self.model_name}: {round(self.accuracy, 2)}%'
+
 class Validation:
 
     @staticmethod
@@ -45,7 +54,7 @@ class Validation:
 
     @staticmethod
     @torch.no_grad()
-    def validate_imagenet_with_imagenette_classes(model: torch.nn.Module, test_loader: DataLoader, device='gpu', save_path=None, print_results=True):
+    def validate_imagenet_with_imagenette_classes(model: torch.nn.Module, test_loader: DataLoader, model_name=None, device='gpu', save_path=None, print_results=True) -> ValidationAccuracyResult:
         imagenet_to_imagenette_class_map = ImageNetClasses.get_imagenet_to_imagenette_index_map()
         imagenette_classes = ImageNetteClasses.get_classes()
         n_correct = 0
@@ -65,7 +74,6 @@ class Validation:
             for original, mapped in imagenet_to_imagenette_class_map.items():
                 mask = predictions == original
                 predictions[mask] = mapped
-
 
             n_samples += labels.size(0)
             n_correct += (predictions == labels).sum().item()
@@ -94,4 +102,8 @@ class Validation:
         if save_path is not None:
             with open(save_path, 'w') as f:
                 f.write(string_builder)
+        model_name = model_name if model_name is not None else model.__class__.__name__
+
+        accs = [100.0 * n_class_correct[i] / n_class_samples[i] for i in range(len(imagenet_to_imagenette_class_map))]
+        return ValidationAccuracyResult(model_name=model_name, accuracy=acc, accuracies=accs)
 

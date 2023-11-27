@@ -78,8 +78,14 @@ class SimpleAttacks:
             if sum(value for value in successful_attacks.values()) >= num_classes * images_to_attack:
                 break
 
-            if successful_attacks[labels[0].item()] >= images_to_attack:
+            if all(successful_attacks[label] >= images_to_attack for label in set(labels.tolist())):
                 continue
+            # remove classes that have already been attacked enough
+            for index, count in successful_attacks.items():
+                if count >= images_to_attack:
+                    mask = labels == index
+                    labels = labels[~mask]
+                    images = images[~mask]
 
             images, labels = images.to(device), labels.to(device)
             images, labels = ModelUtils.remove_missclassified(attack.model, images, labels, device)
