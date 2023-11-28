@@ -2,6 +2,11 @@ from typing import List
 import torch
 
 
+class AttackedImageResult():
+    def __init__(self, adv_image: torch.Tensor, label: torch.Tensor) -> None:
+        self.adv_image = adv_image
+        self.label = label
+
 class AttackResult():
     def __init__(self, actual, predicted, adv_image: torch.Tensor, src_image: torch.Tensor, model_name: str, attack_name: str):
         self.actual = actual

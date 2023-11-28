@@ -2,14 +2,17 @@ from collections import defaultdict
 import os
 import time
 from attacks.attack import Attack
+from attacks.attack_factory import AttackFactory
 from config.imagenet_classes import ImageNetClasses
 from config.imagenette_classes import ImageNetteClasses
 import torch
 from torch.utils.data.dataloader import DataLoader
 from tqdm import tqdm
 from torchvision.utils import save_image
+from data_eng.dataset_loader import DatasetLoader, DatasetType
+from data_eng.transforms import imagenette_transformer
 from domain.attack_eval_score import AttackEvaluationScore
-from domain.attack_result import AttackResult
+from domain.attack_result import AttackResult, AttackedImageResult
 from evaluation.metrics import Metrics
 from shared.model_utils import ModelUtils
 from typing import List
@@ -18,6 +21,9 @@ from domain.attack_result import AttackResult
 from domain.multiattack_result import MultiattackResult
 
 from shared.model_utils import ModelUtils
+from config.imagenet_models import ImageNetModels
+
+
 
 class SimpleAttacks:
 
@@ -44,6 +50,50 @@ class SimpleAttacks:
             it += 1
 
             del adv_images, attack_res
+
+    @staticmethod
+    def get_attacked_imagenette_images(attack_name: str, model_name: str, num_of_images=20, batch_size=16, use_test_set=True) -> List[AttackedImageResult]:
+        imagenette_to_imagenet_index_map = ImageNetteClasses.get_imagenette_to_imagenet_map_by_index()
+        imagenet_to_imagenette_index_map = ImageNetClasses.get_imagenet_to_imagenette_index_map()
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        model = ImageNetModels.get_model(model_name)
+        model.to(device)
+        model.eval()
+        attack = AttackFactory.get_attack(attack_name, model)
+        train_loader, test_loader = DatasetLoader.get_dataset_by_type(dataset_type=DatasetType.IMAGENETTE, batch_size=batch_size)
+        data_loader = test_loader if use_test_set else train_loader
+
+        attack_results = []
+        for images, labels in data_loader:
+            if len(attack_results) >= num_of_images:
+                break
+
+            for original, mapped in imagenette_to_imagenet_index_map.items():
+                mask = labels == original
+                labels[mask] = mapped
+
+            images, labels = images.to(device), labels.to(device)
+            images, labels = ModelUtils.remove_missclassified(model, images, labels, device=device)
+
+            if labels.numel() == 0:
+                continue
+
+            adv_images = attack(images, labels)
+            outputs = attack.model(adv_images)
+            _, predicted_labels = torch.max(outputs.data, 1)
+            for i in range(len(adv_images)):
+                if len(attack_results) >= num_of_images:
+                    break
+
+                if predicted_labels[i] == labels[i]:
+                    continue
+
+                imagenette_label_tensor = torch.tensor(imagenet_to_imagenette_index_map[labels[i].item()])
+                attack_results.append(AttackedImageResult(adv_images[i], imagenette_label_tensor))
+
+        del model, attack, data_loader
+
+        return attack_results
 
     @staticmethod
     def attack_images(

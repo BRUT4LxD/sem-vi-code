@@ -16,7 +16,7 @@ class DatasetType (object):
 
 class DatasetLoader:
     @staticmethod
-    def get_dataset_by_type(dataset_type, transform=None, batch_size=1, train_subset_size=-1, test_subset_size=-1, shuffle=True):
+    def get_dataset_by_type(dataset_type: str, transform=None, batch_size=1, train_subset_size=-1, test_subset_size=-1, shuffle=True):
         if not DatasetType.is_valid_data_set_type(dataset_type):
             raise Exception('Invalid dataset type')
 
