@@ -147,9 +147,22 @@ class Transferability():
         pbar = tqdm(total=len(attack_names) * len(model_names) * len(model_names))
 
         for ground_model_name in model_names:
+            if save_folder_path is not None and os.path.exists(f'{save_folder_path}/{ground_model_name}.csv'):
+                pbar.update(len(attack_names) * len(model_names))
+                continue
+
             transferability = {}
             for attack_name in attack_names:
-                adv_image_results = SimpleAttacks.get_attacked_imagenette_images(attack_name, ground_model_name, images_per_attack, batch_size=attacking_batch_size, use_test_set=use_test_set)
+                b_size = attacking_batch_size
+                while True:
+                    try:
+                        adv_image_results = SimpleAttacks.get_attacked_imagenette_images(attack_name, ground_model_name, images_per_attack, batch_size=b_size, use_test_set=use_test_set)
+                        break
+                    except Exception as e:
+                        print(f"Failed to load attacked dataset for {ground_model_name} and {attack_name}")
+                        b_size = b_size // 2
+                        print(f'Lowering the batchsize by half. From {b_size * 2} to {b_size}')
+                        continue
                 adv_image_with_labels = [(res.adv_image, res.label) for res in adv_image_results]
                 for model_name in model_names:
                     pbar.update(1)
@@ -326,15 +339,22 @@ class Transferability():
         if len(model_names) == 0:
             raise ValueError("No transferability models provided")
 
-        name_to_model = {}
         transferability = {}
-        imagenette_to_imagenet_index_map = ImageNetteClasses.get_imagenette_to_imagenet_map_by_index()
         pbar = tqdm(total=len(attack_names) * len(model_names) * len(model_names))
 
         for ground_model_name in model_names:
             transferability = {}
             for attack_name in attack_names:
-                adv_image_results = SimpleAttacks.get_attacked_imagenette_images(attack_name, ground_model_name, images_per_attack, batch_size=attacking_batch_size, use_test_set=use_test_set)
+                b_size = attacking_batch_size
+                while True:
+                    try:
+                        adv_image_results = SimpleAttacks.get_attacked_imagenette_images(attack_name, ground_model_name, images_per_attack, batch_size=b_size, use_test_set=use_test_set)
+                        break
+                    except Exception as e:
+                        print(f"Failed to load attacked dataset for {ground_model_name} and {attack_name}")
+                        b_size = b_size // 2
+                        print(f'Lowering the batchsize by half. From {b_size * 2} to {b_size}')
+                        continue
                 adv_image_with_labels = [(res.adv_image, res.label) for res in adv_image_results]
                 for model_name in model_names:
                     pbar.update(1)
@@ -355,45 +375,6 @@ class Transferability():
                         _, prediction = torch.max(output, 1)
                         matches = torch.where(prediction == labels, torch.tensor(0), torch.tensor(1)).tolist()
                         transferability[ground_model_name][model_name].extend(matches)
-
-        for ground_model_name in model_names:
-            print(f"Ground model: {ground_model_name} Time: {datetime.now().strftime('%H:%M:%S')}")
-            model_name_pbar = tqdm(total=len(attack_names) * len(model_names))
-            for attack_name in attack_names:
-                for model_name in model_names:
-                    model_name_pbar.set_description(f"Ground model: {ground_model_name:12s}|  Attack: {attack_name:10s}|  Trasferability Model: {model_name:12s}|")
-                    model_name_pbar.update(1)
-                    try:
-                        _, test_loader = DatasetLoader.get_attacked_imagenette_dataset(ground_model_name, attack_name, batch_size=2)
-                    except Exception as e:
-                        print(f"Failed to load attacked dataset for {model_name} and {attack_name}")
-                        print(f"Error: {e}")
-                        continue
-
-                    model = name_to_model[model_name]
-                    model.to(device)
-                    model.eval()
-
-                    for images, labels in test_loader:
-                        for original, mapped in imagenette_to_imagenet_index_map.items():
-                            mask = labels == original
-                            labels[mask] = mapped
-
-                        images, labels = images.to(device), labels.to(device)
-
-                        if ground_model_name not in transferability:
-                            transferability[ground_model_name] = {}
-                        if model_name not in transferability[ground_model_name]:
-                            transferability[ground_model_name][model_name] = []
-
-                        output = model(images)
-                        _, predictions = torch.max(output, 1)
-                        matches = torch.where(labels == predictions, torch.tensor(0), torch.tensor(1)).tolist()
-                        transferability[ground_model_name][model_name].extend(matches)
-                        del images, labels, output, predictions, matches
-
-                    del model, test_loader
-                    torch.cuda.empty_cache()
 
         # sum the results for each attack and each model and present it as a percentage
         for ground_model, models in transferability.items():
@@ -418,14 +399,13 @@ class Transferability():
                     line += f'{str(item):15s}'
                 print(line)
 
-        if save_path_folder is not None:
-            if not os.path.exists(save_path_folder):
-                os.makedirs(save_path_folder)
-            with open(f'{save_path_folder}/m2mTransferability.txt', 'w') as file:
-                for result in results:
-                    line = ""
-                    for item in result: 
-                        line += f'{str(item):15s}'
-                    file.write(line + '\n')
+        if save_folder_path is not None:
+            if not os.path.exists(save_folder_path):
+                os.makedirs(save_folder_path)
+            file_path = os.path.join(save_folder_path, 'm2mtransfer.csv')
+            with open(file_path, 'w', newline='') as file:
+                writer = csv.writer(file)
+                for result_line in results:
+                    writer.writerow(result_line)
 
         return transferability
