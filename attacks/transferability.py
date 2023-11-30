@@ -20,106 +20,9 @@ from datetime import datetime
 from shared.model_utils import ModelUtils
 
 class Transferability():
-
-    @staticmethod
-    def transferability_attack(
-            attacked_model: torch.nn.Module,
-            trans_models: List['torch.nn.Module'],
-            attacks: List['Attack'],
-            data_loader: DataLoader,
-            iterations=20,
-            save_results=False,
-            print_results=True,
-            device='gpu') -> dict:
-
-        # count the number of misclassified images for each attack and each model
-        # 1 - misclassified, 0 - classified correctly
-        # transferability = {
-        #     "att_name": {
-        #         "model_name": [0,0,1,0,1,1,0,1]
-        #     }
-        # }
-
-        if len(attacks) == 0:
-            raise ValueError("No attacks provided")
-
-        if len(trans_models) == 0:
-            raise ValueError("No transferability models provided")
-
-        transferability = {}
-        it = 0
-
-        pbar = tqdm(total=len(attacks) * iterations * len(trans_models))
-        attacked_model.to(device)
-        for trans_model in trans_models:
-            trans_model.to(device)
-
-        for images, labels in data_loader:
-            if it >= iterations:
-                break
-            images, labels = images.to(device), labels.to(device)
-            images, labels = ModelUtils.remove_missclassified(attacked_model, images, labels, device)
-            if labels.numel() == 0:
-                continue
-
-            it += 1
-            for attack in attacks:
-                adv_images = attack(images, labels)
-                for model in trans_models:
-                    pbar.update(1)
-                    model_name = model.__class__.__name__
-                    attack_name = attack.attack
-                    if attack_name not in transferability:
-                        transferability[attack_name] = {}
-                    if model_name not in transferability[attack_name]:
-                        transferability[attack_name][model_name] = []
-
-                    output = model(images)
-                    _, prediction = torch.max(output, 1)
-
-                    adv_output = model(adv_images)
-                    _, adv_prediction = torch.max(adv_output, 1)
-                    matches = torch.where(adv_prediction == prediction, torch.tensor(0), torch.tensor(1)).tolist()
-                    transferability[attack_name][model_name].extend(matches)
-
-        # sum the results for each attack and each model and present it as a percentage
-        for attack_name, models in transferability.items():
-            for model_name, results in models.items():
-                transferability[attack_name][model_name] = round(sum(results) / len(results), 2)
-
-        # make 2d array of results. Each row is a attack, each column is a model
-        results = []
-        model_names = list(transferability[attack_name].keys())
-        headers = ["Attacks"] + model_names
-        results.append(headers)
-        for attack_name, models in transferability.items():
-            results.append([attack_name])
-            for model_name, result in models.items():
-                results[-1].append(result)
-
-        if print_results:
-            print()
-            for result in results:
-                line = ""
-                for item in result:
-                    line += f'{str(item):15s}'
-                print(line)
-
-        if save_results:
-            folder_path = f"./results/transferability"
-            if not os.path.exists(folder_path):
-                os.makedirs(folder_path)
-            with open(f'{folder_path}/{attacked_model.__class__.__name__}.txt', 'w') as file:
-                for result in results:
-                    line = ""
-                    for item in result:
-                        line += f'{str(item):15s}'
-                    file.write(line + '\n')
-
-        return transferability
     
     @staticmethod
-    def transferability_attack2(
+    def transferability_attack(
             model_names: List['str'],
             attack_names: List['str'],
             images_per_attack=20,
@@ -243,7 +146,6 @@ class Transferability():
 
         model_name_pbar = tqdm(total=len(attack_names) * (len(trans_models_names) - 1))
         for attack_name in attack_names:
-
             for model_name in trans_models_names:
                 if model_name == attacked_model_name:
                     continue
@@ -409,3 +311,54 @@ class Transferability():
                     writer.writerow(result_line)
 
         return transferability
+
+    @staticmethod
+    def transferability_model_to_model_from_files(model_names: List['str'], source_folder: str, save_folder_path=None, print_results=True) -> dict:
+
+        model_files = {}
+        # load files from source folder using model names as filename
+        for model_name in model_names:
+            # load csv file
+            file_path = os.path.join(source_folder, f'{model_name}.csv')
+            if not os.path.exists(file_path):
+                print(f'File {file_path} does not exist')
+                continue
+            with open(file_path, 'r') as file:
+                reader = csv.reader(file)
+                model_files[model_name] = list(reader)
+        
+        model_to_model_transferability = []
+        headers = ["Models"]
+        for model_name in model_names:
+            headers.append(model_name)
+
+        model_to_model_transferability.append(headers)
+        i = 0
+        for model_name in model_files.keys():
+            # skip the first row as it contains the model names
+            model_to_attack_trans = model_files[model_name][1:]
+            sum_accuracies = [0.0 for _ in model_names]
+            for line in model_to_attack_trans:
+                line_without_attack = line[1:]
+                for i in range(len(line_without_attack)):
+                    sum_accuracies[i] += round(float(line_without_attack[i]), 2)
+
+            average_accuracies = [round(accuracy / len(model_to_attack_trans), 2) for accuracy in sum_accuracies]
+            trans_arr = []
+            trans_arr.append(model_name)
+            trans_arr.extend(average_accuracies)
+            model_to_model_transferability.append(trans_arr)
+
+        if print_results:
+            print(model_to_model_transferability)
+
+        if save_folder_path is not None:
+            if not os.path.exists(save_folder_path):
+                os.makedirs(save_folder_path)
+            file_path = os.path.join(save_folder_path, 'm2mtransferability.csv')
+            with open(file_path, 'w', newline='') as file:
+                writer = csv.writer(file)
+                for result_line in model_to_model_transferability:
+                    writer.writerow(result_line)
+
+        return model_to_model_transferability

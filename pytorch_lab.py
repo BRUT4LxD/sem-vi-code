@@ -30,18 +30,3 @@ all_model_names = ModelNames().all_model_names
 all_attack_names = AttackNames().all_attack_names
 invalid_attack_names = [AttackNames().DeepFool, AttackNames().SparseFool, AttackNames().FAB, AttackNames().SPSA, AttackNames().JSMA]
 valid_attack_names = [attack_name for attack_name in all_attack_names if attack_name not in invalid_attack_names]
-headers = ["Attacks"] + all_model_names
-print(headers)
-
-
-save_folder_path = './results/transferability_100'
-Transferability.transferability_attack2(
-  model_names=all_model_names,
-  attack_names=valid_attack_names,
-  images_per_attack=100,
-  attacking_batch_size=16,
-  model_batch_size=2,
-  save_folder_path=save_folder_path,
-  print_results=True,
-  device=device)
-
