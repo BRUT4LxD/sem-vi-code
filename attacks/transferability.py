@@ -314,7 +314,6 @@ class Transferability():
 
     @staticmethod
     def transferability_model_to_model_from_files(model_names: List['str'], source_folder: str, save_folder_path=None, print_results=True) -> dict:
-
         model_files = {}
         # load files from source folder using model names as filename
         for model_name in model_names:
@@ -362,3 +361,58 @@ class Transferability():
                     writer.writerow(result_line)
 
         return model_to_model_transferability
+
+    @staticmethod
+    def transferability_attack_to_model_from_files_summary(model_names: List['str'], attack_names: List['str'], source_folder: str, save_folder_path=None, print_results=True) -> dict:
+
+        model_files = {}
+        for model_name in model_names:
+            file_path = os.path.join(source_folder, f'{model_name}.csv')
+            if not os.path.exists(file_path):
+                print(f'File {file_path} does not exist')
+                continue
+            with open(file_path, 'r') as file:
+                reader = csv.reader(file)
+                model_files[model_name] = list(reader)
+
+        attack_to_model_transferability = []
+        headers = ["Models"]
+        for model_name in model_names:
+            headers.append(model_name)
+
+        attack_to_model_transferability.append(headers)
+        sum_accuracies = {}
+        for attack_name in attack_names:
+            sum_accuracies[attack_name] = [-1.0 for _ in model_names]
+
+        for model_name in model_files.keys():
+            model_to_attack_trans = model_files[model_name][1:]
+            for line in model_to_attack_trans:
+                att_name = line[0]
+                line_without_attack = line[1:]
+                for i in range(len(line_without_attack)):
+                    sum_accuracies[att_name][i] += float(line_without_attack[i])
+
+        for att in sum_accuracies.keys():
+            for i in range(len(sum_accuracies[att])):
+                sum_accuracies[att][i] = round(sum_accuracies[att][i] / (len(model_files.keys()) - 1), 2)
+
+        for att in sum_accuracies.keys():
+            trans_arr = []
+            trans_arr.append(att)
+            trans_arr.extend(sum_accuracies[att])
+            attack_to_model_transferability.append(trans_arr)
+
+        if print_results:
+            print(attack_to_model_transferability)
+
+        if save_folder_path is not None:
+            if not os.path.exists(save_folder_path):
+                os.makedirs(save_folder_path)
+            file_path = os.path.join(save_folder_path, 'a2mtransferability.csv')
+            with open(file_path, 'w', newline='') as file:
+                writer = csv.writer(file)
+                for result_line in attack_to_model_transferability:
+                    writer.writerow(result_line)
+
+        return attack_to_model_transferability

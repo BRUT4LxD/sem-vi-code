@@ -15,6 +15,8 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 import time
 from datetime import datetime
+import os
+import csv
 
 from torch.utils.data import DataLoader, SubsetRandomSampler
 import torchvision.transforms as transforms
@@ -30,3 +32,7 @@ all_model_names = ModelNames().all_model_names
 all_attack_names = AttackNames().all_attack_names
 invalid_attack_names = [AttackNames().DeepFool, AttackNames().SparseFool, AttackNames().FAB, AttackNames().SPSA, AttackNames().JSMA]
 valid_attack_names = [attack_name for attack_name in all_attack_names if attack_name not in invalid_attack_names]
+
+save_path_folder = 'results/transferability_100'
+Transferability.transferability_attack_to_model_from_files_summary(all_model_names, valid_attack_names, source_folder=save_path_folder, save_folder_path=save_path_folder)
+
