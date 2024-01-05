@@ -52,11 +52,11 @@ class SimpleAttacks:
             del adv_images, attack_res
 
     @staticmethod
-    def get_attacked_imagenette_images(attack_name: str, model_name: str, num_of_images=20, batch_size=16, use_test_set=True) -> List[AttackedImageResult]:
+    def get_attacked_imagenette_images(attack_name: str, model_name: str, num_of_images=20, batch_size=4, use_test_set=True, model: torch.nn.Module = None) -> List[AttackedImageResult]:
         imagenette_to_imagenet_index_map = ImageNetteClasses.get_imagenette_to_imagenet_map_by_index()
         imagenet_to_imagenette_index_map = ImageNetClasses.get_imagenet_to_imagenette_index_map()
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        model = ImageNetModels.get_model(model_name)
+        model = model if model is not None else ImageNetModels.get_model(model_name)
         model.to(device)
         model.eval()
         attack = AttackFactory.get_attack(attack_name, model)

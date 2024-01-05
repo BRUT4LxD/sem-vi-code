@@ -1,11 +1,11 @@
 from data_eng.io import save_model
 import torch
-from torch.optim.lr_scheduler import StepLR
-
+from torch.optim.lr_scheduler import StepLR, ReduceLROnPlateau
+from torch.utils.data import DataLoader, SubsetRandomSampler
 class Training:
 
     @staticmethod
-    def simple_train(model: torch.nn.Module, loss_fn, optimizer: torch.optim.Adam, train_loader, num_epochs=5, device='gpu', SAVE_MODEL_PATH=None, model_name=None):
+    def simple_train(model: torch.nn.Module, loss_fn: torch.nn.CrossEntropyLoss, optimizer: torch.optim.Adam, train_loader: DataLoader, num_epochs: int = 5, device: str='gpu', SAVE_MODEL_PATH: str = None, model_name: str = None):
         n_total_steps = len(train_loader)
         scheduler = StepLR(optimizer, step_size=5, gamma=0.2)
         model_name = model_name if model_name is not None else model.__class__.__name__
@@ -16,7 +16,7 @@ class Training:
 
                 optimizer.zero_grad()
                 outputs = model(images)
-                loss = loss_fn(outputs, labels)
+                loss: torch.Tensor = loss_fn(outputs, labels)
 
                 loss.backward()
                 optimizer.step()

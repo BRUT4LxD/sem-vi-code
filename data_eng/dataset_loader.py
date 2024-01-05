@@ -109,7 +109,7 @@ def load_imagenette(transform=None, path_to_data='./data/imagenette', batch_size
     train_dataset = datasets.ImageFolder(root=train_path, transform=trans)
     test_dataset = datasets.ImageFolder(root=test_path, transform=trans)
 
-    return _get_data_loaders(
+    return _get_data_loaders( 
         train_dataset,
         test_dataset,
         batch_size=batch_size,

@@ -6,15 +6,45 @@ from config.imagenet_classes import ImageNetClasses
 from config.imagenet_models import ImageNetModels
 from config.imagenette_classes import ImageNetteClasses
 from domain.attack_eval_score import AttackEvaluationScore
+import os
+import csv
 
 class ValidationAccuracyResult:
-    def __init__(self, model_name: str, accuracy: float, accuracies: List['float']):
+    def __init__(self, model_name: str, accuracy: float, accuracies: List['float'], class_names: List['str']):
         self.model_name = model_name
         self.accuracy = accuracy
         self.accuracies = [round(acc, 2) for acc in accuracies]
+        self.class_names = class_names
 
     def __str__(self):
         return f'{self.model_name}: {round(self.accuracy, 2)}%'
+
+    def save_csv(self, it: str, save_path: str):
+        headers = ['it', 'acc'] +  self.class_names
+        results = [it, self.accuracy] + self.accuracies
+
+        with open(save_path, 'w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow(headers)
+            writer.writerow(results)
+
+    def append_to_csv_file(self, it: str, save_path: str):
+        results = [it, self.accuracy] + self.accuracies
+
+        dirname = os.path.dirname(save_path)
+        if not os.path.exists(dirname):
+            os.makedirs(dirname)
+
+        if not os.path.exists(save_path):
+            headers = ['it', 'acc'] + self.class_names
+            with open(save_path, 'w', newline='') as file:
+                writer = csv.writer(file)
+                writer.writerow(headers)
+                file.close()
+
+        with open(save_path, 'a', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow(results)
 
 class Validation:
 
@@ -54,7 +84,14 @@ class Validation:
 
     @staticmethod
     @torch.no_grad()
-    def validate_imagenet_with_imagenette_classes(model: torch.nn.Module, test_loader: DataLoader, model_name=None, device='gpu', save_path=None, print_results=True) -> ValidationAccuracyResult:
+    def validate_imagenet_with_imagenette_classes(
+        model: torch.nn.Module,
+        test_loader: DataLoader,
+        model_name=None,
+        device='gpu',
+        save_path=None,
+        print_results=True
+        ) -> ValidationAccuracyResult:
         imagenet_to_imagenette_class_map = ImageNetClasses.get_imagenet_to_imagenette_index_map()
         imagenette_classes = ImageNetteClasses.get_classes()
         n_correct = 0
@@ -100,10 +137,13 @@ class Validation:
             print(string_builder)
 
         if save_path is not None:
+            save_path_dir = os.path.dirname(save_path)
+            if not os.path.exists(save_path_dir):
+                os.makedirs(save_path_dir)
             with open(save_path, 'w') as f:
                 f.write(string_builder)
-        model_name = model_name if model_name is not None else model.__class__.__name__
 
+        model_name = model_name if model_name is not None else model.__class__.__name__
         accs = [100.0 * n_class_correct[i] / n_class_samples[i] for i in range(len(imagenet_to_imagenette_class_map))]
-        return ValidationAccuracyResult(model_name=model_name, accuracy=acc, accuracies=accs)
+        return ValidationAccuracyResult(model_name=model_name, accuracy=acc, accuracies=accs, class_names=imagenette_classes)
 

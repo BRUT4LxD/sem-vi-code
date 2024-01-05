@@ -325,7 +325,7 @@ class Transferability():
             with open(file_path, 'r') as file:
                 reader = csv.reader(file)
                 model_files[model_name] = list(reader)
-        
+
         model_to_model_transferability = []
         headers = ["Models"]
         for model_name in model_names:
