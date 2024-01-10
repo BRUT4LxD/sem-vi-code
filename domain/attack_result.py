@@ -1,11 +1,14 @@
 from typing import List
 import torch
 
+from domain.attack_distance_score import AttackDistanceScore
+
 
 class AttackedImageResult():
-    def __init__(self, adv_image: torch.Tensor, label: torch.Tensor) -> None:
+    def __init__(self, adv_image: torch.Tensor, label: torch.Tensor, distance: AttackDistanceScore) -> None:
         self.adv_image = adv_image
         self.label = label
+        self.distance = distance
 
 class AttackResult():
     def __init__(self, actual, predicted, adv_image: torch.Tensor, src_image: torch.Tensor, model_name: str, attack_name: str):

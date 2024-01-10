@@ -1,3 +1,4 @@
+from ast import Tuple
 from typing import List
 from torch.nn import Module
 from tqdm import tqdm
@@ -6,6 +7,12 @@ from attacks.simple_attacks import SimpleAttacks
 from data_eng.dataset_loader import DatasetLoader, DatasetType
 from torch.utils.data import DataLoader, ConcatDataset
 
+from domain.attack_distance_score import AttackDistanceScore
+
+class AttackedDatasetGeneratorResult:
+    def __init__(self, data_loader: DataLoader, attack_distance_score: AttackDistanceScore) -> None:
+        self.data_loader = data_loader
+        self.attack_distance_score = attack_distance_score
 
 class AttackedDatasetGenerator:
     """
@@ -47,13 +54,22 @@ class AttackedDatasetGenerator:
         clean_images_count = num_of_images - attacked_images_count
         clean_images = []
         for i, (images, labels) in enumerate(data_loader):
-            if i > clean_images_count:
+            if i >= clean_images_count:
                 break
 
             for j in range(len(images)):
               clean_images.append((images[j], labels[j]))
 
-        return clean_images + attacked_images
+        l1, l2, lInf, power = 0, 0, 0, 0
+        for res in attacked_results:
+          l1 += res.distance.l1
+          l2 += res.distance.l2
+          lInf += res.distance.linf
+          power += res.distance.power
+
+        average_distance_score = AttackDistanceScore(l1=l1 / len(attacked_results), l2=l2 / len(attacked_results), linf=lInf / len(attacked_results), power=power / len(attacked_results))
+
+        return clean_images + attacked_images, average_distance_score
 
     @staticmethod
     def get_attacked_imagenette_dataset(
@@ -65,14 +81,14 @@ class AttackedDatasetGenerator:
       use_test_set: bool = False,
       batch_size: int = 1,
       shuffle = True
-    ) -> DataLoader:
+    ) -> AttackedDatasetGeneratorResult:
 
       datasets = []
 
       loading_bar = tqdm(attack_names, desc='Generating attacked datasets')
       for attack_name in attack_names:
         loading_bar.set_description(f'Generating attacked datasets - {attack_name}')
-        dataset = AttackedDatasetGenerator.get_attacked_imagenette_dataset_from_attack(
+        dataset, distance_score = AttackedDatasetGenerator.get_attacked_imagenette_dataset_from_attack(
           model=model,
           model_name=model_name,
           attack_name=attack_name,
@@ -85,10 +101,10 @@ class AttackedDatasetGenerator:
 
         loading_bar.update()
 
-      return DataLoader(datasets, batch_size=batch_size, shuffle=shuffle)
+      return AttackedDatasetGeneratorResult(DataLoader(datasets, batch_size=batch_size, shuffle=shuffle), distance_score)
 
     @staticmethod
-    def get_attacked_imagenette_dataset_half(model: Module, attack_names: List['str'], model_name=None, test_subset_size: int = 1000, batch_size: int = 1) -> DataLoader:
+    def get_attacked_imagenette_dataset_half(model: Module, attack_names: List['str'], model_name=None, test_subset_size: int = -1, batch_size: int = 1) -> DataLoader:
       _, test_imagenette_loader = DatasetLoader.get_dataset_by_type(dataset_type=DatasetType.IMAGENETTE, batch_size=batch_size, test_subset_size=test_subset_size)
       images_per_attack = int(len(test_imagenette_loader.dataset) / len(attack_names))
       attacked_results: DataLoader = AttackedDatasetGenerator.get_attacked_imagenette_dataset(

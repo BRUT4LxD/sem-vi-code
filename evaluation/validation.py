@@ -12,7 +12,7 @@ import csv
 class ValidationAccuracyResult:
     def __init__(self, model_name: str, accuracy: float, accuracies: List['float'], class_names: List['str']):
         self.model_name = model_name
-        self.accuracy = accuracy
+        self.accuracy = round(accuracy, 2)
         self.accuracies = [round(acc, 2) for acc in accuracies]
         self.class_names = class_names
 
@@ -79,8 +79,8 @@ class Validation:
             if n_class_samples[i] == 0:
                 print(f'accuracy of {classes[i]}: not enough samples')
                 continue
-            acc = 100.0 * n_class_correct[i] / n_class_samples[i]
-            print(f'accuracy of {classes[i]}: {acc}%')
+            class_acc = 100.0 * n_class_correct[i] / n_class_samples[i]
+            print(f'accuracy of {classes[i]}: {class_acc}%')
 
     @staticmethod
     @torch.no_grad()
@@ -130,8 +130,8 @@ class Validation:
             if n_class_samples[i] == 0:
                 string_builder += f'{imagenette_classes[i]}: not enough samples' + '\n'
                 continue
-            acc = 100.0 * n_class_correct[i] / n_class_samples[i]
-            string_builder += f'{imagenette_classes[i]}: {acc}%' + '\n'
+            class_acc = 100.0 * n_class_correct[i] / n_class_samples[i]
+            string_builder += f'{imagenette_classes[i]}: {class_acc}%' + '\n'
 
         if print_results:
             print(string_builder)
@@ -144,6 +144,12 @@ class Validation:
                 f.write(string_builder)
 
         model_name = model_name if model_name is not None else model.__class__.__name__
-        accs = [100.0 * n_class_correct[i] / n_class_samples[i] for i in range(len(imagenet_to_imagenette_class_map))]
+
+        accs = []
+        for i in range(len(imagenet_to_imagenette_class_map)):
+            if n_class_samples[i] == 0:
+                accs.append(-1)
+                continue
+            accs.append(100.0 * n_class_correct[i] / n_class_samples[i])
         return ValidationAccuracyResult(model_name=model_name, accuracy=acc, accuracies=accs, class_names=imagenette_classes)
 

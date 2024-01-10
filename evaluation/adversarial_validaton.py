@@ -16,7 +16,7 @@ import csv
 class AdversarialValidationAccuracyResult:
     def __init__(self, model_name: str, accuracy: float, accuracies: List['float'], class_names: List['str'] , attack_ratio: float):
         self.model_name = model_name
-        self.accuracy = accuracy
+        self.accuracy = round(accuracy,2)
         self.accuracies = [round(acc, 2) for acc in accuracies]
         self.class_names = class_names
         self.attack_ratio = attack_ratio

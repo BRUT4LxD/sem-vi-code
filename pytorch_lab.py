@@ -44,24 +44,39 @@ model_name = ModelNames().resnet18
 resnet = ImageNetModels().get_model(model_name=model_name)
 resnet.to(device)
 
-iterations = 40
-i = 20
+iterations = 20
+i = 0
 
-resnet = load_model(resnet, f"./models/adversarial_models/{model_name}/it{i - 1}.pt")
+# resnet = load_model(resnet, f"./models/adversarial_models/{model_name}/it{i - 1}.pt")
 valid_attack_names = [att for att in valid_attack_names if att != AttackNames().PGDRSL2 and att != AttackNames().EADEN and att != AttackNames().EADL1 and att != AttackNames().Square]
 
+optimizer = torch.optim.Adam(resnet.parameters(), lr=0.00001)
+adv_save_path = f"./results/adversarial_training/{model_name}/adv_val3.txt"
+save_path = f"./results/adversarial_training/{model_name}/val3.txt"
+save_model_path = f"./models/adversarial_models/{model_name}/it{i}.pt"
+
+adv = AdversarialTraining(attack_names=valid_attack_names, model=resnet, optimizer=optimizer, device=device, model_name=model_name)
 while i < iterations:
-  adv_save_path = f"./results/adversarial_training/{model_name}/adv_val.txt"
-  save_path = f"./results/adversarial_training/{model_name}/val.txt"
   save_model_path = f"./models/adversarial_models/{model_name}/it{i}.pt"
-  optimizer = torch.optim.Adam(resnet.parameters(), lr=0.0001)
-  attacked_test_loader = AttackedDatasetGenerator.get_attacked_imagenette_dataset_half(model=resnet, model_name=model_name, attack_names=valid_attack_names, test_subset_size=1000)
-  adv = AdversarialTraining(attack_names=valid_attack_names, model=resnet, optimizer=optimizer, device=device, model_name=model_name)
-  adv.train(num_epochs=10, images_per_attack=40, attack_ratio=0.5, save_model_path=save_model_path)
-  val_result = Validation.validate_imagenet_with_imagenette_classes(model=resnet, model_name=model_name, test_loader=test_loader, device=device)
-  val_result.append_to_csv_file(it=i, save_path=save_path)
-  adv_val_result = Validation.validate_imagenet_with_imagenette_classes(model=resnet, model_name=model_name, test_loader=attacked_test_loader, device=device)
-  adv_val_result.append_to_csv_file(it=i, save_path=adv_save_path)
+  val_result, adv_val_result = adv.train(num_epochs=20, images_per_attack=10, attack_ratio=1, save_model_path=save_path, it_num=i)
+  print(val_result.accuracy)
+  print(adv_val_result.accuracy)
   i += 1
+
+
+
+# while i < iterations:
+#   adv_save_path = f"./results/adversarial_training/{model_name}/adv_val.txt"
+#   save_path = f"./results/adversarial_training/{model_name}/val.txt"
+#   save_model_path = f"./models/adversarial_models/{model_name}/it{i}.pt"
+#   optimizer = torch.optim.Adam(resnet.parameters(), lr=0.0001)
+#   attacked_test_loader = AttackedDatasetGenerator.get_attacked_imagenette_dataset_half(model=resnet, model_name=model_name, attack_names=valid_attack_names, test_subset_size=1000)
+#   adv = AdversarialTraining(attack_names=valid_attack_names, model=resnet, optimizer=optimizer, device=device, model_name=model_name)
+#   adv.train(num_epochs=10, images_per_attack=40, attack_ratio=0.5, save_model_path=save_model_path)
+#   val_result = Validation.validate_imagenet_with_imagenette_classes(model=resnet, model_name=model_name, test_loader=test_loader, device=device)
+#   val_result.append_to_csv_file(it=i, save_path=save_path)
+#   adv_val_result = Validation.validate_imagenet_with_imagenette_classes(model=resnet, model_name=model_name, test_loader=attacked_test_loader, device=device)
+#   adv_val_result.append_to_csv_file(it=i, save_path=adv_save_path)
+#   i += 1
 
 # Validation.validate_imagenet_with_imagenette_classes(model=resnet, model_name=model_name, test_loader=test_loader, device=device)

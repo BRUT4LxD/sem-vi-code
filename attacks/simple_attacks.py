@@ -11,6 +11,7 @@ from tqdm import tqdm
 from torchvision.utils import save_image
 from data_eng.dataset_loader import DatasetLoader, DatasetType
 from data_eng.transforms import imagenette_transformer
+from domain.attack_distance_score import AttackDistanceScore
 from domain.attack_eval_score import AttackEvaluationScore
 from domain.attack_result import AttackResult, AttackedImageResult
 from evaluation.metrics import Metrics
@@ -89,7 +90,12 @@ class SimpleAttacks:
                     continue
 
                 imagenette_label_tensor = torch.tensor(imagenet_to_imagenette_index_map[labels[i].item()])
-                attack_results.append(AttackedImageResult(adv_images[i], imagenette_label_tensor))
+                l1 = Metrics.l1_distance(images[i], adv_images[i])
+                l2 = Metrics.l2_distance(images[i], adv_images[i])
+                lInf = Metrics.linf_distance(images[i], adv_images[i])
+                power = Metrics.calculate_attack_power(images[i], adv_images[i])
+                distance_score = AttackDistanceScore(l1.item(), l2.item(), lInf.item(), power.item())
+                attack_results.append(AttackedImageResult(adv_images[i], imagenette_label_tensor, distance_score))
 
         del model, attack, data_loader
 
