@@ -74,6 +74,7 @@ class SimpleAttacks:
                 labels[mask] = mapped
 
             images, labels = images.to(device), labels.to(device)
+
             images, labels = ModelUtils.remove_missclassified(model, images, labels, device=device)
 
             if labels.numel() == 0:
@@ -90,12 +91,13 @@ class SimpleAttacks:
                     continue
 
                 imagenette_label_tensor = torch.tensor(imagenet_to_imagenette_index_map[labels[i].item()])
-                l1 = Metrics.l1_distance(images[i], adv_images[i])
-                l2 = Metrics.l2_distance(images[i], adv_images[i])
-                lInf = Metrics.linf_distance(images[i], adv_images[i])
-                power = Metrics.calculate_attack_power(images[i], adv_images[i])
+                img_detached, adv_img_detached = images[i].detach().clone(), adv_images[i].detach().clone()
+                l1 = Metrics.l1_distance(img_detached, adv_img_detached)
+                l2 = Metrics.l2_distance(img_detached, adv_img_detached)
+                lInf = Metrics.linf_distance(img_detached, adv_img_detached)
+                power = Metrics.calculate_attack_power(img_detached, adv_img_detached)
                 distance_score = AttackDistanceScore(l1.item(), l2.item(), lInf.item(), power.item())
-                attack_results.append(AttackedImageResult(adv_images[i], imagenette_label_tensor, distance_score))
+                attack_results.append(AttackedImageResult(adv_img_detached, imagenette_label_tensor, distance_score))
 
         del model, attack, data_loader
 

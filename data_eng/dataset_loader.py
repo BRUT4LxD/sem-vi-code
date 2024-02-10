@@ -1,5 +1,5 @@
 import torchvision.datasets as datasets
-from torch.utils.data import DataLoader, Subset, SubsetRandomSampler
+from torch.utils.data import DataLoader, Subset, SubsetRandomSampler, Dataset
 from attacks.attack_names import AttackNames
 from data_eng.transforms import mnist_transformer, cifar_transformer, imagenette_transformer, no_transformer
 from domain.model_names import ModelNames
@@ -13,6 +13,13 @@ class DatasetType (object):
     @staticmethod
     def is_valid_data_set_type(data_set_type):
         return data_set_type in [DatasetType.CIFAR10, DatasetType.IMAGENETTE, DatasetType.MNIST]
+
+class EmptyDataset(Dataset):
+    def __len__(self):
+        return 0
+
+    def __getitem__(self, idx):
+        return None
 
 class DatasetLoader:
     @staticmethod
@@ -109,10 +116,13 @@ def load_imagenette(transform=None, path_to_data='./data/imagenette', batch_size
     train_dataset = datasets.ImageFolder(root=train_path, transform=trans)
     test_dataset = datasets.ImageFolder(root=test_path, transform=trans)
 
-    return _get_data_loaders( 
+    return _get_data_loaders(
         train_dataset,
         test_dataset,
         batch_size=batch_size,
         train_subset_size=train_subset_size,
         test_subset_size=test_subset_size,
         shuffle=shuffle)
+
+def load_empty_dataloader():
+    return DataLoader(EmptyDataset(), batch_size=1)

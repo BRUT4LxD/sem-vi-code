@@ -29,6 +29,7 @@ from config.imagenet_models import ImageNetModels
 from torch.optim.lr_scheduler import StepLR, ReduceLROnPlateau
 
 from training.transfer.setup_pretraining import SetupPretraining
+from torch.utils.tensorboard import SummaryWriter
 
 # device config
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -42,26 +43,41 @@ valid_attack_names = [attack_name for attack_name in all_attack_names if attack_
 
 model_name = ModelNames().resnet18
 resnet = ImageNetModels().get_model(model_name=model_name)
+
+# resnet = load_model(resnet, f"./models/adversarial_models/{model_name}/22-01-2024_00-33.pt")
 resnet.to(device)
 
-iterations = 20
+iterations = 50
 i = 0
 
 # resnet = load_model(resnet, f"./models/adversarial_models/{model_name}/it{i - 1}.pt")
 valid_attack_names = [att for att in valid_attack_names if att != AttackNames().PGDRSL2 and att != AttackNames().EADEN and att != AttackNames().EADL1 and att != AttackNames().Square]
+lr = 0.00001
+attack_ratio = 1
+images_per_attack = 10
+progressive_learning = True
 
-optimizer = torch.optim.Adam(resnet.parameters(), lr=0.00001)
-adv_save_path = f"./results/adversarial_training/{model_name}/adv_val3.txt"
-save_path = f"./results/adversarial_training/{model_name}/val3.txt"
-save_model_path = f"./models/adversarial_models/{model_name}/it{i}.pt"
+model_names = [ModelNames().vgg16, ModelNames().densenet121, ModelNames().mobilenet_v2, ModelNames().efficientnet_b0]
 
-adv = AdversarialTraining(attack_names=valid_attack_names, model=resnet, optimizer=optimizer, device=device, model_name=model_name)
-while i < iterations:
-  save_model_path = f"./models/adversarial_models/{model_name}/it{i}.pt"
-  val_result, adv_val_result = adv.train(num_epochs=20, images_per_attack=10, attack_ratio=1, save_model_path=save_path, it_num=i)
-  print(val_result.accuracy)
-  print(adv_val_result.accuracy)
-  i += 1
+adv_save_path = f"./results/adversarial_training/{model_name}/adv_val.txt"
+save_path = f"./results/adversarial_training/{model_name}/val.txt"
+
+
+for model_name in model_names:
+  current_model = ImageNetModels().get_model(model_name=model_name)
+  adv = AdversarialTraining(attack_names=valid_attack_names, model=current_model, learning_rate=lr, device=device, model_name=model_name)
+
+  date = datetime.now().strftime("%d-%m-%Y_%H-%M")
+  save_model_path = f"./models/adversarial_models/{model_name}/{date}.pt"
+  writer = SummaryWriter(log_dir=f'runs/adversarial_training/{model_name}/{date}_lr={lr}_ar={attack_ratio}_imgs={images_per_attack*len(valid_attack_names)}_prgrsv={progressive_learning}')
+  adv.train_progressive(
+    epochs_per_iter=30,
+    writer=writer,
+    iterations=iterations,
+    images_per_attack=images_per_attack,
+    attack_ratio=1,
+    save_model_path=save_model_path)
+  writer.close()
 
 
 
