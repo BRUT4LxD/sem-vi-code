@@ -99,8 +99,6 @@ class SimpleAttacks:
                 distance_score = AttackDistanceScore(l1.item(), l2.item(), lInf.item(), power.item())
                 attack_results.append(AttackedImageResult(adv_img_detached, imagenette_label_tensor, distance_score))
 
-        del model, attack, data_loader
-
         return attack_results
 
     @staticmethod
