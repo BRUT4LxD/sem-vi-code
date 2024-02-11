@@ -81,6 +81,42 @@ for model_name in model_names:
 
 
 
+
+attacked_dataset = []
+
+# generate adversarial examples for all model_names and valid_attacks
+for model_name in model_names:
+  current_model = ImageNetModels().get_model(model_name=model_name)
+  current_model.to(device)
+
+  for attack_name in valid_attack_names:
+    attack = AttackFactory.get_attack(attack_name=attack_name, model_name=model_name, device=device)
+    attacked_subset = AttackedDatasetGenerator.get_attacked_imagenette_dataset_from_attack(
+      model=current_model,
+      model_name=model_name,
+      attack_name=attack_name,
+      attack_ratio=1,
+      use_test_set=True,
+      num_of_images=20,
+      shuffle=True)
+
+    attacked_dataset.extend(attacked_subset)
+
+attacked_dataloader = DataLoader(attacked_dataset, batch_size=8, shuffle=True)
+
+
+for model_name in model_names:
+  current_model = ImageNetModels().get_model(model_name=model_name)
+  current_model.to(device)
+
+  adv_val = AdversarialValidation(model=current_model, attacked_dataloader=attacked_dataloader, device=device, model_name=model_name)
+  adv_val.validate(save_path=adv_save_path, save_model_path=save_model_path)
+
+  val = Validation(model=current_model, test_loader=test_loader, device=device, model_name=model_name)
+  val.validate(save_path=save_path)
+
+
+
 # while i < iterations:
 #   adv_save_path = f"./results/adversarial_training/{model_name}/adv_val.txt"
 #   save_path = f"./results/adversarial_training/{model_name}/val.txt"
