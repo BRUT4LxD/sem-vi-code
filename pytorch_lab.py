@@ -57,7 +57,7 @@ attack_ratio = 1
 images_per_attack = 10
 progressive_learning = True
 
-model_names = [ModelNames().vgg16, ModelNames().densenet121, ModelNames().mobilenet_v2, ModelNames().efficientnet_b0]
+model_names = [ModelNames().densenet121, ModelNames().mobilenet_v2, ModelNames().efficientnet_b0, ModelNames().vgg16]
 
 adv_save_path = f"./results/adversarial_training/{model_name}/adv_val.txt"
 save_path = f"./results/adversarial_training/{model_name}/val.txt"
@@ -103,18 +103,6 @@ for model_name in model_names:
     attacked_dataset.extend(attacked_subset)
 
 attacked_dataloader = DataLoader(attacked_dataset, batch_size=8, shuffle=True)
-
-
-for model_name in model_names:
-  current_model = ImageNetModels().get_model(model_name=model_name)
-  current_model.to(device)
-
-  adv_val = AdversarialValidation(model=current_model, attacked_dataloader=attacked_dataloader, device=device, model_name=model_name)
-  adv_val.validate(save_path=adv_save_path, save_model_path=save_model_path)
-
-  val = Validation(model=current_model, test_loader=test_loader, device=device, model_name=model_name)
-  val.validate(save_path=save_path)
-
 
 
 # while i < iterations:

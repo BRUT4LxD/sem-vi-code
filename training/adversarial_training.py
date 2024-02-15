@@ -236,18 +236,21 @@ class AdversarialTraining:
 
                 except RuntimeError as e:
                     print(f'[Adversarial Training] Error during training: {e}')
-                    print(f'lowering images_per_attack by 10% to {images_per_attack - int(images_per_attack/10)} and try again')
+                    print(f'lowering images_per_attack by 10% to {images_per_attack - int(images_per_attack/10)} and try again. Current iteration: {current_iteration}')
                     images_per_attack = images_per_attack - int(images_per_attack/10)
                     current_iteration += 1
                     if images_per_attack == 1:
                         break
                     continue
                 except Exception as e:
-                    print(f'[Adversarial Training] Error during training: {e}')
+                    print(f'[Adversarial Training] Error during training: {e}. Current iteration: {current_iteration}')
                     current_iteration += 1
                     if images_per_attack == 1:
                         break
                     continue
+                finally:
+                    current_epoch += 1
+                    epoch += 1
 
                 print(f'iteration {current_iteration} epoch {current_epoch + 1}/{epochs_per_iter}, loss = {loss.item():.12f} lr={optimizer.param_groups[0]["lr"]}')
                 writer.add_scalar("Loss/train", loss.item(), epoch)
