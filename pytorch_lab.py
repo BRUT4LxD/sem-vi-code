@@ -135,15 +135,6 @@ for model_name in tqdm(model_names):
 att_dataset = [(att.adv_image, att.label) for att in attacked_dataset]
 attacked_dataloader = DataLoader(att_dataset, batch_size=16, shuffle=True)
 
-res = Validation.validate_imagenet_with_imagenette_classes(
-  model=adv_vgg,
-  test_loader=test_loader,
-  model_name=ModelNames().vgg16,
-  device=device
-)
-
-res.save_csv(0, f"./results/adversarial_training/{ModelNames().vgg16}/val_{len(test_loader.dataset)}.txt")
-
 i = 0
 for adv_model in adv_models:
   _ = adv_model.eval()
@@ -169,6 +160,36 @@ for adv_model in adv_models:
   res.save_csv(0, f"./results/adversarial_training/{model_name}/val_{len(test_loader.dataset)}.txt")
 
   i = i + 1
+
+
+for model_name in model_names:
+  
+  model = ImageNetModels().get_model(model_name=model_name)
+  _ = model.eval()
+  _ = model.to(device)
+
+  model_name = model_names[i]
+  adv_res = Validation.validate_imagenet_with_imagenette_classes(
+    model=model,
+    test_loader=attacked_dataloader,
+    model_name=model_name,
+    device=device
+  )
+
+  adv_res.save_csv(0, f"./results/adversarial_training/{model_name}/adv_val_{len(attacked_dataloader.dataset)}_untrained.txt")
+
+  res = Validation.validate_imagenet_with_imagenette_classes(
+    model=model,
+    test_loader=test_loader,
+    model_name=model_name,
+    device=device
+  )
+
+  res.save_csv(0, f"./results/adversarial_training/{model_name}/val_{len(test_loader.dataset)}_untrained.txt")
+
+  i = i + 1
+
+
 
 # while i < iterations:
 #   adv_save_path = f"./results/adversarial_training/{model_name}/adv_val.txt"
