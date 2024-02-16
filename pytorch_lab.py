@@ -11,6 +11,7 @@ from torchvision import transforms
 import torch
 from data_eng.io import load_model
 from data_eng.pretrained_model_downloader import PretrainedModelDownloader
+from domain.attack_result import AttackedImageResult
 from domain.model_names import ModelNames
 from evaluation.adversarial_validaton import AdversarialValidation
 from evaluation.validation import Validation
@@ -34,7 +35,7 @@ from torch.utils.tensorboard import SummaryWriter
 # device config
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-train_loader, test_loader = load_imagenette(batch_size=128, shuffle=True)
+train_loader, test_loader = load_imagenette(batch_size=16, shuffle=True)
 
 all_model_names = ModelNames().all_model_names
 all_attack_names = AttackNames().all_attack_names
@@ -57,53 +58,117 @@ attack_ratio = 1
 images_per_attack = 10
 progressive_learning = True
 
-model_names = [ModelNames().densenet121, ModelNames().mobilenet_v2, ModelNames().efficientnet_b0, ModelNames().vgg16]
+model_names = [ModelNames().resnet18, ModelNames().densenet121, ModelNames().mobilenet_v2, ModelNames().efficientnet_b0, ModelNames().vgg16]
 
-adv_save_path = f"./results/adversarial_training/{model_name}/adv_val.txt"
-save_path = f"./results/adversarial_training/{model_name}/val.txt"
-
-
-for model_name in model_names:
-  current_model = ImageNetModels().get_model(model_name=model_name)
-  adv = AdversarialTraining(attack_names=valid_attack_names, model=current_model, learning_rate=lr, device=device, model_name=model_name)
-
-  date = datetime.now().strftime("%d-%m-%Y_%H-%M")
-  save_model_path = f"./models/adversarial_models/{model_name}/{date}.pt"
-  writer = SummaryWriter(log_dir=f'runs/adversarial_training/{model_name}/{date}_lr={lr}_ar={attack_ratio}_imgs={images_per_attack*len(valid_attack_names)}_prgrsv={progressive_learning}')
-  adv.train_progressive(
-    epochs_per_iter=30,
-    writer=writer,
-    iterations=iterations,
-    images_per_attack=images_per_attack,
-    attack_ratio=1,
-    save_model_path=save_model_path)
-  writer.close()
+# adv_save_path = f"./results/adversarial_training/{model_name}/adv_val.txt"
+# save_path = f"./results/adversarial_training/{model_name}/val.txt"
 
 
+# for model_name in model_names:
+#   current_model = ImageNetModels().get_model(model_name=model_name)
+#   adv = AdversarialTraining(attack_names=valid_attack_names, model=current_model, learning_rate=lr, device=device, model_name=model_name)
+
+#   date = datetime.now().strftime("%d-%m-%Y_%H-%M")
+#   save_model_path = f"./models/adversarial_models/{model_name}/{date}.pt"
+#   writer = SummaryWriter(log_dir=f'runs/adversarial_training/{model_name}/{date}_lr={lr}_ar={attack_ratio}_imgs={images_per_attack*len(valid_attack_names)}_prgrsv={progressive_learning}')
+#   adv.train_progressive(
+#     epochs_per_iter=30,
+#     writer=writer,
+#     iterations=iterations,
+#     images_per_attack=images_per_attack,
+#     attack_ratio=1,
+#     save_model_path=save_model_path)
+#   writer.close()
 
 
-attacked_dataset = []
+
+adv_models = []
+
+model_name = ModelNames().resnet18
+raw_model = ImageNetModels().get_model(model_name=model_name)
+adv_resnet = load_model(raw_model, f"./models/adversarial_models/{model_name}/04-02-2024_00-47.pt")
+
+
+model_name = ModelNames().densenet121
+raw_model = ImageNetModels().get_model(model_name=model_name)
+adv_densenet = load_model(raw_model, f"./models/adversarial_models/{model_name}/11-02-2024_19-54.pt")
+
+model_name = ModelNames().mobilenet_v2
+raw_model = ImageNetModels().get_model(model_name=model_name)
+adv_mobilenet = load_model(raw_model, f"./models/adversarial_models/{model_name}/13-02-2024_10-49.pt")
+
+model_name = ModelNames().efficientnet_b0
+raw_model = ImageNetModels().get_model(model_name=model_name)
+adv_efficientnet = load_model(raw_model, f"./models/adversarial_models/{model_name}/13-02-2024_22-59.pt")
+
+model_name = ModelNames().vgg16
+raw_model = ImageNetModels().get_model(model_name=model_name)
+adv_vgg = load_model(raw_model, f"./models/adversarial_models/{model_name}/15-02-2024_07-37.pt")
+
+adv_models.append(adv_resnet)
+adv_models.append(adv_densenet)
+adv_models.append(adv_mobilenet)
+adv_models.append(adv_efficientnet)
+adv_models.append(adv_vgg)
+
+attacked_dataset: list['AttackedImageResult'] = []
 
 # generate adversarial examples for all model_names and valid_attacks
-for model_name in model_names:
+for model_name in tqdm(model_names):
   current_model = ImageNetModels().get_model(model_name=model_name)
-  current_model.to(device)
+  current_model = current_model.to(device)
 
-  for attack_name in valid_attack_names:
-    attack = AttackFactory.get_attack(attack_name=attack_name, model_name=model_name, device=device)
-    attacked_subset = AttackedDatasetGenerator.get_attacked_imagenette_dataset_from_attack(
+  for attack_name in tqdm(valid_attack_names):
+    attack = AttackFactory.get_attack(attack_name=attack_name, model=current_model)
+    attacked_subset = SimpleAttacks.get_attacked_imagenette_images(
       model=current_model,
-      model_name=model_name,
       attack_name=attack_name,
-      attack_ratio=1,
-      use_test_set=True,
-      num_of_images=20,
-      shuffle=True)
+      model_name=model_name,
+      batch_size=1,
+      num_of_images=30,
+      use_test_set=True
+    )
 
     attacked_dataset.extend(attacked_subset)
 
-attacked_dataloader = DataLoader(attacked_dataset, batch_size=8, shuffle=True)
 
+att_dataset = [(att.adv_image, att.label) for att in attacked_dataset]
+attacked_dataloader = DataLoader(att_dataset, batch_size=16, shuffle=True)
+
+res = Validation.validate_imagenet_with_imagenette_classes(
+  model=adv_vgg,
+  test_loader=test_loader,
+  model_name=ModelNames().vgg16,
+  device=device
+)
+
+res.save_csv(0, f"./results/adversarial_training/{ModelNames().vgg16}/val_{len(test_loader.dataset)}.txt")
+
+i = 0
+for adv_model in adv_models:
+  _ = adv_model.eval()
+  _ = adv_model.to(device)
+
+  model_name = model_names[i]
+  adv_res = Validation.validate_imagenet_with_imagenette_classes(
+    model=adv_model,
+    test_loader=attacked_dataloader,
+    model_name=model_name,
+    device=device
+  )
+
+  adv_res.save_csv(0, f"./results/adversarial_training/{model_name}/adv_val_{len(attacked_dataloader.dataset)}.txt")
+
+  res = Validation.validate_imagenet_with_imagenette_classes(
+    model=adv_model,
+    test_loader=test_loader,
+    model_name=model_name,
+    device=device
+  )
+
+  res.save_csv(0, f"./results/adversarial_training/{model_name}/val_{len(test_loader.dataset)}.txt")
+
+  i = i + 1
 
 # while i < iterations:
 #   adv_save_path = f"./results/adversarial_training/{model_name}/adv_val.txt"
