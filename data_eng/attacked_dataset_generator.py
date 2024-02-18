@@ -2,12 +2,15 @@ from ast import Tuple
 from typing import List
 from torch.nn import Module
 from tqdm import tqdm
+from attacks.attack_factory import AttackFactory
 
 from attacks.simple_attacks import SimpleAttacks
+from config.imagenet_models import ImageNetModels
 from data_eng.dataset_loader import DatasetLoader, DatasetType
 from torch.utils.data import DataLoader, ConcatDataset
 
 from domain.attack_distance_score import AttackDistanceScore
+from domain.attack_result import AttackedImageResult
 
 class AttackedDatasetGeneratorResult:
     def __init__(self, data_loader: DataLoader, attack_distance_score: AttackDistanceScore) -> None:
@@ -119,3 +122,44 @@ class AttackedDatasetGenerator:
 
       merged_dataset = ConcatDataset([test_imagenette_loader.dataset, attacked_results.dataset])
       return DataLoader(merged_dataset, batch_size=batch_size, shuffle=True)
+
+
+
+    @staticmethod
+    def get_attacked_imagenette_dataset_multimodel(
+      model_names: List[str],
+      attack_names: List['str'],
+      num_of_images_per_attack: int,
+      use_test_set: bool = True,
+      batch_size: int = 1,
+      device: str = 'gpu') -> DataLoader:
+      """
+      Returns attacked imagenette dataset for all model names.
+      :param model_names: list of model names
+      :param attack_names: list of attack names
+      :param num_of_images_per_attack: number of images per attack
+      :param use_test_set: use test set
+      :param batch_size: batch size of returned dataloader
+      :param device: device
+      :return: Dataloader
+      """
+      attacked_dataset: list['AttackedImageResult'] = []
+      for model_name in tqdm(model_names):
+        current_model = ImageNetModels().get_model(model_name=model_name)
+        current_model = current_model.to(device)
+
+        for attack_name in tqdm(attack_names):
+          attacked_subset = SimpleAttacks.get_attacked_imagenette_images(
+            model=current_model,
+            attack_name=attack_name,
+            model_name=model_name,
+            batch_size=1,
+            num_of_images=num_of_images_per_attack,
+            use_test_set=use_test_set
+          )
+
+          attacked_dataset.extend(attacked_subset)
+
+
+      att_dataset = [(att.adv_image, att.label) for att in attacked_dataset]
+      return DataLoader(att_dataset, batch_size=batch_size, shuffle=True)
