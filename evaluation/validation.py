@@ -20,6 +20,10 @@ class ValidationAccuracyResult:
         return f'{self.model_name}: {round(self.accuracy, 2)}%'
 
     def save_csv(self, it: str, save_path: str):
+        dirname = os.path.dirname(save_path)
+        if not os.path.exists(dirname):
+            os.makedirs(dirname)
+
         headers = ['it', 'acc'] +  self.class_names
         results = [it, self.accuracy] + self.accuracies
 
@@ -46,11 +50,50 @@ class ValidationAccuracyResult:
             writer = csv.writer(file)
             writer.writerow(results)
 
+class ValidationAccuracyBinaryResult:
+    def __init__(self, model_name: str, accuracy: float):
+        self.model_name = model_name
+        self.accuracy = round(accuracy, 2)
+
+    def __str__(self):
+        return f'{self.model_name}: {round(self.accuracy, 2)}%'
+
+    def save_csv(self, it: str, save_path: str):
+        dirname = os.path.dirname(save_path)
+        if not os.path.exists(dirname):
+            os.makedirs(dirname)
+
+        headers = ['it', 'acc']
+        results = [it, self.accuracy]
+
+        with open(save_path, 'w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow(headers)
+            writer.writerow(results)
+
+    def append_to_csv_file(self, it: str, save_path: str):
+        results = [it, self.accuracy]
+
+        dirname = os.path.dirname(save_path)
+        if not os.path.exists(dirname):
+            os.makedirs(dirname)
+
+        if not os.path.exists(save_path):
+            headers = ['it', 'acc']
+            with open(save_path, 'w', newline='') as file:
+                writer = csv.writer(file)
+                writer.writerow(headers)
+                file.close()
+
+        with open(save_path, 'a', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow(results)
+
 class Validation:
 
     @staticmethod
     @torch.no_grad()
-    def simple_validation(model: torch.nn.Module, test_loader: DataLoader, classes: list, device='gpu'):
+    def simple_validation(model: torch.nn.Module, test_loader: DataLoader, classes: list, device='cuda'):
         n_correct = 0
         n_samples = 0
         n_class_correct = [0 for i in range(10)]
@@ -88,7 +131,7 @@ class Validation:
         model: torch.nn.Module,
         test_loader: DataLoader,
         model_name=None,
-        device='gpu',
+        device='cuda',
         save_path=None,
         print_results=True
         ) -> ValidationAccuracyResult:
@@ -153,3 +196,34 @@ class Validation:
             accs.append(100.0 * n_class_correct[i] / n_class_samples[i])
         return ValidationAccuracyResult(model_name=model_name, accuracy=acc, accuracies=accs, class_names=imagenette_classes)
 
+
+    @staticmethod
+    @torch.no_grad()
+    def validate_binary_classification(
+        model: torch.nn.Module,
+        test_loader: DataLoader,
+        device='cuda',
+        print_results=True,
+        model_name=None
+    ) -> ValidationAccuracyResult:
+        n_correct = 0
+        n_samples = 0
+
+        model.eval()
+        for images, labels in tqdm(test_loader):
+            images = images.to(device)
+            labels = labels.to(device)
+            outputs = model(images)
+            predictions = torch.sigmoid(outputs) > 0.5 
+
+            n_samples += labels.size(0)
+            n_correct += (predictions.squeeze().int() == labels).sum().item()
+
+        acc = 100.0 * n_correct / n_samples
+        string_builder = f'Accuracy = {acc}%\n'
+
+        if print_results:
+            print(string_builder)
+
+        model_name = model_name if model_name is not None else model.__class__.__name__
+        return ValidationAccuracyBinaryResult(model_name=model_name, accuracy=acc)

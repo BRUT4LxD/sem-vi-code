@@ -27,7 +27,7 @@ def train_all_densenet(num_epochs=20):
                      train_loader=train_loader,
                      num_epochs=num_epochs,
                      device=device,
-                     SAVE_MODEL_PATH=path)
+                     save_model_path=path)
 
         Validation.simple_validation(model=model,
                           test_loader=test_loader,

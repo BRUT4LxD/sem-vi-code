@@ -4,6 +4,7 @@ from attacks.attack_names import AttackNames
 from attacks.simple_attacks import SimpleAttacks
 from attacks.transferability import Transferability
 from attacks.white_box.fgsm import FGSM
+from config.binary_models import BinaryModels
 from config.imagenette_classes import ImageNetteClasses
 from data_eng.attacked_dataset_generator import AttackedDatasetGenerator
 from data_eng.dataset_loader import DatasetLoader, DatasetType, load_imagenette
@@ -53,81 +54,160 @@ i = 0
 
 # resnet = load_model(resnet, f"./models/adversarial_models/{model_name}/it{i - 1}.pt")
 valid_attack_names = [att for att in valid_attack_names if att != AttackNames().PGDRSL2 and att != AttackNames().EADEN and att != AttackNames().EADL1 and att != AttackNames().Square]
-lr = 0.00001
+lr = 0.0001
 attack_ratio = 1
 images_per_attack = 10
 progressive_learning = True
 
-model_names = [ModelNames().vgg16, ModelNames().resnet18]
-
-# adv_save_path = f"./results/adversarial_training/{model_name}/adv_val.txt"
-# save_path = f"./results/adversarial_training/{model_name}/val.txt"
-
+model_names = [ModelNames().resnet18, ModelNames().densenet121, ModelNames().mobilenet_v2, ModelNames().efficientnet_b0, ModelNames().vgg16]
 
 # for model_name in model_names:
-#   current_model = ImageNetModels().get_model(model_name=model_name)
-#   adv = AdversarialTraining(attack_names=valid_attack_names, model=current_model, learning_rate=lr, device=device, model_name=model_name)
+#   model = ImageNetModels().get_model(model_name=model_name)
+#   Training.train_imagenette(
+#     model=model,
+#     model_name=model_name,
+#     train_loader=train_loader,
+#     test_loader=test_loader,
+#     num_epochs=100,
+#     learning_rate=lr
+#   )
 
-#   date = datetime.now().strftime("%d-%m-%Y_%H-%M")
-#   save_model_path = f"./models/adversarial_models/{model_name}/{date}.pt"
-#   writer = SummaryWriter(log_dir=f'runs/adversarial_training/{model_name}/{date}_lr={lr}_ar={attack_ratio}_imgs={images_per_attack*len(valid_attack_names)}_prgrsv={progressive_learning}')
-#   adv.train_progressive(
-#     epochs_per_iter=30,
-#     writer=writer,
-#     iterations=iterations,
-#     images_per_attack=images_per_attack,
-#     attack_ratio=1,
-#     save_model_path=save_model_path)
-#   writer.close()
+#   save_model_path = f"./models/imagenette/{model_name}.pt"
+#   save_model(model, save_model_path)
 
-for model_name in model_names:
-  model = ImageNetModels().get_model(model_name=model_name)
-  Training.train_imagenette(
-    model=model,
-    model_name=model_name,
-    train_loader=train_loader,
-    test_loader=test_loader,
-    num_epochs=100,
-    learning_rate=lr
+#   results_path = f"./results/imagenette_trained_models/{model_name}_lr{lr}.csv"
+#   res = Validation.validate_imagenet_with_imagenette_classes(
+#     model=model,
+#     test_loader=test_loader,
+#     model_name=model_name,
+#     device=device
+#   )
+
+#   print(f"Validation accuracy: {res}")
+#   res.save_csv(0, results_path)
+
+
+model_name = ModelNames().resnet18
+raw_model = ImageNetModels().get_model(model_name=model_name)
+trained_resnet = load_model(raw_model, f"./models/imagenette/{model_name}.pt")
+
+model_name = ModelNames().densenet121
+raw_model = ImageNetModels().get_model(model_name=model_name)
+trained_densenet = load_model(raw_model, f"./models/imagenette/{model_name}.pt")
+
+model_name = ModelNames().mobilenet_v2
+raw_model = ImageNetModels().get_model(model_name=model_name)
+trained_mobilenet = load_model(raw_model, f"./models/imagenette/{model_name}.pt")
+
+model_name = ModelNames().efficientnet_b0
+raw_model = ImageNetModels().get_model(model_name=model_name)
+trained_efficientnet = load_model(raw_model, f"./models/imagenette/{model_name}.pt")
+
+model_name = ModelNames().vgg16
+raw_model = ImageNetModels().get_model(model_name=model_name)
+trained_vgg = load_model(raw_model, f"./models/imagenette/{model_name}.pt")
+
+trained_models = [trained_resnet, trained_densenet, trained_mobilenet, trained_efficientnet, trained_vgg]
+
+
+# attacked_dataloder = AttackedDatasetGenerator.get_attacked_imagenette_dataset_multimodel(
+#   model_names=model_names,
+#   attack_names=valid_attack_names,
+#   num_of_images_per_attack=30,
+#   use_test_set=True,
+#   batch_size=1
+# )
+
+# for model, model_name in zip(trained_models, model_names):
+#   _ = model.eval()
+#   _ = model.to(device)
+
+#   model_name = model_names[i]
+#   res = Validation.validate_imagenet_with_imagenette_classes(
+#     model=model,
+#     test_loader=attacked_dataloder,
+#     model_name=model_name,
+#     device=device
+#   )
+
+#   res.save_csv(0, f"./results/models_accuracy/imagenette/{model_name}/adv_val.txt")
+
+model = BinaryModels.resnet18()
+model_name = ModelNames().resnet18
+
+# attacked_binary_train = [] 
+# attacked_binary_test = []
+
+# for images, labels in train_loader:
+#   attacked_binary_test.append((images[0], 0))
+#   attacked_binary_train.append((images[0], 1))
+
+# attacked_binary_test = DataLoader(attacked_binary_test, batch_size=1, shuffle=True)
+# attacked_binary_train = DataLoader(attacked_binary_train, batch_size=1, shuffle=True)
+
+# Training.train_binary(
+#   model=model,
+#   model_name=model_name,
+#   train_loader=attacked_binary_train,
+#   test_loader=attacked_binary_test,
+#   num_epochs=20,
+#   learning_rate=lr
+# )
+
+attacked_binary_test = AttackedDatasetGenerator.get_attacked_imagenette_dataset_multimodel_for_binary(
+  model_names=model_names,
+  attack_names=valid_attack_names,
+  num_of_images_per_attack=10,
+  use_test_set=True,
+  batch_size=1
+)
+
+
+date = datetime.now().strftime("%d-%m-%Y_%H-%M")
+writer = SummaryWriter(log_dir=f'runs/binary_training/{model_name}/{date}_lr={lr}')
+
+for i in range(5):
+  attacked_binary_train = AttackedDatasetGenerator.get_attacked_imagenette_dataset_multimodel_for_binary(
+    model_names=model_names,
+    attack_names=valid_attack_names,
+    num_of_images_per_attack=30,
+    use_test_set=False,
+    batch_size=1
   )
 
-  save_model_path = f"./models/imagenette/{model_name}.pt"
-  save_model(model, save_model_path)
-
-  results_path = f"./results/imagenette_trained_models/{model_name}_lr{lr}.csv"
-  res = Validation.validate_imagenet_with_imagenette_classes(
+  Training.train_binary(
     model=model,
-    test_loader=test_loader,
     model_name=model_name,
-    device=device
+    train_loader=attacked_binary_train,
+    test_loader=attacked_binary_test,
+    num_epochs=50,
+    learning_rate=lr,
+    writer=writer,
+    save_model_path=f"./models/binary/{model_name}.pt"
   )
 
-  print(f"Validation accuracy: {res}")
-  res.save_csv(0, results_path)
+  del attacked_binary_train
 
 
-for model_name in model_names:
-  model = ImageNetModels().get_model(model_name=model_name)
-  _ = model.eval()
-  _ = model.to(device)
+# save_model_path = f"./models/binary/{model_name}.pt"
+# save_model(model, save_model_path)
 
-  model_name = model_names[i]
-  adv_res = Validation.validate_imagenet_with_imagenette_classes(
-    model=model,
-    test_loader=test_loader,
-    model_name=model_name,
-    device=device
-  )
 
-  adv_res.save_csv(0, f"./results/adversarial_training/{model_name}/adv_val_{len(attacked_dataloader.dataset)}_untrained.txt")
+# attacked_binary_test = AttackedDatasetGenerator.get_attacked_imagenette_dataset_multimodel_for_binary(
+#   model_names=model_names,
+#   attack_names=valid_attack_names,
+#   num_of_images_per_attack=5,
+#   use_test_set=True,
+#   batch_size=1
+# )
 
-  res = Validation.validate_imagenet_with_imagenette_classes(
-    model=model,
-    test_loader=test_loader,
-    model_name=model_name,
-    device=device
-  )
+# res = Validation.validate_binary_classification(
+#   model=model,
+#   test_loader=attacked_binary_test,
+#   model_name=model_name,
+#   device=device
+# )
 
-  res.save_csv(0, f"./results/adversarial_training/{model_name}/val_{len(test_loader.dataset)}_untrained.txt")
-
-  i = i + 1
+# results_path = f"./results/imagenette_trained_models/{model_name}_lr{lr}.csv"
+# print(f"Validation accuracy: {res}")
+# res.save_csv(0, results_path)

@@ -30,7 +30,7 @@ Training.simple_train(model=model,
              train_loader=train_loader,
              num_epochs=num_epochs,
              device=device,
-             SAVE_MODEL_PATH=SAVE_MODEL_PATH)
+             save_model_path=SAVE_MODEL_PATH)
 
 Validation.simple_validation(model=model,
                   test_loader=test_loader,

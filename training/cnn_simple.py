@@ -36,7 +36,7 @@ class CNNSimpleTrainer:
     Training.simple_train(model, criterion, optimizer, train_loader,
                 num_epochs=num_epochs,
                 device=device,
-                SAVE_MODEL_PATH=model_save_path)
+                save_model_path=model_save_path)
 
     Validation.simple_validation(model, test_loader, batch_size, CifarClasses.get_classes(), device=device)
 

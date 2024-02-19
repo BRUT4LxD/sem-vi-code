@@ -36,6 +36,6 @@ class SystemUnderAttack:
             iterations=10,
             save_results=False,
             print_results=True,
-            device='gpu') -> dict:
+            device='cuda') -> dict:
 
         return Transferability.transferability_attack(attacked_model, trans_models, attacks, data_loader, iterations, save_results, print_results, device)

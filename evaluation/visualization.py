@@ -11,7 +11,7 @@ from domain.multiattack_result import MultiattackResult
 
 
 @torch.no_grad()
-def simple_visualize(test_model, test_loader, batch_size, classes, device='gpu'):
+def simple_visualize(test_model, test_loader, batch_size, classes, device='cuda'):
     batch_cnt = 0
     for images, labels in test_loader:
         if batch_cnt > 1:

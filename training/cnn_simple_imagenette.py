@@ -33,7 +33,7 @@ Training.simple_train(model=model,
              train_loader=train_loader,
              num_epochs=num_epochs,
              device=device,
-             SAVE_MODEL_PATH=MODEL_SAVE_PATH)
+             save_model_path=MODEL_SAVE_PATH)
 
 Validation.simple_validation(model, test_loader, batch_size,
                   ImageNetteClasses.get_classes(), device=device)

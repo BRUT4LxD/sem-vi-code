@@ -43,7 +43,7 @@ class AdversarialValidationAccuracyResult:
 class AdversarialValidation:
 
     @staticmethod
-    def validate_with_imagenette(model: torch.nn.Module, attack_names: List['str'], model_name=None, device='gpu', save_path=None, print_results=True, test_subset_size: int = 1000, batch_size: int = 1) -> AdversarialValidationAccuracyResult:
+    def validate_with_imagenette(model: torch.nn.Module, attack_names: List['str'], model_name=None, device='cuda', save_path=None, print_results=True, test_subset_size: int = 1000, batch_size: int = 1) -> AdversarialValidationAccuracyResult:
         _, test_imagenette_loader = DatasetLoader.get_dataset_by_type(dataset_type=DatasetType.IMAGENETTE, batch_size=batch_size, test_subset_size=test_subset_size)
         images_per_attack = int(len(test_imagenette_loader.dataset) / len(attack_names))
         attacked_results: DataLoader = AttackedDatasetGenerator.get_attacked_imagenette_dataset(
@@ -77,7 +77,7 @@ class AdversarialValidation:
         attack_model_names: List['str'],
         batch_size: int = 1,
         model_name=None,
-        device='gpu',
+        device='cuda',
         save_path=None,
         print_results=True,
         test_subset_size: int = 1000):

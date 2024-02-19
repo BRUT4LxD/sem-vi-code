@@ -1,0 +1,2 @@
+it,acc,tench,English springer,cassette player,chain saw,church,French horn,garbage truck,gas pump,golf ball,parachute
+0,45.32,60.47,41.01,15.13,33.94,33.25,36.04,54.24,37.95,67.17,72.31

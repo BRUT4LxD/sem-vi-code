@@ -31,7 +31,7 @@ class Transferability():
             save_folder_path=None,
             print_results=True,
             use_test_set=True,
-            device='gpu') -> dict:
+            device='cuda') -> dict:
 
         # count the number of misclassified images for each attack and each model
         # 1 - misclassified, 0 - classified correctly
@@ -124,7 +124,7 @@ class Transferability():
             attack_names: List['str'],
             save_path_folder=None,
             print_results=True,
-            device='gpu') -> dict:
+            device='cuda') -> dict:
 
         # count the number of misclassified images for each attack and each model
         # 1 - misclassified, 0 - classified correctly
@@ -228,7 +228,7 @@ class Transferability():
             save_folder_path=None,
             print_results=True,
             use_test_set=True,
-            device='gpu') -> dict:
+            device='cuda') -> dict:
 
         # count the number of misclassified images for each attack and each model
         # 1 - misclassified, 0 - classified correctly

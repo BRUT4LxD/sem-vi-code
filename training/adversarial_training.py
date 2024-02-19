@@ -20,7 +20,7 @@ from evaluation.validation import Validation
 import copy
 
 class AdversarialTraining:
-    def __init__(self, model: Module, learning_rate: float, attack_names: List['str'], model_name: str = None, device: str = 'gpu', key: str = None):
+    def __init__(self, model: Module, learning_rate: float, attack_names: List['str'], model_name: str = None, device: str = 'cuda', key: str = None):
         self.model = model
         self.attack_names = attack_names
         self.learning_rate = learning_rate
@@ -266,10 +266,6 @@ class AdversarialTraining:
                 scheduler.step()
                 current_epoch += 1
                 epoch += 1
-
-            # self._detach_dataloader(train_attacked_loader)
-            # self._detach_dataloader(test_attacked_loader)
-            # self._detach_dataloader(test_loader)
 
             current_iteration += 1
             self._log_attack_distance_score(writer, train_generator_result.attack_distance_score, current_iteration)

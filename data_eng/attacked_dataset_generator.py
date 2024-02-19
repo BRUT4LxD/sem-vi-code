@@ -6,7 +6,7 @@ from attacks.attack_factory import AttackFactory
 
 from attacks.simple_attacks import SimpleAttacks
 from config.imagenet_models import ImageNetModels
-from data_eng.dataset_loader import DatasetLoader, DatasetType
+from data_eng.dataset_loader import DatasetLoader, DatasetType, load_imagenette
 from torch.utils.data import DataLoader, ConcatDataset
 
 from domain.attack_distance_score import AttackDistanceScore
@@ -124,7 +124,6 @@ class AttackedDatasetGenerator:
       return DataLoader(merged_dataset, batch_size=batch_size, shuffle=True)
 
 
-
     @staticmethod
     def get_attacked_imagenette_dataset_multimodel(
       model_names: List[str],
@@ -132,7 +131,7 @@ class AttackedDatasetGenerator:
       num_of_images_per_attack: int,
       use_test_set: bool = True,
       batch_size: int = 1,
-      device: str = 'gpu') -> DataLoader:
+      device: str = 'cuda') -> DataLoader:
       """
       Returns attacked imagenette dataset for all model names.
       :param model_names: list of model names
@@ -163,3 +162,59 @@ class AttackedDatasetGenerator:
 
       att_dataset = [(att.adv_image, att.label) for att in attacked_dataset]
       return DataLoader(att_dataset, batch_size=batch_size, shuffle=True)
+
+
+    @staticmethod
+    def get_attacked_imagenette_dataset_multimodel_for_binary(
+      model_names: List[str],
+      attack_names: List['str'],
+      num_of_images_per_attack: int,
+      use_test_set: bool = True,
+      batch_size: int = 1,
+      device: str = 'cuda') -> DataLoader:
+      """
+      Returns attacked imagenette dataset for all model names.
+      :param model_names: list of model names
+      :param attack_names: list of attack names
+      :param num_of_images_per_attack: number of images per attack
+      :param use_test_set: use test set
+      :param batch_size: batch size of returned dataloader
+      :param device: device
+      :return: Dataloader
+      """
+
+      inner_batch_size = 1
+
+      attacked_dataset: list['AttackedImageResult'] = []
+      for model_name in tqdm(model_names):
+        current_model = ImageNetModels().get_model(model_name=model_name)
+        current_model = current_model.to(device)
+
+        for attack_name in tqdm(attack_names):
+          attacked_subset = SimpleAttacks.get_attacked_imagenette_images(
+            model=current_model,
+            attack_name=attack_name,
+            model_name=model_name,
+            batch_size=inner_batch_size,
+            num_of_images=num_of_images_per_attack,
+            use_test_set=use_test_set
+          )
+
+          attacked_dataset.extend(attacked_subset)
+
+
+      att_dataset = [(att.adv_image, 1) for att in attacked_dataset]
+      source_dataset = []
+
+      train_loader, test_loader = load_imagenette(batch_size=inner_batch_size, shuffle=True)
+      dataloader = test_loader if use_test_set else train_loader
+
+      i = 0
+      for images, labels in dataloader:
+        if i == len(att_dataset):
+          break
+
+        source_dataset.append((images[0], 0))
+        i += 1
+
+      return DataLoader(att_dataset + source_dataset, batch_size=batch_size, shuffle=True)
