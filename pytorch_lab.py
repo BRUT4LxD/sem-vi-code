@@ -117,7 +117,7 @@ adv_models = [adv_resnet, adv_densenet, adv_mobilenet, adv_efficientnet, adv_vgg
 
 multiattacks = []
 attacks_save_folder_path = f"./results/attacks/adv_models"
-for adv_model in adv_models:
+for adv_model in adv_models[3:]:
   _ = adv_model.to(device)
   attack_list = []
   for attack_name in valid_attack_names:
