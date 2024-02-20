@@ -24,7 +24,8 @@ import os
 import csv
 
 from torch.utils.data import DataLoader, SubsetRandomSampler, ConcatDataset
-import torchvision.transforms as transforms 
+import torchvision.transforms as transforms
+from evaluation.visualization import plot_multiattacked_images 
 from training.adversarial_training import AdversarialTraining
 from training.train import Training
 from config.imagenet_models import ImageNetModels
@@ -117,7 +118,7 @@ adv_models = [adv_resnet, adv_densenet, adv_mobilenet, adv_efficientnet, adv_vgg
 
 multiattacks = []
 attacks_save_folder_path = f"./results/attacks/adv_models"
-for adv_model in adv_models[3:]:
+for adv_model in adv_models:
   _ = adv_model.to(device)
   attack_list = []
   for attack_name in valid_attack_names:
@@ -132,6 +133,20 @@ for adv_model in adv_models[3:]:
   )
   multiattacks.append(matt)
 
+from domain.multiattack_result import MultiattackResult, AttackResult
+
+mulatt: MultiattackResult = multiattacks[0]
+att1: AttackResult = mulatt.attack_results[0][2]
+
+for att in mulatt.attack_results:
+  for a in att:
+    print(a.attack_name, a.actual, a.predicted)
+
+
+plot_multiattacked_images(
+  classes_names=ImageNetteClasses.get_classes(),
+  multiattack_results=multiattacks[0],
+)
 
 
 
