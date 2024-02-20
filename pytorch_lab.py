@@ -5,6 +5,7 @@ from attacks.simple_attacks import SimpleAttacks
 from attacks.transferability import Transferability
 from attacks.white_box.fgsm import FGSM
 from config.binary_models import BinaryModels
+from config.imagenet_classes import ImageNetClasses
 from config.imagenette_classes import ImageNetteClasses
 from data_eng.attacked_dataset_generator import AttackedDatasetGenerator
 from data_eng.dataset_loader import DatasetLoader, DatasetType, load_imagenette
@@ -91,6 +92,7 @@ adv_vgg = load_model(raw_vgg_model, f"./models/adversarial_models/{model_name}/1
 model_names = [ModelNames().resnet18, ModelNames().densenet121, ModelNames().mobilenet_v2, ModelNames().efficientnet_b0, ModelNames().vgg16]
 trained_models = [trained_resnet, trained_densenet, trained_mobilenet, trained_efficientnet, trained_vgg]
 adv_models = [adv_resnet, adv_densenet, adv_mobilenet, adv_efficientnet, adv_vgg]
+source_models = [raw_resnet_model, raw_densenet_model, raw_mobilenet_model, raw_efficientnet_model, raw_vgg_model]
 
 
 # for model_name in model_names:
@@ -127,27 +129,27 @@ adv_models = [adv_resnet, adv_densenet, adv_mobilenet, adv_efficientnet, adv_vgg
 # )
 
 multiattacks = []
-attacks_save_folder_path = f"./results/attacks/adv_models"
-attack_images_save_folder_path = f"visualization/adv_models"
-for adv_model in adv_models:
-  _ = adv_model.to(device)
+attacks_save_folder_path = f"./results/attacks/source_models"
+attack_images_save_folder_path = f"./results/visualization/source_models"
+for source_model in source_models:
+  _ = source_model.to(device)
   attack_list = []
   for attack_name in valid_attack_names:
-    attack_list.append(AttackFactory.get_attack(attack_name, adv_model))
+    attack_list.append(AttackFactory.get_attack(attack_name, source_model))
 
   multiattack_result = SimpleAttacks.multiattack(
     attacks=attack_list,
     device=device,
     data_loader=test_loader,
     iterations=100,
-    is_imagenette_model=True,
+    is_imagenette_model=False,
     save_folder_path=attacks_save_folder_path
   )
 
   # leave only successfully attacked images
   multiattack_result.attack_results[0] = [att for att in multiattack_result.attack_results[0] if att.actual != att.predicted]
   plot_multiattacked_images(
-    classes_names=ImageNetteClasses.get_classes(),
+    classes_names=ImageNetClasses.get_classes(),
     multiattack_results=multiattack_result,
     save_path_folder=attack_images_save_folder_path,
     visualize=False
