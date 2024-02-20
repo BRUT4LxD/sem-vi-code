@@ -1,0 +1,6 @@
+Models,resnet18,densenet121,mobilenet_v2,efficientnet_b0,vgg16
+resnet18,1.0,0.91,0.91,0.91,0.91
+densenet121,0.83,1.0,0.83,0.83,0.83
+mobilenet_v2,0.83,0.78,1.0,0.78,0.78
+efficientnet_b0,0.87,0.87,0.87,1.0,0.87
+vgg16,0.83,0.83,0.83,0.83,1.0

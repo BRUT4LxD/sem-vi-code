@@ -311,6 +311,110 @@ class Transferability():
                     writer.writerow(result_line)
 
         return transferability
+    
+    @staticmethod
+    def transferability_model_to_model2(
+            models: List['torch.nn.Module'],
+            model_names: List['str'],
+            attack_names: List['str'],
+            images_per_attack=20,
+            attacking_batch_size=16,
+            model_batch_size=2,
+            save_folder_path=None,
+            print_results=True,
+            use_test_set=True,
+            device='cuda') -> dict:
+
+        # count the number of misclassified images for each attack and each model
+        # 1 - misclassified, 0 - classified correctly
+        # transferability = {
+        #     "model_name": {
+        #         "model_name": [0,0,1,0,1,1,0,1]
+        #     }
+        # }
+
+        if len(model_names) == 0:
+            raise ValueError("No transferability models provided")
+
+        transferability = {}
+        pbar = tqdm(total=len(attack_names) * len(model_names) * len(model_names))
+
+        model_name_to_model = {model_name: model for model_name, model in zip(model_names, models)}
+
+        for ground_model_name in model_names:
+            for attack_name in attack_names:
+                b_size = attacking_batch_size
+                while True:
+                    try:
+                        adv_image_results = SimpleAttacks.get_attacked_imagenette_images(
+                            attack_name=attack_name,
+                            model_name=ground_model_name,
+                            num_of_images=images_per_attack,
+                            batch_size=b_size,
+                            use_test_set=use_test_set,
+                            model=model_name_to_model[ground_model_name])
+                        break
+                    except Exception as e:
+                        print(f"Failed to load attacked dataset for {ground_model_name} and {attack_name}")
+                        b_size = b_size // 2
+                        print(f'Lowering the batchsize by half. From {b_size * 2} to {b_size}')
+                        continue
+                adv_image_with_labels = [(res.adv_image, res.label) for res in adv_image_results]
+                for model_name in model_names:
+                    pbar.update(1)
+                    pbar.set_description(f"Ground Model: {ground_model_name:20s} | Attack: {attack_name:10s} | Model: {model_name:20s}")
+                    if ground_model_name not in transferability:
+                        transferability[ground_model_name] = {}
+                    if model_name not in transferability[ground_model_name]:
+                        transferability[ground_model_name][model_name] = []
+
+                    attacked_images_loader = DataLoader(adv_image_with_labels, batch_size=model_batch_size)
+                    model = model_name_to_model[model_name]
+                    model.to(device)
+                    model.eval()
+
+                    for images, labels in attacked_images_loader:
+                        images, labels = images.to(device), labels.to(device)
+                        output = model(images)
+                        _, prediction = torch.max(output, 1)
+                        matches = torch.where(prediction == labels, torch.tensor(0), torch.tensor(1)).tolist()
+                        transferability[ground_model_name][model_name].extend(matches)
+
+        # sum the results for each attack and each model and present it as a percentage
+        for ground_model, models in transferability.items():
+            for model_name, results in models.items():
+                transferability[ground_model][model_name] = round(sum(results) / len(results), 2)
+
+        # make 2d array of results. Each row is a attack, each column is a model
+
+        print("transferability", transferability)
+
+        results = []
+        headers = ["Models"] + model_names
+        results.append(headers)
+        for ground_model, models in transferability.items():
+            results.append([ground_model])
+            for model_name, result in models.items():
+                results[-1].append(result)
+
+        if print_results:
+            print()
+            for result in results:
+                line = ""
+                for item in result:
+                    line += f'{str(item):15s}'
+                print(line)
+
+        if save_folder_path is not None:
+            if not os.path.exists(save_folder_path):
+                os.makedirs(save_folder_path)
+            file_path = os.path.join(save_folder_path, 'm2mtransfer.csv')
+            with open(file_path, 'w', newline='') as file:
+                writer = csv.writer(file)
+                for result_line in results:
+                    writer.writerow(result_line)
+
+        return transferability
 
     @staticmethod
     def transferability_model_to_model_from_files(model_names: List['str'], source_folder: str, save_folder_path=None, print_results=True) -> dict:

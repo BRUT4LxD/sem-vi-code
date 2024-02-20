@@ -53,7 +53,24 @@ class SimpleAttacks:
             del adv_images, attack_res
 
     @staticmethod
-    def get_attacked_imagenette_images(attack_name: str, model_name: str, num_of_images=20, batch_size=4, use_test_set=True, model: torch.nn.Module = None) -> List[AttackedImageResult]:
+    def get_attacked_imagenette_images(
+        attack_name: str,
+        model_name: str,
+        num_of_images=20,
+        batch_size=4,
+        use_test_set=True,
+        model: torch.nn.Module = None) -> List[AttackedImageResult]:
+        """
+        Returns attacked imagenette images.
+        :param attack_name: attack name
+        :param model_name: model name
+        :param num_of_images: number of images to attack
+        :param batch_size: batch size
+        :param use_test_set: if True, test set is used, otherwise train set is used
+        :param model: model
+        :return: attacked imagenette images
+        """
+
         imagenette_to_imagenet_index_map = ImageNetteClasses.get_imagenette_to_imagenet_map_by_index()
         imagenet_to_imagenette_index_map = ImageNetClasses.get_imagenet_to_imagenette_index_map()
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -168,7 +185,23 @@ class SimpleAttacks:
             del adv_images, images, labels
 
     @staticmethod
-    def multiattack(attacks: List[Attack], test_loader: DataLoader, device='cuda', print_results=True, iterations=10, save_results=False) -> MultiattackResult:
+    def multiattack(
+        attacks: List[Attack],
+        data_loader: DataLoader,
+        device='cuda',
+        print_results=True,
+        iterations=10,
+        save_folder_path=None) -> MultiattackResult:
+        """
+        Run multiple attacks on the same model and dataset and return the results.
+        :param attacks: List of attacks to run
+        :param test_loader: DataLoader for the dataset
+        :param device: Device to run the attacks on
+        :param print_results: Whether to print the results
+        :param iterations: Number of iterations to run each attack
+        :param save_results: Whether to save the results
+        :return: MultiattackResult
+        """
         evaluation_scores: List['AttackEvaluationScore'] = []
         attack_results: List[List['AttackResult']] = []
 
@@ -184,7 +217,7 @@ class SimpleAttacks:
 
             itx = 0
             try:
-                for images, labels in test_loader:
+                for images, labels in data_loader:
                     pbar.update(1)
                     if itx >= iterations:
                         break
@@ -218,11 +251,10 @@ class SimpleAttacks:
             for ev in evaluation_scores:
                 print(ev)
 
-        if save_results:
-            folder_path = f"./results/attacks"
-            if not os.path.exists(folder_path):
-                os.makedirs(folder_path)
-            with open(f'{folder_path}/{attack.model_name}.txt', 'w') as file:
+        if save_folder_path is not None:
+            if not os.path.exists(save_folder_path):
+                os.makedirs(save_folder_path)
+            with open(f'{save_folder_path}/{attack.model_name}.txt', 'w') as file:
                 for eval_score in evaluation_scores:
                     file.write(str(eval_score) + '\n')
         return MultiattackResult(evaluation_scores, attack_results)

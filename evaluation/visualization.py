@@ -54,7 +54,7 @@ def plot_adversarial_examples(examples, attack_params):
 
 
 @torch.no_grad()
-def plot_multiattacked_images(multiattack_results, classes_names, rgb=True, save_visualization=False, visualize=True):
+def plot_multiattacked_images(multiattack_results, classes_names, rgb=True, save_path_folder=None, visualize=True):
     attack_results = multiattack_results.attack_results
     eval_scores = multiattack_results.eval_scores
 
@@ -109,8 +109,8 @@ def plot_multiattacked_images(multiattack_results, classes_names, rgb=True, save
         if visualize:
             plt.show()
 
-        if save_visualization and len(attack_results[i]) > 0:
-            save_path = f"./results/visualization/{attack_results[i][0].model_name}"
+        if save_path_folder is not None and len(attack_results[i]) > 0:
+            save_path = f".{save_path_folder}/{attack_results[i][0].model_name}"
             os.makedirs(save_path, exist_ok=True)
             fig.savefig(f'{save_path}/{attack_results[i][0].model_name}_{eval_scores[i].attack_name}.png')
 
