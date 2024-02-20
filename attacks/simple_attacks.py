@@ -191,7 +191,8 @@ class SimpleAttacks:
         device='cuda',
         print_results=True,
         iterations=10,
-        save_folder_path=None) -> MultiattackResult:
+        save_folder_path=None,
+        is_imagenette_model=False) -> MultiattackResult:
         """
         Run multiple attacks on the same model and dataset and return the results.
         :param attacks: List of attacks to run
@@ -204,6 +205,8 @@ class SimpleAttacks:
         """
         evaluation_scores: List['AttackEvaluationScore'] = []
         attack_results: List[List['AttackResult']] = []
+
+        labels_mapper = ImageNetClasses.get_imagenet_to_imagenette_index_map() if is_imagenette_model else None
 
         pbar = tqdm(total=len(attacks) * iterations)
         it = -1
@@ -218,13 +221,15 @@ class SimpleAttacks:
             itx = 0
             try:
                 for images, labels in data_loader:
+
                     pbar.update(1)
                     if itx >= iterations:
                         break
                     itx += 1
                     images, labels = images.to(device), labels.to(device)
                     images, labels = ModelUtils.remove_missclassified(
-                        attack.model, images, labels, device)
+                        attack.model, images, labels, device, labels_mapper)
+
                     if labels.numel() == 0:
                         continue
 
@@ -232,8 +237,7 @@ class SimpleAttacks:
                     adv_images = attack(images, labels)
                     end = time.time()
                     att_time += end-start
-                    attack_res = AttackResult.create_from_adv_image(attack.model, adv_images, images, labels, attack.model_name, attack.attack)
-                    del adv_images, images, labels
+                    attack_res = AttackResult.create_from_adv_image(attack.model, adv_images, images, labels, attack.model_name, attack.attack, labels_mapper)
                     attack_results[it].extend(attack_res)
             except RuntimeError as e:
                 if 'out of memory' in str(e):

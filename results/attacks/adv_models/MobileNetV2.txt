@@ -1,22 +1,23 @@
-APGD        acc: 14.29%  prec: 0.1%   rec: 0.01%   f1: 0.02%    l1: 640587.81 l2: 1867.52   lInf: 7.0     pwr: 128667.55   time: 117.39ms/img       n_samples: 49
-APGDT       acc: 0.0%    prec: 0.0%   rec: 0.0%    f1: 0.0%     l1: 733237.81 l2: 2138.12   lInf: 8.0     pwr: 150206.7    time: 202.34ms/img       n_samples: 33
-BIM         acc: 5.56%   prec: 0.1%   rec: 0.01%   f1: 0.01%    l1: 677862.56 l2: 2079.48   lInf: 8.0     pwr: 121556.45   time: 97.15ms/img        n_samples: 36
-CW          acc: 11.63%  prec: 0.1%   rec: 0.01%   f1: 0.02%    l1: 89233.66  l2: 349.68    lInf: 9.0     pwr: 131312.33   time: 431.98ms/img       n_samples: 43
-DIFGSM      acc: 15.22%  prec: 0.1%   rec: 0.02%   f1: 0.03%    l1: 673553.12 l2: 2067.17   lInf: 8.0     pwr: 121540.77   time: 80.14ms/img        n_samples: 46
-EOTPGD      acc: 5.88%   prec: 0.1%   rec: 0.01%   f1: 0.01%    l1: 723192.88 l2: 2125.35   lInf: 8.0     pwr: 147060.33   time: 214.28ms/img       n_samples: 34
-FFGSM       acc: 80.85%  prec: 0.1%   rec: 0.08%   f1: 0.09%    l1: 1022206.12l2: 2742.02   lInf: 8.0     pwr: 149216.14   time: 10.53ms/img        n_samples: 47
-FGSM        acc: 85.0%   prec: 0.1%   rec: 0.08%   f1: 0.09%    l1: 1178467.0 l2: 3068.94   lInf: 8.0     pwr: 148763.12   time: 11.20ms/img        n_samples: 40
-GN          acc: 93.62%  prec: 0.1%   rec: 0.09%   f1: 0.1%     l1: 2924416.25l2: 9515.14   lInf: 115.0   pwr: 149579.72   time: 0.87ms/img         n_samples: 47
-Jitter      acc: 36.36%  prec: 0.1%   rec: 0.04%   f1: 0.05%    l1: 685504.19 l2: 2034.78   lInf: 8.0     pwr: 146691.55   time: 124.42ms/img       n_samples: 33
-MIFGSM      acc: 12.7%   prec: 0.1%   rec: 0.01%   f1: 0.02%    l1: 980683.56 l2: 2714.59   lInf: 8.0     pwr: 141805.72   time: 73.98ms/img        n_samples: 63
-NIFGSM      acc: 37.78%  prec: 0.1%   rec: 0.04%   f1: 0.05%    l1: 999379.56 l2: 2747.33   lInf: 8.0     pwr: 142278.5    time: 83.61ms/img        n_samples: 45
-PGD         acc: 6.12%   prec: 0.1%   rec: 0.01%   f1: 0.01%    l1: 714797.81 l2: 2105.33   lInf: 8.0     pwr: 147280.53   time: 80.92ms/img        n_samples: 49
-PGDL2       acc: 61.22%  prec: 0.1%   rec: 0.06%   f1: 0.08%    l1: 51638.05  l2: 192.79    lInf: 6.0     pwr: 150036.95   time: 85.59ms/img        n_samples: 49
-RFGSM       acc: 5.13%   prec: 0.1%   rec: 0.01%   f1: 0.01%    l1: 708397.06 l2: 2065.58   lInf: 8.0     pwr: 148954.16   time: 89.33ms/img        n_samples: 39
-SINIFGSM    acc: 66.67%  prec: 0.1%   rec: 0.07%   f1: 0.08%    l1: 996619.69 l2: 2741.11   lInf: 8.0     pwr: 142795.12   time: 460.67ms/img       n_samples: 39
-TIFGSM      acc: 36.17%  prec: 0.1%   rec: 0.04%   f1: 0.05%    l1: 757372.0  l2: 2252.85   lInf: 8.0     pwr: 127276.51   time: 77.05ms/img        n_samples: 47
-TPGD        acc: 45.83%  prec: 0.1%   rec: 0.05%   f1: 0.06%    l1: 670584.12 l2: 2047.45   lInf: 8.0     pwr: 148684.67   time: 94.15ms/img        n_samples: 48
-UPGD        acc: 7.69%   prec: 0.1%   rec: 0.01%   f1: 0.01%    l1: 972884.94 l2: 2700.09   lInf: 8.0     pwr: 141491.48   time: 93.01ms/img        n_samples: 39
-VMIFGSM     acc: 2.7%    prec: 0.1%   rec: 0.0%    f1: 0.01%    l1: 1016165.62l2: 2776.92   lInf: 8.0     pwr: 143012.06   time: 643.76ms/img       n_samples: 37
-VNIFGSM     acc: 14.81%  prec: 0.1%   rec: 0.01%   f1: 0.03%    l1: 1034737.31l2: 2810.37   lInf: 8.0     pwr: 143231.12   time: 531.38ms/img       n_samples: 54
-Pixle       acc: 95.35%  prec: 0.1%   rec: 0.1%    f1: 0.1%     l1: 141376.59 l2: 3890.47   lInf: 228.0   pwr: 2080.12     time: 3690.92ms/img      n_samples: 43
+APGD        acc: 93.55%  prec: 0.94%  rec: 0.91%   f1: 0.89%    l1: 48116.81  l2: 140.2     lInf: 1.0     pwr: 9663.32     time: 30.50ms/img        n_samples: 93
+APGDT       acc: 91.4%   prec: 0.83%  rec: 0.9%    f1: 0.86%    l1: 63459.1   l2: 184.08    lInf: 1.0     pwr: 12944.82    time: 60.27ms/img        n_samples: 93
+BIM         acc: 90.32%  prec: 0.82%  rec: 0.89%   f1: 0.85%    l1: 659838.06 l2: 2039.74   lInf: 8.0     pwr: 119982.2    time: 181.07ms/img       n_samples: 93
+CW          acc: 89.13%  prec: 0.81%  rec: 0.9%    f1: 0.85%    l1: 12674.46  l2: 48.52     lInf: 1.0     pwr: 79954.66    time: 236.42ms/img       n_samples: 92
+DIFGSM      acc: 86.05%  prec: 0.9%   rec: 0.9%    f1: 0.86%    l1: 658635.56 l2: 2034.0    lInf: 8.0     pwr: 120373.98   time: 180.72ms/img       n_samples: 86
+EOTPGD      acc: 92.55%  prec: 0.84%  rec: 0.89%   f1: 0.86%    l1: 712310.75 l2: 2098.74   lInf: 8.0     pwr: 147276.34   time: 348.52ms/img       n_samples: 94
+FFGSM       acc: 97.8%   prec: 0.97%  rec: 0.97%   f1: 0.96%    l1: 1019506.69l2: 2739.47   lInf: 8.0     pwr: 148632.03   time: 18.32ms/img        n_samples: 91
+FGSM        acc: 97.85%  prec: 0.97%  rec: 0.97%   f1: 0.97%    l1: 1176487.75l2: 3065.87   lInf: 8.0     pwr: 148450.0    time: 18.07ms/img        n_samples: 93
+GN          acc: 97.78%  prec: 0.96%  rec: 0.98%   f1: 0.97%    l1: 2859470.5 l2: 9354.14   lInf: 115.0   pwr: 149093.8    time: 1.82ms/img         n_samples: 90
+Jitter      acc: 95.24%  prec: 0.97%  rec: 0.96%   f1: 0.95%    l1: 697520.5  l2: 2065.52   lInf: 8.0     pwr: 146571.72   time: 211.34ms/img       n_samples: 84
+MIFGSM      acc: 89.25%  prec: 0.91%  rec: 0.9%    f1: 0.86%    l1: 967348.12 l2: 2692.3    lInf: 8.0     pwr: 140431.03   time: 176.70ms/img       n_samples: 93
+NIFGSM      acc: 92.39%  prec: 0.94%  rec: 0.92%   f1: 0.91%    l1: 990929.12 l2: 2732.4    lInf: 8.0     pwr: 141573.31   time: 173.29ms/img       n_samples: 92
+PGD         acc: 89.89%  prec: 0.81%  rec: 0.88%   f1: 0.83%    l1: 714308.38 l2: 2102.96   lInf: 8.0     pwr: 147318.2    time: 171.89ms/img       n_samples: 89
+PGDL2       acc: 92.47%  prec: 0.93%  rec: 0.92%   f1: 0.91%    l1: 65929.8   l2: 247.87    lInf: 8.0     pwr: 149628.45   time: 176.89ms/img       n_samples: 93
+PGDRS       acc: 100.0%  prec: 1.0%   rec: 1.0%    f1: 1.0%     l1: 632309.25 l2: 1981.76   lInf: 8.0     pwr: 115318.19   time: 176.40ms/img       n_samples: 91
+RFGSM       acc: 88.3%   prec: 0.81%  rec: 0.9%    f1: 0.85%    l1: 702568.62 l2: 2052.43   lInf: 8.0     pwr: 148673.56   time: 170.14ms/img       n_samples: 94
+SINIFGSM    acc: 95.51%  prec: 0.96%  rec: 0.94%   f1: 0.94%    l1: 990650.19 l2: 2731.96   lInf: 8.0     pwr: 141676.84   time: 907.46ms/img       n_samples: 89
+TIFGSM      acc: 92.22%  prec: 0.91%  rec: 0.95%   f1: 0.92%    l1: 734746.12 l2: 2205.55   lInf: 8.0     pwr: 125448.26   time: 179.31ms/img       n_samples: 90
+TPGD        acc: 50.59%  prec: 0.55%  rec: 0.53%   f1: 0.51%    l1: 669241.31 l2: 2045.54   lInf: 8.0     pwr: 148288.52   time: 186.70ms/img       n_samples: 85
+UPGD        acc: 93.26%  prec: 0.93%  rec: 0.91%   f1: 0.88%    l1: 973782.69 l2: 2701.98   lInf: 8.0     pwr: 141075.86   time: 172.36ms/img       n_samples: 89
+VMIFGSM     acc: 85.56%  prec: 0.88%  rec: 0.88%   f1: 0.84%    l1: 968905.38 l2: 2689.7    lInf: 8.0     pwr: 139931.09   time: 1067.00ms/img      n_samples: 90
+VNIFGSM     acc: 86.17%  prec: 0.88%  rec: 0.92%   f1: 0.86%    l1: 995294.5  l2: 2737.29   lInf: 8.0     pwr: 141218.33   time: 1061.29ms/img      n_samples: 94
+Pixle       acc: 98.9%   prec: 0.98%  rec: 0.99%   f1: 0.99%    l1: 23281.49  l2: 1136.91   lInf: 185.0   pwr: 355.47      time: 500.30ms/img       n_samples: 91

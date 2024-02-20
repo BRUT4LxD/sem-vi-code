@@ -24,7 +24,14 @@ class AttackResult():
 
     @torch.no_grad()
     @staticmethod
-    def create_from_adv_image(model: torch.nn.Module, adv_images: torch.Tensor, src_images: torch.Tensor, source_label: torch.Tensor, model_name: str, attack_name: str) -> List['AttackResult']:
+    def create_from_adv_image(
+        model: torch.nn.Module,
+        adv_images: torch.Tensor,
+        src_images: torch.Tensor,
+        source_label: torch.Tensor,
+        model_name: str,
+        attack_name: str,
+        labels_mapper: dict = None) -> List['AttackResult']:
         if(adv_images.shape[0] != source_label.shape[0]):
             raise ValueError(
                 f'advImages.shape {adv_images.shape} and labels.shape {source_label.shape} must be the same')
@@ -33,6 +40,11 @@ class AttackResult():
         model.eval()
         outputs = model(adv_images)
         _, predicted_labels = torch.max(outputs.data, 1)
+
+        if labels_mapper is not None:
+            for original, mapped in labels_mapper.items():
+                mask = predicted_labels == original
+                predicted_labels[mask] = mapped
 
         for i, (predicted_label, source_label) in enumerate(zip(predicted_labels, source_label)):
             attack_results.append(AttackResult(

@@ -23,6 +23,8 @@ from datetime import datetime
 import os
 import csv
 
+from domain.multiattack_result import MultiattackResult, AttackResult
+
 from torch.utils.data import DataLoader, SubsetRandomSampler, ConcatDataset
 import torchvision.transforms as transforms
 from evaluation.visualization import plot_multiattacked_images 
@@ -37,7 +39,7 @@ from torch.utils.tensorboard import SummaryWriter
 # device config
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-train_loader, test_loader = load_imagenette(batch_size=16, shuffle=True)
+train_loader, test_loader = load_imagenette(batch_size=1, shuffle=True)
 
 all_model_names = ModelNames().all_model_names
 all_attack_names = AttackNames().all_attack_names
@@ -116,39 +118,51 @@ adv_models = [adv_resnet, adv_densenet, adv_mobilenet, adv_efficientnet, adv_vgg
 #   print(f"Validation accuracy: {res}")
 #   res.save_csv(0, results_path)
 
+# _ = adv_vgg.eval()
+# _ = adv_vgg.to(device)
+# Validation.validate_imagenet_with_imagenette_classes(
+#   model=adv_vgg,
+#   test_loader=test_loader,
+#   model_name=ModelNames().vgg16,
+# )
+
 multiattacks = []
 attacks_save_folder_path = f"./results/attacks/adv_models"
+attack_images_save_folder_path = f"visualization/adv_models"
 for adv_model in adv_models:
   _ = adv_model.to(device)
   attack_list = []
   for attack_name in valid_attack_names:
     attack_list.append(AttackFactory.get_attack(attack_name, adv_model))
-  
-  matt = SimpleAttacks.multiattack(
+
+  multiattack_result = SimpleAttacks.multiattack(
     attacks=attack_list,
     device=device,
     data_loader=test_loader,
-    iterations=30,
+    iterations=100,
+    is_imagenette_model=True,
     save_folder_path=attacks_save_folder_path
   )
-  multiattacks.append(matt)
 
-from domain.multiattack_result import MultiattackResult, AttackResult
-
-mulatt: MultiattackResult = multiattacks[0]
-att1: AttackResult = mulatt.attack_results[0][2]
-
-for att in mulatt.attack_results:
-  for a in att:
-    print(a.attack_name, a.actual, a.predicted)
-
-
-plot_multiattacked_images(
-  classes_names=ImageNetteClasses.get_classes(),
-  multiattack_results=multiattacks[0],
-)
+  # leave only successfully attacked images
+  multiattack_result.attack_results[0] = [att for att in multiattack_result.attack_results[0] if att.actual != att.predicted]
+  plot_multiattacked_images(
+    classes_names=ImageNetteClasses.get_classes(),
+    multiattack_results=multiattack_result,
+    save_path_folder=attack_images_save_folder_path,
+    visualize=False
+  )
 
 
+# diff = torch.abs(adv_image - src_image)
+# diff_mask = torch.where(diff == 0, torch.tensor(1.0), torch.tensor(0.0))
+# diff_mask_summed = torch.clamp(diff_mask.sum(0), 0, 1)
+# diff_mask_summed = diff_mask_summed.cpu().numpy()
+
+# plot_multiattacked_images(
+#   classes_names=ImageNetteClasses.get_classes(),
+#   multiattack_results=multiattacks[0]
+# )
 
 # attacked_dataloder = AttackedDatasetGenerator.get_attacked_imagenette_dataset_multimodel(
 #   model_names=model_names,

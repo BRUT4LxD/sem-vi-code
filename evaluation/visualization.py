@@ -54,7 +54,7 @@ def plot_adversarial_examples(examples, attack_params):
 
 
 @torch.no_grad()
-def plot_multiattacked_images(multiattack_results, classes_names, rgb=True, save_path_folder=None, visualize=True):
+def plot_multiattacked_images(multiattack_results: MultiattackResult, classes_names: list, rgb=True, save_path_folder=None, visualize=True):
     attack_results = multiattack_results.attack_results
     eval_scores = multiattack_results.eval_scores
 
@@ -74,14 +74,13 @@ def plot_multiattacked_images(multiattack_results, classes_names, rgb=True, save
 
         ax = axes[1, img_cnt]
         diff_img = torch.abs(attack_data.src_image - attack_data.adv_image).detach().cpu()
+        diff_img = torch.where(diff_img != 0, torch.tensor(1.0), torch.tensor(0.0))
         diff_img = (diff_img.permute(1, 2, 0) if rgb else diff_img[0])
         plot_image(ax, diff_img, cmap=None if rgb else 'gray')
 
         ax = axes[2, img_cnt]
         adv_img = (attack_data.adv_image.permute(1, 2, 0) if rgb else attack_data.adv_image[0]).detach().cpu()
         plot_image(ax, adv_img, cmap=None if rgb else 'gray')
-
-        del ax, img, diff_img, adv_img
 
     max_columns = min(max(len(a) for a in attack_results), 5)
 
@@ -99,8 +98,6 @@ def plot_multiattacked_images(multiattack_results, classes_names, rgb=True, save
             img_cnt += 1
 
             # Remove any reference to tensors to free up GPU memory
-            del attack_data.src_image
-            del attack_data.adv_image
             torch.cuda.empty_cache()
 
         fig.suptitle(eval_scores[i], fontsize=14)
@@ -116,10 +113,5 @@ def plot_multiattacked_images(multiattack_results, classes_names, rgb=True, save
 
         # Cleanup to avoid potential memory leaks
         plt.close(fig)
-        gc.collect()
 
-    # Addtionally, cleanup the entire list of attack results
-    del attack_results, eval_scores
     torch.cuda.empty_cache()
-    gc.collect()
-
