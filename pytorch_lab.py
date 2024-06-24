@@ -93,6 +93,7 @@ model_names = [ModelNames().resnet18, ModelNames().densenet121, ModelNames().mob
 trained_models = [trained_resnet, trained_densenet, trained_mobilenet, trained_efficientnet, trained_vgg]
 adv_models = [adv_resnet, adv_densenet, adv_mobilenet, adv_efficientnet, adv_vgg]
 source_models = [raw_resnet_model, raw_densenet_model, raw_mobilenet_model, raw_efficientnet_model, raw_vgg_model]
+binary_models = []
 
 
 # for model_name in model_names:
@@ -128,32 +129,32 @@ source_models = [raw_resnet_model, raw_densenet_model, raw_mobilenet_model, raw_
 #   model_name=ModelNames().vgg16,
 # )
 
-multiattacks = []
-attacks_save_folder_path = f"./results/attacks/source_models"
-attack_images_save_folder_path = f"./results/visualization/source_models"
-for source_model in source_models:
-  _ = source_model.to(device)
-  attack_list = []
-  for attack_name in valid_attack_names:
-    attack_list.append(AttackFactory.get_attack(attack_name, source_model))
+# multiattacks = []
+# attacks_save_folder_path = f"./results/attacks/source_models"
+# attack_images_save_folder_path = f"./results/visualization/source_models"
+# for source_model in source_models:
+#   _ = source_model.to(device)
+#   attack_list = []
+#   for attack_name in valid_attack_names:
+#     attack_list.append(AttackFactory.get_attack(attack_name, source_model))
 
-  multiattack_result = SimpleAttacks.multiattack(
-    attacks=attack_list,
-    device=device,
-    data_loader=test_loader,
-    iterations=100,
-    is_imagenette_model=False,
-    save_folder_path=attacks_save_folder_path
-  )
+#   multiattack_result = SimpleAttacks.multiattack(
+#     attacks=attack_list,
+#     device=device,
+#     data_loader=test_loader,
+#     iterations=100,
+#     is_imagenette_model=False,
+#     save_folder_path=attacks_save_folder_path
+#   )
 
-  # leave only successfully attacked images
-  multiattack_result.attack_results[0] = [att for att in multiattack_result.attack_results[0] if att.actual != att.predicted]
-  plot_multiattacked_images(
-    classes_names=ImageNetClasses.get_classes(),
-    multiattack_results=multiattack_result,
-    save_path_folder=attack_images_save_folder_path,
-    visualize=False
-  )
+#   # leave only successfully attacked images
+#   multiattack_result.attack_results[0] = [att for att in multiattack_result.attack_results[0] if att.actual != att.predicted]
+#   plot_multiattacked_images(
+#     classes_names=ImageNetClasses.get_classes(),
+#     multiattack_results=multiattack_result,
+#     save_path_folder=attack_images_save_folder_path,
+#     visualize=False
+#   )
 
 
 # diff = torch.abs(adv_image - src_image)
@@ -166,13 +167,52 @@ for source_model in source_models:
 #   multiattack_results=multiattacks[0]
 # )
 
-# attacked_dataloder = AttackedDatasetGenerator.get_attacked_imagenette_dataset_multimodel(
-#   model_names=model_names,
-#   attack_names=valid_attack_names,
-#   num_of_images_per_attack=30,
-#   use_test_set=True,
-#   batch_size=1
-# )
+attacked_dataloder = AttackedDatasetGenerator.get_attacked_imagenette_dataset_multimodel_for_binary(
+  model_names=model_names,
+  attack_names=valid_attack_names,
+  num_of_images_per_attack=10,
+  use_test_set=True,
+  batch_size=1
+)
+
+binary_model = load_model(BinaryModels.resnet18(), "./models/binary/resnet18.pt")
+_ = binary_model.eval()
+_ = binary_model.to(device)
+
+num_success_detection = 0
+num_total = 0
+for images, labels in tqdm(attacked_dataloder):
+  images, labels = images.to(device), labels.to(device)
+  img, lbl = images[0], labels[0].item()
+  num_total += 1
+  outputs = binary_model(images)
+  predictions = torch.sigmoid(outputs) > 0.5
+  if predictions and lbl == 1:
+    num_success_detection += 1
+  elif not predictions and lbl == 0:
+    num_success_detection += 1
+
+
+  # counts = {}
+  # for model in adv_models:
+  #   _ = model.eval()
+  #   _ = model.to(device)
+  #   adv_prediction = model(images)
+  #   adv_prediction = torch.argmax(adv_prediction, dim=1).item()
+  #   if adv_prediction not in counts:
+  #     counts[adv_prediction] = 1
+  #   else:
+  #     counts[adv_prediction] += 1
+
+  # max_count = max(counts.values())
+  # if max_count >= 4:
+  #   if lbl == 0:
+  #     num_success_detection += 1
+  # else:
+  #   if lbl == 1:
+  #     num_success_detection += 1
+
+print(f"Success detection: {num_success_detection}/{num_total} = {num_success_detection / num_total}")
 
 # for model, model_name in zip(trained_models, model_names):
 #   _ = model.eval()
