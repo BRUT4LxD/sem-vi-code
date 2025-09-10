@@ -127,5 +127,61 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Project-specific exclusions
 data/
 models/
+runs/
+results/
+*.pt
+*.pth
+*.pkl
+*.pickle
+
+# Virtual environments
+venv/
+env/
+.venv/
+.env/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Jupyter notebook checkpoints
+.ipynb_checkpoints/
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+
+# CUDA and GPU related
+*.cubin
+*.fatbin
+*.ptx
+
+# Large dataset files (uncomment if needed)
+# *.tar.gz
+# *.zip
+# *.7z
+
+# AI Context files (keep these in git)
+# .ai/ directory contains AI-specific context files
+# .ai/.cursorrules
+# .ai/PROJECT_CONTEXT.md
+# .ai/AI_INSTRUCTIONS.md
+# .ai/QUICK_REFERENCE.md
+# .ai/PROJECT_AI_CONTEXT.md

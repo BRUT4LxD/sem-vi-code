@@ -2,77 +2,84 @@ from typing import List
 import torch
 from tqdm import tqdm
 import numpy as np
+from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_score
+from sklearn.metrics.pairwise import manhattan_distances, euclidean_distances
+from scipy.spatial.distance import pdist, squareform
 from domain.attack_distance_score import AttackDistanceScore
 
 from domain.attack_eval_score import AttackEvaluationScore
 from domain.attack_result import AttackResult
 from domain.model_config import ModelConfig
 
+from torchmetrics import Accuracy, Precision, Recall, F1Score
+from torchmetrics.functional import pairwise_manhattan_distance, pairwise_euclidean_distance
+
 class Metrics:
 
     @torch.no_grad()
     @staticmethod
     def _accuracy(output, target):
+        """Calculate accuracy using sklearn implementation"""
         pred = torch.argmax(output, dim=1)
-        correct = pred.eq(target).sum().item()
-        acc = correct / len(target)
-        return acc
+        return accuracy_score(target.cpu().numpy(), pred.cpu().numpy())
 
     @torch.no_grad()
     @staticmethod
-    def _precision(output, target):
+    def _precision(output, target, num_classes):
+        """Calculate precision using sklearn implementation"""
         pred = torch.argmax(output, dim=1)
-        tp = (pred & target).sum().item()
-        fp = (pred & ~target).sum().item()
-        x = (tp + fp) if (tp + fp) != 0 else 1
-        prec = tp / x
-        return prec
+        return precision_score(target.cpu().numpy(), pred.cpu().numpy(), average='macro', zero_division=0)
 
     @torch.no_grad()
     @staticmethod
-    def _recall(output, target):
+    def _recall(output, target, num_classes):
+        """Calculate recall using sklearn implementation"""
         pred = torch.argmax(output, dim=1)
-        tp = (pred & target).sum().item()
-        fn = (~pred & target).sum().item()
-        x = (tp + fn) if (tp + fn) != 0 else 1
-        rec = tp / x
-        return rec
+        return recall_score(target.cpu().numpy(), pred.cpu().numpy(), average='macro', zero_division=0)
 
     @torch.no_grad()
     @staticmethod
-    def _f1_score(output, target):
-        prec = Metrics._precision(output, target)
-        rec = Metrics._recall(output, target)
-        x = (prec + rec) if (prec + rec) != 0 else 1
-        f1 = 2 * (prec * rec) / x
-        return f1
+    def _f1_score(output, target, num_classes):
+        """Calculate F1 score using sklearn implementation"""
+        pred = torch.argmax(output, dim=1)
+        return f1_score(target.cpu().numpy(), pred.cpu().numpy(), average='macro', zero_division=0)
 
 
-    @torch.no_grad()
     @staticmethod
+    @torch.no_grad()
     def l1_distance(image1: torch.Tensor, image2: torch.Tensor):
-        return torch.norm(image1 - image2, p=1)
+        """Calculate L1 distance using sklearn implementation"""
+        # Flatten tensors for sklearn
+        img1_flat = image1.flatten().cpu().numpy().reshape(1, -1)
+        img2_flat = image2.flatten().cpu().numpy().reshape(1, -1)
+        return manhattan_distances(img1_flat, img2_flat)[0, 0]
 
-    @torch.no_grad()
     @staticmethod
+    @torch.no_grad()
     def l2_distance(image1: torch.Tensor, image2: torch.Tensor):
-        return torch.norm(image1 - image2, p=2)
+        """Calculate L2 distance using sklearn implementation"""
+        # Flatten tensors for sklearn
+        img1_flat = image1.flatten().cpu().numpy().reshape(1, -1)
+        img2_flat = image2.flatten().cpu().numpy().reshape(1, -1)
+        return euclidean_distances(img1_flat, img2_flat)[0, 0]
 
-    @torch.no_grad()
     @staticmethod
+    @torch.no_grad()
     def linf_distance(image1: torch.Tensor, image2: torch.Tensor):
+        """Calculate L∞ distance using PyTorch (most efficient for this metric)"""
         return torch.norm(image1 - image2, p=float('inf'))
 
-    @torch.no_grad()
     @staticmethod
-    def calculate_attack_power(image1: torch.Tensor, image2: torch.Tensor):
-        diff = image1 != image2
-        pwr = diff.int().sum()
-        return pwr
+    @torch.no_grad()
+    def calculate_attack_power(image1: torch.Tensor, image2: torch.Tensor, threshold: float = 1e-6):
+        """Calculate attack power as number of pixels that changed significantly"""
+        diff = torch.abs(image1 - image2)
+        changed_pixels = (diff > threshold).sum()
+        return changed_pixels
 
     @torch.no_grad()
     @staticmethod
-    def evaluate_model(model: torch.nn.Module, data_loader: torch.utils.data.DataLoader):
+    def evaluate_model(model: torch.nn.Module, data_loader: torch.utils.data.DataLoader, num_classes: int):
         model.eval()
         acc, prec, rec, f1 = 0, 0, 0, 0
         total = 0
@@ -82,9 +89,9 @@ class Metrics:
             images, labels = images.to(device), labels.to(device)
             outputs = model(images)
             acc += Metrics._accuracy(outputs, labels)
-            prec += Metrics._precision(outputs, labels)
-            rec += Metrics._recall(outputs, labels)
-            f1 += Metrics._f1_score(outputs, labels)
+            prec += Metrics._precision(outputs, labels, num_classes)
+            rec += Metrics._recall(outputs, labels, num_classes)
+            f1 += Metrics._f1_score(outputs, labels, num_classes)
             total += 1
         acc /= total
         prec /= total
@@ -157,3 +164,35 @@ class Metrics:
         distances = Metrics.calculate_attack_distance_score(attack_results)
 
         return AttackEvaluationScore(acc, prec, rec, f1, conf_matrix, distances)
+
+    @staticmethod
+    @torch.no_grad()
+    def evaluate_model_torchmetrics(model: torch.nn.Module, data_loader: torch.utils.data.DataLoader, num_classes: int):
+        
+        model.eval()
+        device = next(model.parameters()).device
+        
+        # Initialize metrics
+        accuracy = Accuracy(task='multiclass', num_classes=num_classes).to(device)
+        precision = Precision(task='multiclass', num_classes=num_classes, average='macro').to(device)
+        recall = Recall(task='multiclass', num_classes=num_classes, average='macro').to(device)
+        f1 = F1Score(task='multiclass', num_classes=num_classes, average='macro').to(device)
+        
+        for images, labels in tqdm(data_loader):
+            images, labels = images.to(device), labels.to(device)
+            outputs = model(images)
+            preds = torch.argmax(outputs, dim=1)
+            
+            # Update metrics
+            accuracy(preds, labels)
+            precision(preds, labels)
+            recall(preds, labels)
+            f1(preds, labels)
+        
+        # Compute final metrics
+        acc = accuracy.compute().item()
+        prec = precision.compute().item()
+        rec = recall.compute().item()
+        f1_score = f1.compute().item()
+        
+        return acc, prec, rec, f1_score

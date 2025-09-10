@@ -1,0 +1,55 @@
+# AI Assistant Rules for Adversarial Attack Research Project
+
+## Project Overview
+This is a research project focused on adversarial attacks against deep learning models. The project includes:
+- Multiple neural network architectures (ResNet, VGG, DenseNet, EfficientNet, MobileNetV2)
+- White-box and black-box adversarial attacks
+- Evaluation metrics and visualization tools
+- Training scripts for various datasets (CIFAR-10, ImageNette, ImageNet)
+
+## Key Directories
+- `architectures/`: Neural network model definitions
+- `attacks/`: Adversarial attack implementations (white_box/, black_box/)
+- `evaluation/`: Metrics, validation, and visualization tools
+- `training/`: Model training scripts
+- `data_eng/`: Data loading and preprocessing utilities
+- `domain/`: Core domain models and entities
+
+## Important Files
+- `evaluation/metrics.py`: Refactored with scikit-learn for robust metrics
+- `requirements.txt`: Dependencies including PyTorch with CUDA support
+- `SETUP.md`: Comprehensive setup instructions
+
+## Code Style & Conventions
+- Use type hints for all function parameters and return values
+- Follow PEP 8 style guidelines
+- Use docstrings for all classes and methods
+- Prefer library implementations over custom code when available
+- Use `@torch.no_grad()` for inference operations
+
+## Common Patterns
+- All attack classes inherit from base attack class
+- Metrics use scikit-learn for classification metrics
+- Models are loaded using PyTorch's state_dict
+- CUDA is used for GPU acceleration when available
+
+## Dependencies
+- PyTorch 2.0.0 with CUDA support
+- scikit-learn for metrics
+- matplotlib for visualization
+- numpy for numerical operations
+- tqdm for progress bars
+
+## When Making Changes
+1. Always check for existing library implementations first
+2. Ensure CUDA compatibility for GPU operations
+3. Add proper error handling and validation
+4. Update documentation when adding new features
+5. Test with both CPU and GPU when possible
+
+## Research Context
+This project studies adversarial robustness in deep learning models. Focus on:
+- Attack effectiveness and transferability
+- Model robustness across different architectures
+- Evaluation metrics for adversarial attacks
+- Visualization of attack patterns and model behavior
