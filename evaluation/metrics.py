@@ -99,8 +99,8 @@ class Metrics:
         f1 /= total
         return acc, prec, rec, f1
 
-    @torch.no_grad()
     @staticmethod
+    @torch.no_grad()
     def calculate_attack_distance_score(attack_results: List[AttackResult]) -> AttackDistanceScore:
         l1 = 0.0
         l2 = 0.0
@@ -124,8 +124,8 @@ class Metrics:
 
         return AttackDistanceScore(l1.item(), l2.item(), lInf.item(), power.item())
 
-    @torch.no_grad()
     @staticmethod
+    @torch.no_grad()
     def evaluate_attack(attack_results: List[AttackResult], num_classes: int) -> AttackEvaluationScore:
         if len(attack_results) == 0:
             return AttackEvaluationScore(0.0, 0.0, 0.0, 0.0, np.zeros((num_classes, num_classes), dtype=np.int32), AttackDistanceScore(0.0, 0.0, 0.0, 0.0))
