@@ -1,9 +1,21 @@
-matplotlib==3.7.1
-numpy==1.23.5
-scipy==1.10.0
-torch==2.0.0
-torchvision==0.15.0
-tqdm==4.65.0
-wrappers==0.1.9
-scikit-learn>=1.3.0
-torchmetrics>=0.11.0
+# Core PyTorch ecosystem - Latest stable versions for RTX 3070 (Python 3.8 compatible)
+torch>=2.4.1
+torchvision>=0.19.1
+torchaudio>=2.4.1
+
+# Scientific computing (Python 3.8 compatible)
+numpy>=1.24.4
+scipy>=1.10.1
+
+# Machine learning metrics
+scikit-learn>=1.3.2
+torchmetrics>=1.2.0
+
+# Visualization
+matplotlib>=3.7.0
+
+# Progress bars
+tqdm>=4.66.1
+
+# Logging and monitoring (Python 3.8 compatible)
+tensorboard>=2.14.0
