@@ -6,6 +6,7 @@ from torch.utils.data import DataLoader, SubsetRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 
 from evaluation.validation import Validation, ValidationAccuracyResult
+from training.transfer.setup_pretraining import SetupPretraining
 
 from torch.nn import Module, CrossEntropyLoss, BCELoss, BCEWithLogitsLoss
 from torch.optim import Adam
@@ -93,11 +94,18 @@ class Training:
         device='cuda',
         save_model_path=None,
         model_name=None,
-        writer: SummaryWriter = None):
+        writer: SummaryWriter = None,
+        setup_model=True):
 
         if writer is None:
             date = datetime.now().strftime("%d-%m-%Y_%H-%M")
             writer = SummaryWriter(log_dir=f'runs/imagenette_training/{model_name}/{date}_lr={learning_rate}')
+
+        # Setup model for ImageNette if requested
+        if setup_model:
+            print(f"⚙️ Setting up {model_name} for ImageNette training...")
+            model = SetupPretraining.setup_imagenette(model)
+            print(f"✅ Model setup complete - ready for ImageNette (10 classes)")
 
         _ = model.train()
         _ = model.to(device)
