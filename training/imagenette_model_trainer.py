@@ -7,10 +7,11 @@ This module provides a comprehensive training system specifically designed for I
 validation, and model management.
 
 Usage:
-    from training.model_trainer import ImageNetteModelTrainer
+    from training.imagenette_model_trainer import ImageNetteModelTrainer
+    from training.training_configs import ImageNetteTrainingConfigs
     
     trainer = ImageNetteModelTrainer()
-    trainer.train_model('resnet18', 'advanced')
+    trainer.train_model('resnet18', ImageNetteTrainingConfigs.ADVANCED)
     trainer.validate_model('./models/imagenette/resnet18_advanced.pt')
 """
 
@@ -18,7 +19,7 @@ import torch
 import os
 import sys
 from datetime import datetime
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Literal
 
 # Add project root to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -30,6 +31,7 @@ from data_eng.dataset_loader import load_imagenette
 from data_eng.io import load_model_imagenette
 from training.train import Training
 from training.transfer.setup_pretraining import SetupPretraining
+from training.training_configs import ImageNetteTrainingConfigs
 from evaluation.metrics import Metrics
 from evaluation.validation import Validation
 from evaluation.visualization import simple_visualize
@@ -65,72 +67,36 @@ class ImageNetteModelTrainer:
         print(f"📁 Models will be saved to: {self.models_dir}")
         print(f"🎯 Dataset: ImageNette (10 classes)")
     
-    # ImageNette-specific training configurations
-    TRAINING_CONFIGS = {
-        'test': {
-            'num_epochs': 2,
-            'learning_rate': 0.001,
-            'batch_size': 16,
-            'train_subset_size': 2000,
-            'test_subset_size': 1000,
-            'verbose': True,
-            'description': 'Quick test configuration for rapid prototyping on ImageNette'
-        },
-        'standard': {
-            'num_epochs': 10,
-            'learning_rate': 0.001,
-            'batch_size': 32,
-            'train_subset_size': 5000,
-            'test_subset_size': 2000,
-            'scheduler_type': 'step',
-            'scheduler_params': {'step_size': 3, 'gamma': 0.8},
-            'weight_decay': 1e-4,
-            'verbose': True,
-            'description': 'Standard configuration for balanced ImageNette training'
-        },
-        'advanced': {
-            'num_epochs': 30,
-            'learning_rate': 0.001,
-            'batch_size': 64,
-            'train_subset_size': -1,  # Use full ImageNette dataset
-            'test_subset_size': -1,   # Use full ImageNette dataset
-            'scheduler_type': 'cosine',
-            'scheduler_params': {'eta_min': 1e-6},
-            'weight_decay': 1e-4,
-            'gradient_clip_norm': 1.0,
-            'early_stopping_patience': 5,
-            'verbose': True,
-            'description': 'Full ImageNette dataset configuration for maximum performance'
-        },
-    }
-    
     # Available models for ImageNette training
     AVAILABLE_MODELS = [
         ModelNames.resnet18,
+        ModelNames.resnet50,
+        ModelNames.resnet101,
+        ModelNames.resnet152,
         ModelNames.densenet121,
+        ModelNames.densenet161,
+        ModelNames.densenet169,
+        ModelNames.densenet201,
+        ModelNames.vgg11,
+        ModelNames.vgg13,
         ModelNames.vgg16,
+        ModelNames.vgg19,
         ModelNames.mobilenet_v2,
         ModelNames.efficientnet_b0
+    ]
+    
+    AVAILABLE_CONFIGS = [
+        ImageNetteTrainingConfigs.TEST,
+        ImageNetteTrainingConfigs.STANDARD,
+        ImageNetteTrainingConfigs.ADVANCED
     ]
     
     def list_available_configs(self) -> Dict[str, Dict]:
         """List all available ImageNette training configurations."""
         print(f"\n📋 Available ImageNette Training Configurations:")
         print(f"{'='*70}")
-        for config_name, config in self.TRAINING_CONFIGS.items():
-            print(f"\n🔧 {config_name.upper()}:")
-            print(f"   Description: {config['description']}")
-            print(f"   Epochs: {config['num_epochs']}")
-            print(f"   Learning Rate: {config['learning_rate']}")
-            print(f"   Batch Size: {config['batch_size']}")
-            print(f"   Train Samples: {config.get('train_subset_size', 'Full ImageNette dataset')}")
-            print(f"   Test Samples: {config.get('test_subset_size', 'Full ImageNette dataset')}")
-            if 'scheduler_type' in config:
-                print(f"   Scheduler: {config['scheduler_type']}")
-            if 'weight_decay' in config:
-                print(f"   Weight Decay: {config['weight_decay']}")
-        
-        return self.TRAINING_CONFIGS
+        ImageNetteTrainingConfigs.print_config_summary()
+        return ImageNetteTrainingConfigs.list_configs()
     
     def list_available_models(self) -> List[str]:
         """List all available models for ImageNette training."""
@@ -151,18 +117,21 @@ class ImageNetteModelTrainer:
         
         return classes
     
-    def train_model(self, model_name: str, config_name: str = 'standard', 
+    def train_model(self, model_name: str, config_name: str = ImageNetteTrainingConfigs.STANDARD, 
                    custom_config: Optional[Dict] = None) -> Dict:
         """
         Train an ImageNette model with specified configuration.
         
         Args:
             model_name: Name of the model to train
-            config_name: Name of the training configuration
+            config_name: Name of the training configuration (must be from ImageNetteTrainingConfigs)
             custom_config: Custom configuration to override defaults
             
         Returns:
             dict: Training results including model, metrics, and metadata
+            
+        Raises:
+            ValueError: If model_name or config_name is not valid
         """
         print(f"\n{'='*70}")
         print(f"🏋️ Training {model_name} for ImageNette with {config_name} configuration")
@@ -171,13 +140,15 @@ class ImageNetteModelTrainer:
         try:
             # Validate inputs
             if model_name not in self.AVAILABLE_MODELS:
-                raise ValueError(f"Model {model_name} not available. Use list_available_models() to see options.")
+                available_models = ', '.join(self.AVAILABLE_MODELS)
+                raise ValueError(f"Model '{model_name}' not available. Available models: {available_models}")
             
-            if config_name not in self.TRAINING_CONFIGS:
-                raise ValueError(f"Configuration {config_name} not available. Use list_available_configs() to see options.")
+            if config_name not in self.AVAILABLE_CONFIGS:
+                available_configs = ', '.join(self.AVAILABLE_CONFIGS)
+                raise ValueError(f"Configuration '{config_name}' not available. Available configurations: {available_configs}")
             
-            # Get configuration
-            config = self.TRAINING_CONFIGS[config_name].copy()
+            # Get configuration from training_configs module
+            config = ImageNetteTrainingConfigs.get_config(config_name)
             if custom_config:
                 config.update(custom_config)
             
@@ -255,20 +226,28 @@ class ImageNetteModelTrainer:
                 'success': False
             }
     
-    def train_multiple_models(self, model_names: List[str], config_name: str = 'standard') -> List[Dict]:
+    def train_multiple_models(self, model_names: List[str], config_name: str = ImageNetteTrainingConfigs.STANDARD) -> List[Dict]:
         """
         Train multiple ImageNette models with the same configuration.
         
         Args:
             model_names: List of model names to train
-            config_name: Training configuration to use
+            config_name: Training configuration to use (must be from ImageNetteTrainingConfigs)
             
         Returns:
             List of training results for each model
+            
+        Raises:
+            ValueError: If config_name is not valid
         """
         print(f"\n{'='*70}")
         print(f"🚀 Training Multiple ImageNette Models with {config_name} configuration")
         print(f"{'='*70}")
+        
+        # Validate configuration
+        if config_name not in self.AVAILABLE_CONFIGS:
+            available_configs = ', '.join(self.AVAILABLE_CONFIGS)
+            raise ValueError(f"Configuration '{config_name}' not available. Available configurations: {available_configs}")
         
         results = []
         
@@ -429,20 +408,28 @@ class ImageNetteModelTrainer:
             'num_classes': 10
         }
     
-    def train_and_validate(self, model_name: str, config_name: str = 'standard') -> Dict:
+    def train_and_validate(self, model_name: str, config_name: str = ImageNetteTrainingConfigs.STANDARD) -> Dict:
         """
         Train and validate an ImageNette model in one command.
         
         Args:
             model_name: Model to train
-            config_name: Configuration to use
+            config_name: Configuration to use (must be from ImageNetteTrainingConfigs)
             
         Returns:
             dict: Combined training and validation results
+            
+        Raises:
+            ValueError: If config_name is not valid
         """
         print(f"\n{'='*70}")
         print(f"⚡ Train & Validate ImageNette Model: {model_name} with {config_name}")
         print(f"{'='*70}")
+        
+        # Validate configuration
+        if config_name not in self.AVAILABLE_CONFIGS:
+            available_configs = ', '.join(self.AVAILABLE_CONFIGS)
+            raise ValueError(f"Configuration '{config_name}' not available. Available configurations: {available_configs}")
         
         # Train model
         training_result = self.train_model(model_name, config_name)
@@ -471,11 +458,11 @@ if __name__ == "__main__":
     trainer.list_available_configs()
     trainer.list_imagenette_classes()
     
-    # Example: Train and validate a model
-    # result = trainer.train_and_validate('resnet18', 'quick_test')
+    # Example: Train and validate a model using strongly typed config names
+    # result = trainer.train_and_validate('resnet18', ImageNetteTrainingConfigs.TEST)
     
     # Example: Train multiple models
-    # results = trainer.train_multiple_models(['resnet18', 'densenet121'], 'standard')
+    # results = trainer.train_multiple_models(['resnet18', 'densenet121'], ImageNetteTrainingConfigs.STANDARD)
     
     # Example: Compare models
     # model_paths = ['./models/imagenette/resnet18_standard.pt', './models/imagenette/densenet121_standard.pt']
