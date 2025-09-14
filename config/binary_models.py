@@ -1,7 +1,7 @@
 from data_eng.pretrained_model_downloader import PretrainedModelDownloader
 from torch.nn import Module, Linear
 
-from domain.model_names import ModelNames
+from domain.model.model_names import ModelNames
 
 class BinaryModels:
 

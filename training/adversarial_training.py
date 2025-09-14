@@ -14,7 +14,7 @@ from data_eng.io import save_model
 import os
 from datetime import datetime
 from torch.utils.tensorboard import SummaryWriter
-from domain.attack_distance_score import AttackDistanceScore
+from domain.attack.attack_distance_score import AttackDistanceScore
 
 from evaluation.validation import Validation
 import copy

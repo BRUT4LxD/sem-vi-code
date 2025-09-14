@@ -1,7 +1,7 @@
 from typing import List
 import torch
 
-from domain.attack_distance_score import AttackDistanceScore
+from domain.attack.attack_distance_score import AttackDistanceScore
 
 
 class AttackedImageResult():

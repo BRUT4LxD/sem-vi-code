@@ -4,12 +4,11 @@ from tqdm import tqdm
 import numpy as np
 from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_score
 from sklearn.metrics.pairwise import manhattan_distances, euclidean_distances
-from scipy.spatial.distance import pdist, squareform
-from domain.attack_distance_score import AttackDistanceScore
+from domain.attack.attack_distance_score import AttackDistanceScore
 
-from domain.attack_eval_score import AttackEvaluationScore
-from domain.attack_result import AttackResult
-from domain.model_config import ModelConfig
+from domain.attack.attack_eval_score import AttackEvaluationScore
+from domain.attack.attack_result import AttackResult
+from domain.model.model_config import ModelConfig
 
 from torchmetrics import Accuracy, Precision, Recall, F1Score
 from torchmetrics.functional import pairwise_manhattan_distance, pairwise_euclidean_distance

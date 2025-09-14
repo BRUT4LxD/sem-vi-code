@@ -2,7 +2,7 @@ import torchvision.datasets as datasets
 from torch.utils.data import DataLoader, Subset, SubsetRandomSampler, Dataset
 from attacks.attack_names import AttackNames
 from data_eng.transforms import mnist_transformer, cifar_transformer, imagenette_transformer, no_transformer
-from domain.model_names import ModelNames
+from domain.model.model_names import ModelNames
 import torch
 import random
 

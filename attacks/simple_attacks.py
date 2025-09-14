@@ -11,15 +11,15 @@ from tqdm import tqdm
 from torchvision.utils import save_image
 from data_eng.dataset_loader import DatasetLoader, DatasetType
 from data_eng.transforms import imagenette_transformer
-from domain.attack_distance_score import AttackDistanceScore
-from domain.attack_eval_score import AttackEvaluationScore
-from domain.attack_result import AttackResult, AttackedImageResult
+from domain.attack.attack_distance_score import AttackDistanceScore
+from domain.attack.attack_eval_score import AttackEvaluationScore
+from domain.attack.attack_result import AttackResult, AttackedImageResult
 from evaluation.metrics import Metrics
 from shared.model_utils import ModelUtils
 from typing import List
-from domain.attack_eval_score import AttackEvaluationScore
-from domain.attack_result import AttackResult
-from domain.multiattack_result import MultiattackResult
+from domain.attack.attack_eval_score import AttackEvaluationScore
+from domain.attack.attack_result import AttackResult
+from domain.attack.multiattack_result import MultiattackResult
 
 from shared.model_utils import ModelUtils
 from config.imagenet_models import ImageNetModels

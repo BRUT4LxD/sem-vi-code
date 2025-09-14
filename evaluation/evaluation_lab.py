@@ -3,7 +3,7 @@ from config.imagenet_models import ImageNetModels
 from data_eng.dataset_loader import DatasetLoader, DatasetType
 from data_eng.io import load_model
 from data_eng.pretrained_model_downloader import PretrainedModelDownloader
-from domain.model_names import ModelNames
+from domain.model.model_names import ModelNames
 from evaluation.metrics import Metrics
 from training.transfer.setup_pretraining import SetupPretraining
 

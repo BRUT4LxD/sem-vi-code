@@ -5,7 +5,7 @@ from torchvision.models import densenet121, DenseNet121_Weights, densenet161, De
 from torchvision.models import vgg11, VGG11_Weights, vgg13, VGG13_Weights, vgg16, VGG16_Weights, vgg19, VGG19_Weights
 from torchvision.models import mobilenet_v2, MobileNet_V2_Weights, mobilenet_v3_small, MobileNet_V3_Small_Weights, mobilenet_v3_large, MobileNet_V3_Large_Weights
 from torchvision.models import efficientnet_b0, EfficientNet_B0_Weights, efficientnet_b1, EfficientNet_B1_Weights, efficientnet_b2, EfficientNet_B2_Weights, efficientnet_b3, EfficientNet_B3_Weights, efficientnet_b4, EfficientNet_B4_Weights, efficientnet_b5, EfficientNet_B5_Weights, efficientnet_b6, EfficientNet_B6_Weights, efficientnet_b7, EfficientNet_B7_Weights
-from domain.model_names import ModelNames
+from domain.model.model_names import ModelNames
 
 class PretrainedModelDownloader:
 

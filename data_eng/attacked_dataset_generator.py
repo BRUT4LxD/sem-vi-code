@@ -9,8 +9,8 @@ from config.imagenet_models import ImageNetModels
 from data_eng.dataset_loader import DatasetLoader, DatasetType, load_imagenette
 from torch.utils.data import DataLoader, ConcatDataset
 
-from domain.attack_distance_score import AttackDistanceScore
-from domain.attack_result import AttackedImageResult
+from domain.attack.attack_distance_score import AttackDistanceScore
+from domain.attack.attack_result import AttackedImageResult
 
 class AttackedDatasetGeneratorResult:
     def __init__(self, data_loader: DataLoader, attack_distance_score: AttackDistanceScore) -> None:

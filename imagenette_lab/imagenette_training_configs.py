@@ -82,17 +82,8 @@ class ImageNetteTrainingConfigs:
     # Available models for ImageNette training
     AVAILABLE_MODELS = [
         ModelNames.resnet18,
-        ModelNames.resnet50,
-        ModelNames.resnet101,
-        ModelNames.resnet152,
         ModelNames.densenet121,
-        ModelNames.densenet161,
-        ModelNames.densenet169,
-        ModelNames.densenet201,
-        ModelNames.vgg11,
-        ModelNames.vgg13,
         ModelNames.vgg16,
-        ModelNames.vgg19,
         ModelNames.mobilenet_v2,
         ModelNames.efficientnet_b0
     ]

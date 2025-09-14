@@ -5,7 +5,7 @@ from torch.utils.data import DataLoader
 from config.imagenet_classes import ImageNetClasses
 from config.imagenet_models import ImageNetModels
 from config.imagenette_classes import ImageNetteClasses
-from domain.attack_eval_score import AttackEvaluationScore
+from domain.attack.attack_eval_score import AttackEvaluationScore
 import os
 import csv
 

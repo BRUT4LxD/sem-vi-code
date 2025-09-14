@@ -5,9 +5,9 @@ import numpy as np
 import os
 import gc
 
-from domain.attack_eval_score import AttackEvaluationScore
-from domain.attack_result import AttackResult
-from domain.multiattack_result import MultiattackResult
+from domain.attack.attack_eval_score import AttackEvaluationScore
+from domain.attack.attack_result import AttackResult
+from domain.attack.multiattack_result import MultiattackResult
 
 
 @torch.no_grad()

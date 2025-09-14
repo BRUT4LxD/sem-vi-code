@@ -1,6 +1,6 @@
 import numpy as np
 
-from domain.attack_distance_score import AttackDistanceScore
+from domain.attack.attack_distance_score import AttackDistanceScore
 
 
 class AttackEvaluationScore():

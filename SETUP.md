@@ -108,7 +108,7 @@ print(f'✅ scikit-learn test passed: accuracy = {acc}')
 ```bash
 python -c "
 from evaluation.metrics import Metrics
-from domain.attack_result import AttackResult
+from domain.attack.attack_result import AttackResult
 print('✅ Project modules imported successfully')
 "
 ```
