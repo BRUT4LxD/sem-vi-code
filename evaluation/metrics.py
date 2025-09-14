@@ -15,35 +15,6 @@ from torchmetrics.functional import pairwise_manhattan_distance, pairwise_euclid
 
 class Metrics:
 
-    @torch.no_grad()
-    @staticmethod
-    def _accuracy(output, target):
-        """Calculate accuracy using sklearn implementation"""
-        pred = torch.argmax(output, dim=1)
-        return accuracy_score(target.cpu().numpy(), pred.cpu().numpy())
-
-    @torch.no_grad()
-    @staticmethod
-    def _precision(output, target, num_classes):
-        """Calculate precision using sklearn implementation"""
-        pred = torch.argmax(output, dim=1)
-        return precision_score(target.cpu().numpy(), pred.cpu().numpy(), average='macro', zero_division=0)
-
-    @torch.no_grad()
-    @staticmethod
-    def _recall(output, target, num_classes):
-        """Calculate recall using sklearn implementation"""
-        pred = torch.argmax(output, dim=1)
-        return recall_score(target.cpu().numpy(), pred.cpu().numpy(), average='macro', zero_division=0)
-
-    @torch.no_grad()
-    @staticmethod
-    def _f1_score(output, target, num_classes):
-        """Calculate F1 score using sklearn implementation"""
-        pred = torch.argmax(output, dim=1)
-        return f1_score(target.cpu().numpy(), pred.cpu().numpy(), average='macro', zero_division=0)
-
-
     @staticmethod
     @torch.no_grad()
     def l0_distance(image1: torch.Tensor, image2: torch.Tensor, threshold: float = 1e-6):
@@ -108,7 +79,7 @@ class Metrics:
 
     @staticmethod
     @torch.no_grad()
-    def calculate_attack_power(image1: torch.Tensor, image2: torch.Tensor, threshold: float = 1e-6):
+    def attack_power(image1: torch.Tensor, image2: torch.Tensor, threshold: float = 1e-6):
         """
         Calculate attack power as number of pixels that changed significantly.
         This is equivalent to L0 distance with a threshold.
@@ -123,119 +94,10 @@ class Metrics:
         """
         return Metrics.l0_distance(image1, image2, threshold)
 
-    @staticmethod
-    @torch.no_grad()
-    def calculate_perturbation_magnitude(image1: torch.Tensor, image2: torch.Tensor):
-        """
-        Calculate the magnitude of perturbation (L2 norm of the difference).
-        
-        Args:
-            image1: Original image tensor
-            image2: Adversarial image tensor
-            
-        Returns:
-            float: Perturbation magnitude
-        """
-        return Metrics.l2_distance(image1, image2)
 
     @staticmethod
     @torch.no_grad()
-    def calculate_perturbation_ratio(image1: torch.Tensor, image2: torch.Tensor):
-        """
-        Calculate the ratio of perturbation magnitude to original image magnitude.
-        
-        Args:
-            image1: Original image tensor
-            image2: Adversarial image tensor
-            
-        Returns:
-            float: Perturbation ratio (perturbation_magnitude / original_magnitude)
-        """
-        perturbation_mag = Metrics.l2_distance(image1, image2)
-        original_mag = torch.norm(image1, p=2).item()
-        return perturbation_mag / original_mag if original_mag > 0 else 0.0
-
-    @staticmethod
-    @torch.no_grad()
-    def calculate_structural_similarity_index(image1: torch.Tensor, image2: torch.Tensor):
-        """
-        Calculate a simplified Structural Similarity Index (SSIM) approximation.
-        Note: This is a simplified version. For full SSIM, use specialized libraries.
-        
-        Args:
-            image1: Original image tensor
-            image2: Adversarial image tensor
-            
-        Returns:
-            float: SSIM-like score (higher is more similar)
-        """
-        # Convert to numpy for easier computation
-        img1 = image1.cpu().numpy()
-        img2 = image2.cpu().numpy()
-        
-        # Calculate means
-        mu1 = np.mean(img1)
-        mu2 = np.mean(img2)
-        
-        # Calculate variances and covariance
-        sigma1_sq = np.var(img1)
-        sigma2_sq = np.var(img2)
-        sigma12 = np.mean((img1 - mu1) * (img2 - mu2))
-        
-        # SSIM constants
-        c1 = 0.01 ** 2
-        c2 = 0.03 ** 2
-        
-        # Calculate SSIM
-        numerator = (2 * mu1 * mu2 + c1) * (2 * sigma12 + c2)
-        denominator = (mu1 ** 2 + mu2 ** 2 + c1) * (sigma1_sq + sigma2_sq + c2)
-        
-        return numerator / denominator if denominator != 0 else 0.0
-
-    @staticmethod
-    @torch.no_grad()
-    def calculate_peak_signal_to_noise_ratio(image1: torch.Tensor, image2: torch.Tensor, max_val: float = 1.0):
-        """
-        Calculate Peak Signal-to-Noise Ratio (PSNR).
-        
-        Args:
-            image1: Original image tensor
-            image2: Adversarial image tensor
-            max_val: Maximum possible pixel value
-            
-        Returns:
-            float: PSNR in dB (higher is better)
-        """
-        mse = torch.mean((image1 - image2) ** 2).item()
-        if mse == 0:
-            return float('inf')  # Perfect reconstruction
-        return 20 * torch.log10(torch.tensor(max_val)) - 10 * torch.log10(torch.tensor(mse))
-
-    @torch.no_grad()
-    @staticmethod
-    def evaluate_model(model: torch.nn.Module, data_loader: torch.utils.data.DataLoader, num_classes: int):
-        model.eval()
-        acc, prec, rec, f1 = 0, 0, 0, 0
-        total = 0
-        device = next(model.parameters()).device
-
-        for images, labels in tqdm(data_loader):
-            images, labels = images.to(device), labels.to(device)
-            outputs = model(images)
-            acc += Metrics._accuracy(outputs, labels)
-            prec += Metrics._precision(outputs, labels, num_classes)
-            rec += Metrics._recall(outputs, labels, num_classes)
-            f1 += Metrics._f1_score(outputs, labels, num_classes)
-            total += 1
-        acc /= total
-        prec /= total
-        rec /= total
-        f1 /= total
-        return acc, prec, rec, f1
-
-    @staticmethod
-    @torch.no_grad()
-    def calculate_attack_distance_score(attack_results: List[AttackResult]) -> AttackDistanceScore:
+    def attack_distance_score(attack_results: List[AttackResult]) -> AttackDistanceScore:
         l0 = 0.0
         l1 = 0.0
         l2 = 0.0
@@ -251,7 +113,7 @@ class Metrics:
             l1 += Metrics.l1_distance(result.src_image, result.adv_image)
             l2 += Metrics.l2_distance(result.src_image, result.adv_image)
             lInf += Metrics.linf_distance(result.src_image, result.adv_image)
-            power += Metrics.calculate_attack_power(result.src_image, result.adv_image)
+            power += Metrics.attack_power(result.src_image, result.adv_image)
 
         l0 = l0 / n
         l1 = l1 / n
@@ -298,7 +160,7 @@ class Metrics:
         prec = np.mean(np.array(precision) * 100)
         rec = np.mean(np.array(recall) * 100)
         f1 = np.mean(np.array(f1_score) * 100)
-        distances = Metrics.calculate_attack_distance_score(attack_results)
+        distances = Metrics.attack_distance_score(attack_results)
 
         return AttackEvaluationScore(acc, prec, rec, f1, conf_matrix, distances)
 

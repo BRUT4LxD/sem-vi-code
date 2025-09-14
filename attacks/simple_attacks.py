@@ -112,7 +112,7 @@ class SimpleAttacks:
                 l1 = Metrics.l1_distance(img_detached, adv_img_detached)
                 l2 = Metrics.l2_distance(img_detached, adv_img_detached)
                 lInf = Metrics.linf_distance(img_detached, adv_img_detached)
-                power = Metrics.calculate_attack_power(img_detached, adv_img_detached)
+                power = Metrics.attack_power(img_detached, adv_img_detached)
                 distance_score = AttackDistanceScore(l1.item(), l2.item(), lInf.item(), power.item())
                 attack_results.append(AttackedImageResult(adv_img_detached, imagenette_label_tensor, distance_score))
 
