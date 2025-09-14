@@ -4,7 +4,7 @@ from attacks.transferability import Transferability
 import torch
 from torch.utils.data.dataloader import DataLoader
 from typing import List
-from domain.multiattack_result import MultiattackResult
+from domain.attack.multiattack_result import MultiattackResult
 
 class SystemUnderAttack:
 

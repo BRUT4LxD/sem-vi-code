@@ -21,7 +21,7 @@ from config.imagenet_models import ImageNetModels
 from config.imagenette_classes import ImageNetteClasses
 from training.train import Training
 from training.transfer.setup_pretraining import SetupPretraining
-from domain.model_names import ModelNames
+from domain.model.model_names import ModelNames
 from data_eng.dataset_loader import load_imagenette
 
 # Device configuration

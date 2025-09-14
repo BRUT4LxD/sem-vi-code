@@ -13,8 +13,8 @@ from torchvision import transforms
 import torch
 from data_eng.io import load_model, save_model
 from data_eng.pretrained_model_downloader import PretrainedModelDownloader
-from domain.attack_result import AttackedImageResult
-from domain.model_names import ModelNames
+from domain.attack.attack_result import AttackedImageResult
+from domain.model.model_names import ModelNames
 from evaluation.adversarial_validaton import AdversarialValidation
 from evaluation.validation import Validation
 import matplotlib.pyplot as plt
@@ -24,7 +24,7 @@ from datetime import datetime
 import os
 import csv
 
-from domain.multiattack_result import MultiattackResult, AttackResult
+from domain.attack.multiattack_result import MultiattackResult, AttackResult
 
 from torch.utils.data import DataLoader, SubsetRandomSampler, ConcatDataset
 import torchvision.transforms as transforms
