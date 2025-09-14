@@ -296,41 +296,46 @@ class ImageNetteValidator:
         
         return results
     
-    def save_model_summary_results(self, result: Dict) -> str:
+    def save_all_models_summary(self, results: List[Dict]) -> str:
         """
-        Save summary results for a single model to CSV.
+        Save summary results for all models in a single CSV file.
         
         Args:
-            result: Validation result for a single model
+            results: List of validation results
             
         Returns:
             str: Path to saved file
         """
-        if not result['success']:
-            print(f"❌ Cannot save results for failed model: {result['model_name']}")
+        successful_results = [r for r in results if r['success']]
+        
+        if not successful_results:
+            print("❌ No successful results to save")
             return ""
         
         # Prepare data for summary CSV
-        summary_data = [{
-            'model_name': result['model_name'],
-            'overall_accuracy': result['overall_accuracy'],
-            'overall_precision': result['overall_precision'],
-            'overall_recall': result['overall_recall'],
-            'overall_f1': result['overall_f1'],
-            'training_epoch': result['training_epoch'],
-            'training_val_accuracy': result['training_val_accuracy'],
-            'validation_timestamp': result['validation_timestamp']
-        }]
+        summary_data = []
+        for result in successful_results:
+            summary_data.append({
+                'model_name': result['model_name'],
+                'overall_accuracy': result['overall_accuracy'],
+                'overall_precision': result['overall_precision'],
+                'overall_recall': result['overall_recall'],
+                'overall_f1': result['overall_f1'],
+                'training_epoch': result['training_epoch'],
+                'training_val_accuracy': result['training_val_accuracy'],
+                'validation_timestamp': result['validation_timestamp']
+            })
         
         # Create DataFrame and save
         df = pd.DataFrame(summary_data)
+        df = df.sort_values('overall_accuracy', ascending=False)
         
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        filename = f"{result['model_name']}_summary_{timestamp}.csv"
+        filename = f"imagenette_models_summary_{timestamp}.csv"
         filepath = os.path.join(self.results_dir, filename)
         
         df.to_csv(filepath, index=False)
-        print(f"📊 Summary results for {result['model_name']} saved to: {filepath}")
+        print(f"📊 Summary results for all models saved to: {filepath}")
         
         return filepath
     
@@ -377,69 +382,13 @@ class ImageNetteValidator:
         
         return filepath
     
-    def generate_summary_report(self, results: List[Dict]) -> str:
-        """
-        Generate a comprehensive summary report.
-        
-        Args:
-            results: List of validation results
-            
-        Returns:
-            str: Path to saved report
-        """
-        successful_results = [r for r in results if r['success']]
-        
-        if not successful_results:
-            print("❌ No successful results to report")
-            return ""
-        
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        filename = f"imagenette_validation_report_{timestamp}.txt"
-        filepath = os.path.join(self.results_dir, filename)
-        
-        with open(filepath, 'w') as f:
-            f.write("ImageNette Model Validation Report\n")
-            f.write("=" * 50 + "\n")
-            f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-            f.write(f"Dataset: ImageNette (10 classes)\n")
-            f.write(f"Models validated: {len(successful_results)}\n\n")
-            
-            # Overall performance ranking
-            f.write("Overall Performance Ranking:\n")
-            f.write("-" * 30 + "\n")
-            successful_results.sort(key=lambda x: x['overall_accuracy'], reverse=True)
-            for i, result in enumerate(successful_results, 1):
-                f.write(f"{i}. {result['model_name']}: {result['overall_accuracy']:.4f}\n")
-            
-            f.write("\nDetailed Results:\n")
-            f.write("-" * 20 + "\n")
-            for result in successful_results:
-                f.write(f"\n{result['model_name']}:\n")
-                f.write(f"  Overall Accuracy: {result['overall_accuracy']:.4f}\n")
-                f.write(f"  Overall Precision: {result['overall_precision']:.4f}\n")
-                f.write(f"  Overall Recall: {result['overall_recall']:.4f}\n")
-                f.write(f"  Overall F1: {result['overall_f1']:.4f}\n")
-                f.write(f"  Training Epoch: {result['training_epoch']}\n")
-                f.write(f"  Training Val Accuracy: {result['training_val_accuracy']}\n")
-                
-                f.write("  Per-Class Performance:\n")
-                per_class_metrics = result['per_class_metrics']
-                for class_name, metrics in per_class_metrics.items():
-                    f.write(f"    {class_name}: Acc={metrics['accuracy']:.3f}, "
-                           f"Prec={metrics['precision']:.3f}, "
-                           f"Rec={metrics['recall']:.3f}, "
-                           f"F1={metrics['f1']:.3f}, "
-                           f"Samples={metrics['samples']}\n")
-        
-        print(f"📋 Validation report saved to: {filepath}")
-        return filepath
     
-    def run_full_validation(self) -> Dict[str, List[str]]:
+    def run_full_validation(self) -> Dict[str, str]:
         """
         Run complete validation pipeline.
         
         Returns:
-            dict: Lists of paths to generated files
+            dict: Paths to generated files
         """
         print(f"\n{'='*70}")
         print(f"🚀 Running Full ImageNette Validation Pipeline")
@@ -452,31 +401,22 @@ class ImageNetteValidator:
             print("❌ No models to validate")
             return {}
         
-        # Save results for each model
-        summary_files = []
-        per_class_files = []
+        # Save single summary file for all models
+        summary_file = self.save_all_models_summary(results)
         
+        # Save per-class results for each model
+        per_class_files = []
         for result in results:
             if result['success']:
-                # Save summary results for this model
-                summary_file = self.save_model_summary_results(result)
-                if summary_file:
-                    summary_files.append(summary_file)
-                
-                # Save per-class results for this model
                 per_class_file = self.save_model_per_class_results(result)
                 if per_class_file:
                     per_class_files.append(per_class_file)
         
-        # Generate overall report
-        report_file = self.generate_summary_report(results)
-        
-        print(f"\n📁 Generated {len(summary_files)} summary files and {len(per_class_files)} per-class files")
+        print(f"\n📁 Generated 1 summary file and {len(per_class_files)} per-class files")
         
         return {
-            'summary_csv_files': summary_files,
-            'per_class_csv_files': per_class_files,
-            'report_txt': report_file
+            'summary_csv': summary_file,
+            'per_class_csv_files': per_class_files
         }
 
 
@@ -489,22 +429,16 @@ if __name__ == "__main__":
     
     print(f"\n✅ Validation complete! Generated files:")
     
-    # Display summary files
-    if files.get('summary_csv_files'):
-        print(f"\n📊 Summary files ({len(files['summary_csv_files'])}):")
-        for file_path in files['summary_csv_files']:
-            print(f"   📄 {file_path}")
+    # Display summary file
+    if files.get('summary_csv'):
+        print(f"\n📊 Summary file:")
+        print(f"   📄 {files['summary_csv']}")
     
     # Display per-class files
     if files.get('per_class_csv_files'):
         print(f"\n📊 Per-class files ({len(files['per_class_csv_files'])}):")
         for file_path in files['per_class_csv_files']:
             print(f"   📄 {file_path}")
-    
-    # Display report file
-    if files.get('report_txt'):
-        print(f"\n📋 Overall report:")
-        print(f"   📄 {files['report_txt']}")
     
     # Example: Validate specific model
     # result = validator.validate_model('resnet18')
