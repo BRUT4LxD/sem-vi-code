@@ -26,12 +26,12 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config.imagenet_models import ImageNetModels
 from config.imagenette_classes import ImageNetteClasses
-from domain.model_names import ModelNames
+from domain.model.model_names import ModelNames
 from data_eng.dataset_loader import load_imagenette
 from data_eng.io import load_model_imagenette
 from training.train import Training
 from training.transfer.setup_pretraining import SetupPretraining
-from training.training_configs import ImageNetteTrainingConfigs
+from imagenette_training_configs import ImageNetteTrainingConfigs
 from evaluation.metrics import Metrics
 from evaluation.validation import Validation
 from evaluation.visualization import simple_visualize

@@ -8,7 +8,7 @@ from config.imagenet_models import ImageNetModels
 from config.imagenette_classes import ImageNetteClasses
 from data_eng.attacked_dataset_generator import AttackedDatasetGenerator
 from data_eng.dataset_loader import DatasetLoader, DatasetType
-from domain.attack_eval_score import AttackEvaluationScore
+from domain.attack.attack_eval_score import AttackEvaluationScore
 from evaluation.validation import Validation
 import os
 import csv
