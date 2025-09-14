@@ -22,8 +22,8 @@ class AttackResult():
     def __str__(self) -> str:
         return f"Actual: {self.actual}, Predicted: {self.predicted}"
 
-    @torch.no_grad()
     @staticmethod
+    @torch.no_grad()
     def create_from_adv_image(
         model: torch.nn.Module,
         adv_images: torch.Tensor,

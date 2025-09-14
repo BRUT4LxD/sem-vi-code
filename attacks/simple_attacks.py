@@ -29,11 +29,14 @@ from config.imagenet_models import ImageNetModels
 class SimpleAttacks:
 
     @staticmethod
-    def single_attack(attack: Attack, test_loader: DataLoader, device='cuda', iterations: int = 1):
+    def single_attack(attack: Attack, test_loader: DataLoader, device='cuda', iterations: int = 1, num_classes: int = None):
         model: torch.nn.Module = attack.model
-        last_layer = list(model.children())[-1]
-        last_layer_outputs = list(last_layer.parameters())[-1]
-        num_classes = len(last_layer_outputs)
+
+        if num_classes is None:
+            last_layer = list(model.children())[-1]
+            last_layer_outputs = list(last_layer.parameters())[-1]
+            num_classes = len(last_layer_outputs)
+
         it = 0
         for images, labels in test_loader:
             if it >= iterations:
@@ -43,7 +46,7 @@ class SimpleAttacks:
             start = time.time()
             adv_images = attack(images, labels)
             attack_res = AttackResult.create_from_adv_image(
-                model, adv_images, images, labels, model.__call__.__name__, attack.attack)
+                model, adv_images, images, labels, "resnet18", attack.attack)
             end = time.time()
             ev = Metrics.evaluate_attack_score(attack_res, num_classes)
             print('{}: samples: {}, {} ({} ms)'.format(attack.attack, labels.shape[0], ev,

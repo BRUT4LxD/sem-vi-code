@@ -65,7 +65,7 @@ def load_model_imagenette(model_path: str, model_name: str = None, device: str =
             raise FileNotFoundError(f"Model file not found: {model_path}")
         
         # Load the checkpoint
-        checkpoint = torch.load(model_path, map_location=device)
+        checkpoint = torch.load(model_path, map_location=device, weights_only=False)
         
         # Extract model name from path if not provided
         if model_name is None:
