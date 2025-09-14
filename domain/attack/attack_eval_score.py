@@ -11,24 +11,27 @@ class AttackEvaluationScore:
     A comprehensive dataclass to store evaluation scores for an attack.
     Combines traditional attack evaluation with effectiveness metrics.
 
+    Note: Core metrics (acc, prec, rec, f1) are stored as percentage values (0-100).
+    Effectiveness metrics are stored as ratios (0-1).
+
     Attributes:
-        acc: The accuracy score (robust accuracy).
-        prec: The precision score.
-        rec: The recall score.
-        f1: The F1 score.
+        acc: The accuracy score (robust accuracy) - stored as percentage (0-100).
+        prec: The precision score - stored as percentage (0-100).
+        rec: The recall score - stored as percentage (0-100).
+        f1: The F1 score - stored as percentage (0-100).
         conf_matrix: The confusion matrix.
         distance_score: Distance metrics.
         attack_name: The name of the attack.
         time: The time taken for the attack.
         n_samples: The number of samples in the dataset.
         
-        # Attack effectiveness metrics (optional)
-        adversarial_accuracy: Robust accuracy on adversarial examples.
-        asr_unconditional: Unconditional Attack Success Rate.
-        asr_conditional: Conditional Attack Success Rate.
-        accuracy_drop: Accuracy drop from clean to adversarial.
-        relative_accuracy_drop: Relative accuracy drop.
-        clean_accuracy: Clean accuracy for comparison.
+        # Attack effectiveness metrics (optional) - stored as ratios (0-1)
+        adversarial_accuracy: Robust accuracy on adversarial examples (0-1).
+        asr_unconditional: Unconditional Attack Success Rate (0-1).
+        asr_conditional: Conditional Attack Success Rate (0-1).
+        accuracy_drop: Accuracy drop from clean to adversarial (0-1).
+        relative_accuracy_drop: Relative accuracy drop (0-1).
+        clean_accuracy: Clean accuracy for comparison (0-1).
     """
     
     # Core evaluation metrics
@@ -72,12 +75,12 @@ class AttackEvaluationScore:
         Sets the attack effectiveness metrics.
 
         Args:
-            adversarial_accuracy: Robust accuracy on adversarial examples.
-            asr_unconditional: Unconditional Attack Success Rate.
-            asr_conditional: Conditional Attack Success Rate.
-            accuracy_drop: Accuracy drop from clean to adversarial.
-            relative_accuracy_drop: Relative accuracy drop.
-            clean_accuracy: Clean accuracy for comparison.
+            adversarial_accuracy: Robust accuracy on adversarial examples (0-1).
+            asr_unconditional: Unconditional Attack Success Rate (0-1).
+            asr_conditional: Conditional Attack Success Rate (0-1).
+            accuracy_drop: Accuracy drop from clean to adversarial (0-1).
+            relative_accuracy_drop: Relative accuracy drop (0-1).
+            clean_accuracy: Clean accuracy for comparison (0-1).
         """
         self.adversarial_accuracy = adversarial_accuracy
         self.asr_unconditional = asr_unconditional
@@ -98,6 +101,9 @@ class AttackEvaluationScore:
     def to_dict(self) -> dict:
         """
         Convert the dataclass to a dictionary for serialization.
+        
+        Note: Core metrics (acc, prec, rec, f1) are stored as percentages (0-100).
+        Effectiveness metrics are stored as ratios (0-1).
         
         Returns:
             Dictionary representation of the evaluation score.
@@ -138,7 +144,11 @@ class AttackEvaluationScore:
         prec = f'prec: {self.prec}% '
         rec = f'rec: {self.rec}% '
         f1 = f'f1: {self.f1}% '
-        time = f'time: {format(self.time*1000/self.n_samples, ".2f")}ms/img ' if self.time and self.n_samples > 0 is not None else ""
+        if (self.time is not None) and (self.n_samples is not None) and (self.n_samples > 0):
+            per_img_ms = 1000.0 * self.time / self.n_samples
+            time = f'time: {per_img_ms:.2f}ms/img '
+        else:
+            time = ""
         n_samples = f'n_samples: {self.n_samples}' if self.n_samples is not None else ""
 
         # Basic metrics line

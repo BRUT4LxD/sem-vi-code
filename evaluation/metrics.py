@@ -256,10 +256,12 @@ class Metrics:
         Args:
             attack_results: List of attack results
             num_classes: Number of classes
-            clean_accuracy: Optional clean accuracy for effectiveness metrics
+            clean_accuracy: Optional clean accuracy for effectiveness metrics (0-1)
             
         Returns:
-            AttackEvaluationScore: Comprehensive attack evaluation with optional effectiveness metrics
+            AttackEvaluationScore: Comprehensive attack evaluation with optional effectiveness metrics.
+            Core metrics (acc, prec, rec, f1) are stored as percentages (0-100).
+            Effectiveness metrics are stored as ratios (0-1).
         """
         if len(attack_results) == 0:
             return AttackEvaluationScore(0.0, 0.0, 0.0, 0.0, np.zeros((num_classes, num_classes), dtype=np.int32), AttackDistanceScore(0.0, 0.0, 0.0, 0.0, 0.0))
