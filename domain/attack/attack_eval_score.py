@@ -1,86 +1,65 @@
 import numpy as np
 from typing import Optional
+from dataclasses import dataclass, field
 
 from domain.attack.attack_distance_score import AttackDistanceScore
 
 
-class AttackEvaluationScore():
+@dataclass
+class AttackEvaluationScore:
     """
-    A comprehensive class to store evaluation scores for an attack.
+    A comprehensive dataclass to store evaluation scores for an attack.
     Combines traditional attack evaluation with effectiveness metrics.
 
     Attributes:
-        acc (float): The accuracy score (robust accuracy).
-        prec (float): The precision score.
-        rec (float): The recall score.
-        f1 (float): The F1 score.
-        conf_matrix (np.ndarray): The confusion matrix.
-        distance_score (AttackDistanceScore): Distance metrics.
-        attack_name (str): The name of the attack.
-        time (float): The time taken for the attack.
-        n_samples (int): The number of samples in the dataset.
+        acc: The accuracy score (robust accuracy).
+        prec: The precision score.
+        rec: The recall score.
+        f1: The F1 score.
+        conf_matrix: The confusion matrix.
+        distance_score: Distance metrics.
+        attack_name: The name of the attack.
+        time: The time taken for the attack.
+        n_samples: The number of samples in the dataset.
         
         # Attack effectiveness metrics (optional)
-        adversarial_accuracy (Optional[float]): Robust accuracy on adversarial examples.
-        asr_unconditional (Optional[float]): Unconditional Attack Success Rate.
-        asr_conditional (Optional[float]): Conditional Attack Success Rate.
-        accuracy_drop (Optional[float]): Accuracy drop from clean to adversarial.
-        relative_accuracy_drop (Optional[float]): Relative accuracy drop.
-        clean_accuracy (Optional[float]): Clean accuracy for comparison.
+        adversarial_accuracy: Robust accuracy on adversarial examples.
+        asr_unconditional: Unconditional Attack Success Rate.
+        asr_conditional: Conditional Attack Success Rate.
+        accuracy_drop: Accuracy drop from clean to adversarial.
+        relative_accuracy_drop: Relative accuracy drop.
+        clean_accuracy: Clean accuracy for comparison.
     """
-
-    def __init__(self, acc: float, prec: float, rec: float, f1: float, conf_matrix: np.ndarray, 
-                 distance_score: AttackDistanceScore, attack_name: str = None, time: float = None, 
-                 n_samples: int = None, adversarial_accuracy: Optional[float] = None,
-                 asr_unconditional: Optional[float] = None, asr_conditional: Optional[float] = None,
-                 accuracy_drop: Optional[float] = None, relative_accuracy_drop: Optional[float] = None,
-                 clean_accuracy: Optional[float] = None):
-        """
-        Initializes an AttackEvaluationScore object.
-
-        Args:
-            acc (float): The accuracy score (robust accuracy).
-            prec (float): The precision score.
-            rec (float): The recall score.
-            f1 (float): The F1 score.
-            conf_matrix (np.ndarray): The confusion matrix.
-            distance_score (AttackDistanceScore): Distance metrics.
-            attack_name (str, optional): The name of the attack. Defaults to None.
-            time (float, optional): The time taken for the attack. Defaults to None.
-            n_samples (int, optional): The number of samples in the dataset. Defaults to None.
-            adversarial_accuracy (Optional[float]): Robust accuracy on adversarial examples.
-            asr_unconditional (Optional[float]): Unconditional Attack Success Rate.
-            asr_conditional (Optional[float]): Conditional Attack Success Rate.
-            accuracy_drop (Optional[float]): Accuracy drop from clean to adversarial.
-            relative_accuracy_drop (Optional[float]): Relative accuracy drop.
-            clean_accuracy (Optional[float]): Clean accuracy for comparison.
-        """
-        self.acc = acc
-        self.prec = prec
-        self.rec = rec
-        self.f1 = f1
-        self.conf_matrix = conf_matrix
-        self.distance_score = distance_score
-        self.attack_name = attack_name
-        self.time = time
-        self.n_samples = n_samples
-        
-        # Attack effectiveness metrics
-        self.adversarial_accuracy = adversarial_accuracy
-        self.asr_unconditional = asr_unconditional
-        self.asr_conditional = asr_conditional
-        self.accuracy_drop = accuracy_drop
-        self.relative_accuracy_drop = relative_accuracy_drop
-        self.clean_accuracy = clean_accuracy
+    
+    # Core evaluation metrics
+    acc: float
+    prec: float
+    rec: float
+    f1: float
+    conf_matrix: np.ndarray
+    distance_score: AttackDistanceScore
+    
+    # Optional metadata
+    attack_name: Optional[str] = None
+    time: Optional[float] = None
+    n_samples: Optional[int] = None
+    
+    # Optional effectiveness metrics
+    adversarial_accuracy: Optional[float] = None
+    asr_unconditional: Optional[float] = None
+    asr_conditional: Optional[float] = None
+    accuracy_drop: Optional[float] = None
+    relative_accuracy_drop: Optional[float] = None
+    clean_accuracy: Optional[float] = None
 
     def set_after_attack(self, attack_name: str, time: int, n_samples: int):
         """
         Sets the attack name, time, and number of samples.
 
         Args:
-            attack_name (str): The name of the attack.
-            time (int): The time taken for the attack.
-            n_samples (int): The number of samples in the dataset.
+            attack_name: The name of the attack.
+            time: The time taken for the attack.
+            n_samples: The number of samples in the dataset.
         """
         self.attack_name = attack_name
         self.time = time
@@ -93,12 +72,12 @@ class AttackEvaluationScore():
         Sets the attack effectiveness metrics.
 
         Args:
-            adversarial_accuracy (float): Robust accuracy on adversarial examples.
-            asr_unconditional (float): Unconditional Attack Success Rate.
-            asr_conditional (Optional[float]): Conditional Attack Success Rate.
-            accuracy_drop (Optional[float]): Accuracy drop from clean to adversarial.
-            relative_accuracy_drop (Optional[float]): Relative accuracy drop.
-            clean_accuracy (Optional[float]): Clean accuracy for comparison.
+            adversarial_accuracy: Robust accuracy on adversarial examples.
+            asr_unconditional: Unconditional Attack Success Rate.
+            asr_conditional: Conditional Attack Success Rate.
+            accuracy_drop: Accuracy drop from clean to adversarial.
+            relative_accuracy_drop: Relative accuracy drop.
+            clean_accuracy: Clean accuracy for comparison.
         """
         self.adversarial_accuracy = adversarial_accuracy
         self.asr_unconditional = asr_unconditional
@@ -112,9 +91,40 @@ class AttackEvaluationScore():
         Check if effectiveness metrics are available.
 
         Returns:
-            bool: True if effectiveness metrics are set, False otherwise.
+            True if effectiveness metrics are set, False otherwise.
         """
         return self.adversarial_accuracy is not None and self.asr_unconditional is not None
+
+    def to_dict(self) -> dict:
+        """
+        Convert the dataclass to a dictionary for serialization.
+        
+        Returns:
+            Dictionary representation of the evaluation score.
+        """
+        return {
+            'acc': self.acc,
+            'prec': self.prec,
+            'rec': self.rec,
+            'f1': self.f1,
+            'conf_matrix': self.conf_matrix.tolist() if isinstance(self.conf_matrix, np.ndarray) else self.conf_matrix,
+            'distance_score': {
+                'l0_pixels': self.distance_score.l0_pixels,
+                'l1': self.distance_score.l1,
+                'l2': self.distance_score.l2,
+                'linf': self.distance_score.linf,
+                'power_mse': self.distance_score.power_mse
+            },
+            'attack_name': self.attack_name,
+            'time': self.time,
+            'n_samples': self.n_samples,
+            'adversarial_accuracy': self.adversarial_accuracy,
+            'asr_unconditional': self.asr_unconditional,
+            'asr_conditional': self.asr_conditional,
+            'accuracy_drop': self.accuracy_drop,
+            'relative_accuracy_drop': self.relative_accuracy_drop,
+            'clean_accuracy': self.clean_accuracy
+        }
 
     def __str__(self) -> str:
         """
