@@ -19,7 +19,7 @@ print(f"✅ Loaded model: {result['model_name']}")
 attack = FGSM(model)
 
 # Get test data (small subset for quick testing)
-_, test_loader = load_imagenette(batch_size=4, test_subset_size=20)
+_, test_loader = load_imagenette(batch_size=1, test_subset_size=-1)
 
 # Run attack
-SystemUnderAttack.simple_attack(attack, test_loader, num_classes=len(ImageNetteClasses.get_classes()))
+SystemUnderAttack.simple_attack(attack, test_loader, num_classes=len(ImageNetteClasses.get_classes()), visualize=True)

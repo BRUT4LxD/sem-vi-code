@@ -9,8 +9,8 @@ from domain.attack.multiattack_result import MultiattackResult
 class SystemUnderAttack:
 
     @staticmethod
-    def simple_attack(attack: Attack, test_loader: DataLoader, device='cuda', iterations: int = 1, num_classes: int = None):
-        SimpleAttacks.single_attack(attack, test_loader, device, iterations, num_classes)
+    def simple_attack(attack: Attack, test_loader: DataLoader, device='cuda', iterations: int = 1, num_classes: int = None, visualize: bool = False):
+        SimpleAttacks.single_attack(attack, test_loader, device, iterations, num_classes, visualize)
 
     @staticmethod
     def attack_images(

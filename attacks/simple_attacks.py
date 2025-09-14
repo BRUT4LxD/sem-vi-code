@@ -15,6 +15,7 @@ from domain.attack.attack_distance_score import AttackDistanceScore
 from domain.attack.attack_eval_score import AttackEvaluationScore
 from domain.attack.attack_result import AttackResult, AttackedImageResult
 from evaluation.metrics import Metrics
+from evaluation.visualization import attack_visualization
 from shared.model_utils import ModelUtils
 from typing import List
 from domain.attack.attack_eval_score import AttackEvaluationScore
@@ -29,7 +30,7 @@ from config.imagenet_models import ImageNetModels
 class SimpleAttacks:
 
     @staticmethod
-    def single_attack(attack: Attack, test_loader: DataLoader, device='cuda', iterations: int = 1, num_classes: int = None):
+    def single_attack(attack: Attack, test_loader: DataLoader, device='cuda', iterations: int = 1, num_classes: int = None, visualize: bool = False):
         model: torch.nn.Module = attack.model
 
         if num_classes is None:
@@ -46,11 +47,23 @@ class SimpleAttacks:
             start = time.time()
             adv_images = attack(images, labels)
             attack_res = AttackResult.create_from_adv_image(
-                model, adv_images, images, labels, "resnet18", attack.attack)
+                model, adv_images, images, labels, attack.model_name, attack.attack)
             end = time.time()
             ev = Metrics.evaluate_attack_score(attack_res, num_classes)
             print('{}: samples: {}, {} ({} ms)'.format(attack.attack, labels.shape[0], ev,
                 int((end-start)*1000)))
+            
+            if visualize:
+                attack_visualization(
+                    source_image=images[0],
+                    attacked_image=adv_images[0],
+                    model_name=attack.model_name,
+                    attack_name=attack.attack,
+                    true_label=labels[0].item(),
+                    predicted_label=attack_res[0].predicted,
+                    distance_score=ev.distance_score
+                )
+            
             it += 1
 
             del adv_images, attack_res

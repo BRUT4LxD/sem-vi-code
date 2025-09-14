@@ -115,3 +115,87 @@ def plot_multiattacked_images(multiattack_results: MultiattackResult, classes_na
         plt.close(fig)
 
     torch.cuda.empty_cache()
+
+
+@torch.no_grad()
+def attack_visualization(source_image: torch.Tensor, attacked_image: torch.Tensor, 
+                        model_name: str, attack_name: str, true_label: int = None, 
+                        predicted_label: int = None, distance_score=None):
+    """
+    Visualize a single attack example showing original, adversarial, and difference images.
+    
+    Args:
+        source_image: Original image tensor (CHW format)
+        attacked_image: Adversarial image tensor (CHW format)
+        model_name: Name of the model
+        attack_name: Name of the attack
+        true_label: True label of the image (optional)
+        predicted_label: Predicted label after attack (optional)
+        distance_score: AttackDistanceScore object with distance metrics (optional)
+    """
+    # Convert to CPU and display format (HWC)
+    source_display = source_image.cpu().permute(1, 2, 0)
+    attacked_display = attacked_image.cpu().permute(1, 2, 0)
+    
+    # Calculate the actual difference (adversarial - original)
+    actual_diff = attacked_display - source_display
+    
+    # Create a colored difference map (red for positive, blue for negative changes)
+    diff_colored = torch.zeros_like(source_display)
+    
+    # Process each RGB channel separately
+    for channel in range(3):  # RGB channels
+        channel_diff = actual_diff[:, :, channel]
+        
+        # Red channel: positive differences (adversarial > original)
+        diff_colored[:, :, 0] += torch.clamp(channel_diff * 8, 0, 1)
+        
+        # Green channel: negative differences (adversarial < original)  
+        diff_colored[:, :, 1] += torch.clamp(-channel_diff * 8, 0, 1)
+    
+    # Normalize to [0, 1] range
+    diff_colored = torch.clamp(diff_colored, 0, 1)
+    
+    # Create the plot
+    fig, axes = plt.subplots(1, 3, figsize=(18, 6))
+    
+    # Original image
+    axes[0].imshow(source_display.clamp(0, 1))
+    title_orig = 'Original'
+    if true_label is not None:
+        title_orig += f'\n(True: {true_label})'
+    axes[0].set_title(title_orig)
+    axes[0].axis('off')
+    
+    # Adversarial image
+    axes[1].imshow(attacked_display.clamp(0, 1))
+    title_adv = 'Adversarial'
+    if predicted_label is not None:
+        title_adv += f'\n(Pred: {predicted_label})'
+    axes[1].set_title(title_adv)
+    axes[1].axis('off')
+    
+    # Difference image
+    axes[2].imshow(diff_colored)
+    axes[2].set_title('Difference (Red: +, Green: -)')
+    axes[2].axis('off')
+    
+    # Add main title below the images
+    main_title = f'Model: {model_name} | Attack: {attack_name}'
+    plt.figtext(0.5, 0.05, main_title, ha='center', fontsize=14, weight='bold')
+    
+    # Add distance metrics if available
+    if distance_score is not None:
+        l0 = distance_score.l0_pixels
+        l1 = distance_score.l1
+        l2 = distance_score.l2
+        linf = distance_score.linf
+        power = distance_score.power_mse
+        
+        distance_text = f'L0: {l0:.2f} | L1: {l1:.3f} | L2: {l2:.4f} | L∞: {linf:.4f} | Power: {power:.4f}'
+        plt.figtext(0.5, 0.02, distance_text, ha='center', fontsize=12, 
+                   bbox=dict(boxstyle="round,pad=0.3", facecolor="lightgray"))
+    
+    plt.tight_layout()
+    plt.subplots_adjust(bottom=0.15)
+    plt.show()
