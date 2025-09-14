@@ -26,7 +26,6 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config.imagenet_models import ImageNetModels
 from config.imagenette_classes import ImageNetteClasses
-from domain.model.model_names import ModelNames
 from data_eng.dataset_loader import load_imagenette
 from data_eng.io import load_model_imagenette
 from training.train import Training
@@ -61,36 +60,15 @@ class ImageNetteModelTrainer:
             self.device = torch.device(device)
         
         self.models_dir = models_dir
+        self.AVAILABLE_MODELS = ImageNetteTrainingConfigs.AVAILABLE_MODELS
+        self.AVAILABLE_CONFIGS = ImageNetteTrainingConfigs.ALL_CONFIGS
         os.makedirs(self.models_dir, exist_ok=True)
         
         print(f"🚀 ImageNetteModelTrainer initialized on device: {self.device}")
         print(f"📁 Models will be saved to: {self.models_dir}")
         print(f"🎯 Dataset: ImageNette (10 classes)")
     
-    # Available models for ImageNette training
-    AVAILABLE_MODELS = [
-        ModelNames.resnet18,
-        ModelNames.resnet50,
-        ModelNames.resnet101,
-        ModelNames.resnet152,
-        ModelNames.densenet121,
-        ModelNames.densenet161,
-        ModelNames.densenet169,
-        ModelNames.densenet201,
-        ModelNames.vgg11,
-        ModelNames.vgg13,
-        ModelNames.vgg16,
-        ModelNames.vgg19,
-        ModelNames.mobilenet_v2,
-        ModelNames.efficientnet_b0
-    ]
-    
-    AVAILABLE_CONFIGS = [
-        ImageNetteTrainingConfigs.TEST,
-        ImageNetteTrainingConfigs.STANDARD,
-        ImageNetteTrainingConfigs.ADVANCED
-    ]
-    
+
     def list_available_configs(self) -> Dict[str, Dict]:
         """List all available ImageNette training configurations."""
         print(f"\n📋 Available ImageNette Training Configurations:")
