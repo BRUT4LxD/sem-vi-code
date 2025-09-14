@@ -125,44 +125,132 @@ class Metrics:
 
     @staticmethod
     @torch.no_grad()
-    def evaluate_attack(attack_results: List[AttackResult], num_classes: int) -> AttackEvaluationScore:
+    def evaluate_attack_score(attack_results: List[AttackResult], num_classes: int) -> AttackEvaluationScore:
+        """
+        Evaluate attack effectiveness by measuring model performance on adversarial examples.
+        
+        Args:
+            attack_results: List of attack results
+            num_classes: Number of classes
+            
+        Returns:
+            AttackEvaluationScore: Attack evaluation metrics
+        """
         if len(attack_results) == 0:
             return AttackEvaluationScore(0.0, 0.0, 0.0, 0.0, np.zeros((num_classes, num_classes), dtype=np.int32), AttackDistanceScore(0.0, 0.0, 0.0, 0.0, 0.0))
 
-        actual = [result.actual for result in attack_results]
-        predicted = [result.predicted for result in attack_results]
+        # Extract true labels and adversarial predictions
+        true_labels = [result.actual for result in attack_results]
+        adv_predictions = [result.predicted for result in attack_results]
 
+        # Create confusion matrix: true_labels vs adversarial_predictions
         conf_matrix = np.zeros((num_classes, num_classes), dtype=np.int32)
+        for true_label, adv_pred in zip(true_labels, adv_predictions):
+            conf_matrix[true_label][adv_pred] += 1
 
-        for a, p in zip(actual, predicted):
-            conf_matrix[a][p] += 1
-
+        # Calculate accuracy (how often model predicts correctly on adversarial examples)
         accuracy = np.trace(conf_matrix) / np.sum(conf_matrix)
 
+        # Calculate per-class precision, recall, F1
         precision = []
         recall = []
         f1_score = []
+        
         for i in range(num_classes):
+            # True Positives: correctly predicted as class i
             tp = conf_matrix[i][i]
+            # False Positives: incorrectly predicted as class i
             fp = np.sum(conf_matrix[:, i]) - tp
+            # False Negatives: class i incorrectly predicted as other classes
             fn = np.sum(conf_matrix[i, :]) - tp
 
+            # Calculate metrics with zero division handling
             precision_i = tp / (tp + fp) if (tp + fp) != 0 else 0.0
             recall_i = tp / (tp + fn) if (tp + fn) != 0 else 0.0
-            f1_score_i = 2 * precision_i * recall_i / \
-                (precision_i + recall_i) if (precision_i + recall_i) != 0 else 0.0
+            f1_score_i = 2 * precision_i * recall_i / (precision_i + recall_i) if (precision_i + recall_i) != 0 else 0.0
 
             precision.append(precision_i)
             recall.append(recall_i)
             f1_score.append(f1_score_i)
 
-        acc = (accuracy * 100)
-        prec = np.mean(np.array(precision) * 100)
-        rec = np.mean(np.array(recall) * 100)
-        f1 = np.mean(np.array(f1_score) * 100)
+        # Convert to percentages
+        acc = accuracy * 100
+        prec = np.mean(np.array(precision)) * 100
+        rec = np.mean(np.array(recall)) * 100
+        f1 = np.mean(np.array(f1_score)) * 100
+        
+        # Calculate distance metrics
         distances = Metrics.attack_distance_score(attack_results)
 
         return AttackEvaluationScore(acc, prec, rec, f1, conf_matrix, distances)
+
+    @staticmethod
+    @torch.no_grad()
+    def evaluate_attack(attack_results: List[AttackResult], clean_accuracy: float, 
+                                    num_classes: int) -> dict:
+        """
+        Evaluate comprehensive attack effectiveness including Attack Success Rate (ASR).
+        
+        Args:
+            attack_results: List of attack results
+            clean_accuracy: Model accuracy on clean images (0.0 to 1.0)
+            num_classes: Number of classes
+            
+        Returns:
+            dict: Comprehensive attack effectiveness metrics
+        """
+        if len(attack_results) == 0:
+            return {
+                'attack_success_rate': 0.0,
+                'accuracy_drop': 0.0,
+                'relative_accuracy_drop': 0.0,
+                'robustness_score': 1.0,
+                'degradation_ratio': 0.0,
+                'adversarial_accuracy': clean_accuracy,
+                'clean_accuracy': clean_accuracy,
+                'successful_attacks': 0,
+                'total_attacks': 0
+            }
+        
+        # Calculate adversarial accuracy from attack results
+        correct_predictions = sum(1 for result in attack_results if result.actual == result.predicted)
+        adversarial_accuracy = correct_predictions / len(attack_results)
+        
+        # Calculate Attack Success Rate (ASR)
+        # ASR = (Clean_Accuracy - Adversarial_Accuracy) / Clean_Accuracy
+        attack_success_rate = max(0.0, (clean_accuracy - adversarial_accuracy) / clean_accuracy) if clean_accuracy > 0 else 0.0
+        
+        # Calculate accuracy drop metrics
+        accuracy_drop = max(0.0, clean_accuracy - adversarial_accuracy)
+        relative_accuracy_drop = accuracy_drop / clean_accuracy if clean_accuracy > 0 else 0.0
+        
+        # Count successful attacks (where prediction changed from correct to incorrect)
+        successful_attacks = sum(1 for result in attack_results if result.actual != result.predicted)
+        
+        # Calculate traditional attack metrics
+        attack_eval = Metrics.evaluate_attack_score(attack_results, num_classes)
+        
+        # Combine all metrics
+        return {
+            'clean_accuracy': clean_accuracy,
+            'adversarial_accuracy': adversarial_accuracy,
+            'attack_success_rate': attack_success_rate,
+            'accuracy_drop': accuracy_drop,
+            'relative_accuracy_drop': relative_accuracy_drop,
+            'robustness_score': 1.0 - attack_success_rate,  # Higher robustness = lower ASR
+            'degradation_ratio': accuracy_drop / clean_accuracy if clean_accuracy > 0 else 0.0,
+            'successful_attacks': successful_attacks,
+            'total_attacks': len(attack_results),
+            'attack_accuracy': attack_eval.acc / 100.0,  # Convert to 0-1 range
+            'attack_precision': attack_eval.prec / 100.0,
+            'attack_recall': attack_eval.rec / 100.0,
+            'attack_f1': attack_eval.f1 / 100.0,
+            'l0_distance': attack_eval.distance_score.l0,
+            'l1_distance': attack_eval.distance_score.l1,
+            'l2_distance': attack_eval.distance_score.l2,
+            'linf_distance': attack_eval.distance_score.linf,
+            'attack_power': attack_eval.distance_score.power
+        }
 
     @staticmethod
     @torch.no_grad()

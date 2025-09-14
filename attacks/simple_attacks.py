@@ -45,7 +45,7 @@ class SimpleAttacks:
             attack_res = AttackResult.create_from_adv_image(
                 model, adv_images, images, labels, model.__call__.__name__, attack.attack)
             end = time.time()
-            ev = Metrics.evaluate_attack(attack_res, num_classes)
+            ev = Metrics.evaluate_attack_score(attack_res, num_classes)
             print('{}: samples: {}, {} ({} ms)'.format(attack.attack, labels.shape[0], ev,
                 int((end-start)*1000)))
             it += 1
@@ -245,7 +245,7 @@ class SimpleAttacks:
                         f'WARNING: ran out of memory, skipping attack for model: {attack.model_name} and attack: {attack.attack}')
                     continue
 
-            ev = Metrics.evaluate_attack(attack_results[it], num_classes)
+            ev = Metrics.evaluate_attack_score(attack_results[it], num_classes)
             ev.set_after_attack(attack.attack, att_time, len(attack_results[it]))
             evaluation_scores.append(ev)
 
