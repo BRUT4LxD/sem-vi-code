@@ -9,11 +9,18 @@ import os
 import sys
 from datetime import datetime
 
+from data_eng.io import load_model, load_model_imagenette
+from evaluation.metrics import Metrics
+from evaluation.validation import Validation
+from evaluation.visualization import simple_visualize
+
 # Add project root to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config.imagenet_models import ImageNetModels
+from config.imagenette_classes import ImageNetteClasses
 from training.train import Training
+from training.transfer.setup_pretraining import SetupPretraining
 from domain.model_names import ModelNames
 from data_eng.dataset_loader import load_imagenette
 
@@ -59,37 +66,6 @@ training_configs = {
     }
 }
 
-def load_real_imagenette_dataset(batch_size=16, train_subset_size=-1, test_subset_size=-1):
-    """Load real ImageNette dataset."""
-    print(f"📊 Loading real ImageNette dataset...")
-    print(f"   Batch size: {batch_size}")
-    if train_subset_size > 0:
-        print(f"   Train subset size: {train_subset_size}")
-    if test_subset_size > 0:
-        print(f"   Test subset size: {test_subset_size}")
-    
-    try:
-        train_loader, test_loader = load_imagenette(
-            transform=None,  # Uses imagenette_transformer() by default
-            path_to_data='./data/imagenette',
-            batch_size=batch_size,
-            train_subset_size=train_subset_size,
-            test_subset_size=test_subset_size,
-            shuffle=True
-        )
-        
-        print(f"   Train samples: {len(train_loader.dataset)}")
-        print(f"   Test samples: {len(test_loader.dataset)}")
-        print(f"   ✅ Real ImageNette dataset loaded successfully!")
-        
-        return train_loader, test_loader
-        
-    except Exception as e:
-        print(f"   ❌ Failed to load real ImageNette dataset: {str(e)}")
-        print(f"   📝 Make sure ImageNette dataset is available at './data/imagenette/'")
-        raise RuntimeError(f"Cannot load ImageNette dataset: {str(e)}")
-
-
 def train_single_model(model_name, config_name='quick_test'):
     """Train a single model with specified configuration."""
     print(f"\n{'='*60}")
@@ -103,10 +79,8 @@ def train_single_model(model_name, config_name='quick_test'):
         
         # Create dataset
         config = training_configs[config_name]
-        train_loader, val_loader = load_real_imagenette_dataset(
+        train_loader, test_loader = load_imagenette(
             batch_size=config['batch_size'],
-            train_subset_size=1000,  # Use subset for faster training
-            test_subset_size=200
         )
         
         # Setup save path
@@ -120,13 +94,13 @@ def train_single_model(model_name, config_name='quick_test'):
         training_results = Training.train_imagenette(
             model=model,
             train_loader=train_loader,
-            test_loader=val_loader,
+            test_loader=test_loader,
             learning_rate=config['learning_rate'],
             num_epochs=config['num_epochs'],
             device=device,
             save_model_path=save_path,
             model_name=model_name,
-            writer=None,  # Disable TensorBoard for testing
+            writer=None,
             setup_model=True,
             scheduler_type=config.get('scheduler_type', 'step'),
             scheduler_params=config.get('scheduler_params', None),
@@ -144,17 +118,20 @@ def train_single_model(model_name, config_name='quick_test'):
         print(f"   Final training loss: {training_results['train_losses'][-1]:.4f}")
         
         return {
+            'model': model,
             'success': True,
             'model_name': model_name,
             'config': config_name,
             'training_time': training_time,
             'best_val_accuracy': training_results['best_val_accuracy'],
-            'final_train_loss': training_results['train_losses'][-1]
+            'final_train_loss': training_results['train_losses'][-1],
+            'save_path': save_path
         }
         
     except Exception as e:
         print(f"❌ Training failed: {str(e)}")
         return {
+            'model': model,
             'success': False,
             'model_name': model_name,
             'config': config_name,
@@ -180,17 +157,12 @@ def train_multiple_models(model_names, config_name='quick_test'):
     
     return results
 
-# Example usage - uncomment what you want to test:
+model_names = [ModelNames.resnet18, ModelNames.densenet121, ModelNames.vgg16, ModelNames.mobilenet_v2, ModelNames.efficientnet_b0]
+# results = train_multiple_models(model_names, 'advanced')
+_, test_loader = load_imagenette(
+            batch_size=16,
+        )
 
-train_single_model(ModelNames.resnet18, 'quick_test')
-
-# Multiple models training
-# train_multiple_models([ModelNames.resnet18, ModelNames.densenet121], 'quick_test')
-
-# All models training
-# train_multiple_models(available_models, 'quick_test')
-
-# Different configurations
-# train_single_model(ModelNames.resnet18, 'standard')
-# train_single_model(ModelNames.resnet18, 'advanced')
-
+for model_name in model_names:
+  result = load_model_imagenette(f"./models/imagenette/{model_name}_advanced.pt", model_name)
+  Metrics.evaluate_model_torchmetrics(result['model'], test_loader, 10, verbose=True)

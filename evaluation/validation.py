@@ -227,3 +227,59 @@ class Validation:
 
         model_name = model_name if model_name is not None else model.__class__.__name__
         return ValidationAccuracyBinaryResult(model_name=model_name, accuracy=acc)
+
+    @staticmethod
+    @torch.no_grad()
+    def validate_imagenette_epoch(
+        model: torch.nn.Module,
+        test_loader: DataLoader,
+        criterion,
+        device='cuda',
+        verbose=True,
+        epoch=None,
+        num_epochs=None
+    ) -> dict:
+        """
+        Validate model for one epoch during ImageNette training.
+        
+        Args:
+            model: PyTorch model to validate
+            test_loader: Validation data loader
+            criterion: Loss function
+            device: Device to run validation on
+            verbose: Whether to show progress bar
+            epoch: Current epoch number (for progress display)
+            num_epochs: Total number of epochs (for progress display)
+            
+        Returns:
+            dict: Dictionary containing validation metrics (loss, accuracy)
+        """
+        model.eval()
+        total_loss = 0.0
+        correct_predictions = 0
+        total_samples = 0
+        
+        with torch.no_grad():
+            progress_bar = tqdm(test_loader, desc=f"Epoch {epoch+1}/{num_epochs} [Val]", 
+                              disable=not verbose)
+            
+            for data, target in progress_bar:
+                data, target = data.to(device), target.to(device)
+                output = model(data)
+                loss = criterion(output, target)
+                
+                total_loss += loss.item()
+                pred = output.argmax(dim=1)
+                correct_predictions += pred.eq(target).sum().item()
+                total_samples += target.size(0)
+                
+                # Update progress bar
+                progress_bar.set_postfix({
+                    'Loss': f'{loss.item():.4f}',
+                    'Acc': f'{100. * correct_predictions / total_samples:.2f}%'
+                })
+        
+        avg_loss = total_loss / len(test_loader)
+        accuracy = 100. * correct_predictions / total_samples
+        
+        return {'loss': avg_loss, 'accuracy': accuracy}

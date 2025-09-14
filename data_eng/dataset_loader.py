@@ -4,6 +4,7 @@ from attacks.attack_names import AttackNames
 from data_eng.transforms import mnist_transformer, cifar_transformer, imagenette_transformer, no_transformer
 from domain.model_names import ModelNames
 import torch
+import random
 
 class DatasetType (object):
     CIFAR10 = 'cifar10'
@@ -64,19 +65,25 @@ class DatasetLoader:
         return train_loader, test_loader
 
 
-def _get_data_loaders(train_dataset, test_dataset, batch_size=1, train_subset_size=-1, test_subset_size=-1, shuffle=True):
+def _get_data_loaders(train_dataset, test_dataset, batch_size=1, train_subset_size=-1, test_subset_size=-1, shuffle=True, random_seed=42):
     train_loader = None
     test_loader = None
 
     if train_subset_size > 0:
-        subset = Subset(train_dataset, list(range(train_subset_size)))
+        # Use random sampling instead of taking first N samples
+        random.seed(random_seed)
+        train_indices = random.sample(range(len(train_dataset)), min(train_subset_size, len(train_dataset)))
+        subset = Subset(train_dataset, train_indices)
         train_loader = DataLoader(subset, batch_size=batch_size, shuffle=shuffle)
     else:
         train_loader = DataLoader(
             train_dataset, batch_size=batch_size, shuffle=shuffle)
 
     if test_subset_size > 0:
-        subset = Subset(test_dataset, list(range(test_subset_size)))
+        # Use random sampling instead of taking first N samples
+        random.seed(random_seed)  # Use same seed for reproducibility
+        test_indices = random.sample(range(len(test_dataset)), min(test_subset_size, len(test_dataset)))
+        subset = Subset(test_dataset, test_indices)
         test_loader = DataLoader(subset, batch_size=batch_size, shuffle=shuffle)
     else:
         test_loader = DataLoader(

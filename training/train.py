@@ -226,7 +226,7 @@ class Training:
             # Validation phase
             val_metrics = None
             if test_loader is not None and (epoch + 1) % validation_frequency == 0:
-                val_metrics = Training._validate_epoch(
+                val_metrics = Validation.validate_imagenette_epoch(
                     model, test_loader, criterion, device, verbose, epoch, num_epochs
                 )
             
@@ -371,38 +371,6 @@ class Training:
         
         return {'loss': avg_loss, 'accuracy': accuracy}
 
-    @staticmethod
-    def _validate_epoch(model, test_loader, criterion, device, verbose, epoch, num_epochs):
-        """Validate for one epoch."""
-        model.eval()
-        total_loss = 0.0
-        correct_predictions = 0
-        total_samples = 0
-        
-        with torch.no_grad():
-            progress_bar = tqdm(test_loader, desc=f"Epoch {epoch+1}/{num_epochs} [Val]", 
-                              disable=not verbose)
-            
-            for data, target in progress_bar:
-                data, target = data.to(device), target.to(device)
-                output = model(data)
-                loss = criterion(output, target)
-                
-                total_loss += loss.item()
-                pred = output.argmax(dim=1)
-                correct_predictions += pred.eq(target).sum().item()
-                total_samples += target.size(0)
-                
-                # Update progress bar
-                progress_bar.set_postfix({
-                    'Loss': f'{loss.item():.4f}',
-                    'Acc': f'{100. * correct_predictions / total_samples:.2f}%'
-                })
-        
-        avg_loss = total_loss / len(test_loader)
-        accuracy = 100. * correct_predictions / total_samples
-        
-        return {'loss': avg_loss, 'accuracy': accuracy}
 
     @staticmethod
     def _print_epoch_summary(epoch, num_epochs, train_metrics, val_metrics, lr, epoch_time, training_state):

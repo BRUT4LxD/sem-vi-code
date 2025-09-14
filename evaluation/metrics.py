@@ -167,7 +167,7 @@ class Metrics:
 
     @staticmethod
     @torch.no_grad()
-    def evaluate_model_torchmetrics(model: torch.nn.Module, data_loader: torch.utils.data.DataLoader, num_classes: int):
+    def evaluate_model_torchmetrics(model: torch.nn.Module, data_loader: torch.utils.data.DataLoader, num_classes: int, verbose: bool = True):
         
         model.eval()
         device = next(model.parameters()).device
@@ -194,5 +194,8 @@ class Metrics:
         prec = precision.compute().item()
         rec = recall.compute().item()
         f1_score = f1.compute().item()
+
+        if verbose:
+            print(f'Accuracy: {acc}, Precision: {prec}, Recall: {rec}, F1 Score: {f1_score}')
         
         return acc, prec, rec, f1_score
