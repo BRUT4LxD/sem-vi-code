@@ -1,4 +1,4 @@
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, TYPE_CHECKING
 import torch
 from tqdm import tqdm
 import numpy as np
@@ -7,7 +7,48 @@ from domain.attack.attack_eval_score import AttackEvaluationScore
 from domain.attack.attack_result import AttackResult
 from torchmetrics import Accuracy, Precision, Recall, F1Score
 
+if TYPE_CHECKING:
+    from domain.attack.attack_eval_score import AttackEvaluationScore
+
 class Metrics:
+
+    @staticmethod
+    def denormalize_image(image: torch.Tensor, mean: tuple = (0.485, 0.456, 0.406), 
+                         std: tuple = (0.229, 0.224, 0.225)) -> torch.Tensor:
+        """
+        Denormalize an image tensor from ImageNet normalization to [0,1] range.
+        
+        Args:
+            image: Normalized image tensor (C,H,W) or (N,C,H,W)
+            mean: Mean values used for normalization (default ImageNet)
+            std: Standard deviation values used for normalization (default ImageNet)
+            
+        Returns:
+            torch.Tensor: Denormalized image in [0,1] range
+        """
+        # Convert to tensor if needed
+        if not isinstance(image, torch.Tensor):
+            image = torch.tensor(image)
+        
+        # Ensure mean and std are tensors with correct shape
+        if image.ndim == 3:  # (C,H,W)
+            mean = torch.tensor(mean).view(3, 1, 1)
+            std = torch.tensor(std).view(3, 1, 1)
+        elif image.ndim == 4:  # (N,C,H,W)
+            mean = torch.tensor(mean).view(1, 3, 1, 1)
+            std = torch.tensor(std).view(1, 3, 1, 1)
+        else:
+            raise ValueError("Expected (C,H,W) or (N,C,H,W) tensor")
+        
+        # Move to same device as image
+        mean = mean.to(image.device)
+        std = std.to(image.device)
+        
+        # Denormalize: x = (x_norm * std) + mean
+        denormalized = image * std + mean
+        
+        # Clamp to [0,1] range
+        return torch.clamp(denormalized, 0.0, 1.0)
 
     @staticmethod
     @torch.no_grad()
@@ -17,13 +58,19 @@ class Metrics:
         Counts individual tensor elements (per-channel).
         
         Args:
-            image1: Original image tensor
-            image2: Adversarial image tensor
+            image1: Original image tensor (expected in [0,1] range)
+            image2: Adversarial image tensor (expected in [0,1] range)
             threshold: Minimum change to consider an element as modified
             
         Returns:
             float: L0 distance (number of modified elements)
         """
+        # Validate input range
+        assert (0.0 <= image1).all() and (image1 <= 1.0).all(), \
+            "l0_elements expects [0,1] range; denormalize first."
+        assert (0.0 <= image2).all() and (image2 <= 1.0).all(), \
+            "l0_elements expects [0,1] range; denormalize first."
+        
         diff = torch.abs(image1 - image2)
         return (diff > threshold).sum().item()
 
@@ -35,13 +82,19 @@ class Metrics:
         Counts pixels where ANY channel changed (collapses channels).
         
         Args:
-            image1: Original image tensor (C,H,W) or (N,C,H,W)
-            image2: Adversarial image tensor (C,H,W) or (N,C,H,W)
+            image1: Original image tensor (C,H,W) or (N,C,H,W) (expected in [0,1] range)
+            image2: Adversarial image tensor (C,H,W) or (N,C,H,W) (expected in [0,1] range)
             threshold: Minimum change to consider a pixel as modified
             
         Returns:
             float or list: L0 distance (number of modified pixels)
         """
+        # Validate input range
+        assert (0.0 <= image1).all() and (image1 <= 1.0).all(), \
+            "l0_pixels expects [0,1] range; denormalize first."
+        assert (0.0 <= image2).all() and (image2 <= 1.0).all(), \
+            "l0_pixels expects [0,1] range; denormalize first."
+        
         diff = torch.abs(image1 - image2)
         if diff.ndim == 3:  # (C,H,W)
             changed = (diff > threshold).any(dim=0)  # collapse channels
@@ -65,6 +118,12 @@ class Metrics:
         Returns:
             float: L1 distance (in [0,1] range)
         """
+        # Validate input range
+        assert (0.0 <= image1).all() and (image1 <= 1.0).all(), \
+            "l1_distance expects [0,1] range; denormalize first."
+        assert (0.0 <= image2).all() and (image2 <= 1.0).all(), \
+            "l1_distance expects [0,1] range; denormalize first."
+        
         return torch.norm(image1 - image2, p=1).item()
 
     @staticmethod
@@ -80,6 +139,12 @@ class Metrics:
         Returns:
             float: L2 distance (in [0,1] range)
         """
+        # Validate input range
+        assert (0.0 <= image1).all() and (image1 <= 1.0).all(), \
+            "l2_distance expects [0,1] range; denormalize first."
+        assert (0.0 <= image2).all() and (image2 <= 1.0).all(), \
+            "l2_distance expects [0,1] range; denormalize first."
+        
         return torch.norm(image1 - image2, p=2).item()
 
     @staticmethod
@@ -95,6 +160,12 @@ class Metrics:
         Returns:
             float: L∞ distance (in [0,1] range)
         """
+        # Validate input range
+        assert (0.0 <= image1).all() and (image1 <= 1.0).all(), \
+            "linf_distance expects [0,1] range; denormalize first."
+        assert (0.0 <= image2).all() and (image2 <= 1.0).all(), \
+            "linf_distance expects [0,1] range; denormalize first."
+        
         return torch.norm(image1 - image2, p=float('inf')).item()
 
     @staticmethod
@@ -105,12 +176,18 @@ class Metrics:
         This follows signal/image processing convention for "power".
         
         Args:
-            image1: Original image tensor
-            image2: Adversarial image tensor
+            image1: Original image tensor (expected in [0,1] range)
+            image2: Adversarial image tensor (expected in [0,1] range)
             
         Returns:
             float: Mean squared perturbation per element
         """
+        # Validate input range
+        assert (0.0 <= image1).all() and (image1 <= 1.0).all(), \
+            "attack_power_mse expects [0,1] range; denormalize first."
+        assert (0.0 <= image2).all() and (image2 <= 1.0).all(), \
+            "attack_power_mse expects [0,1] range; denormalize first."
+        
         diff = image1 - image2
         return diff.pow(2).mean().item()
 
@@ -121,12 +198,18 @@ class Metrics:
         Calculate attack power as mean squared perturbation per pixel (averaged over channels).
         
         Args:
-            image1: Original image tensor (C,H,W)
-            image2: Adversarial image tensor (C,H,W)
+            image1: Original image tensor (C,H,W) (expected in [0,1] range)
+            image2: Adversarial image tensor (C,H,W) (expected in [0,1] range)
             
         Returns:
             float: Mean squared perturbation per pixel
         """
+        # Validate input range
+        assert (0.0 <= image1).all() and (image1 <= 1.0).all(), \
+            "attack_power_mse_per_pixel expects [0,1] range; denormalize first."
+        assert (0.0 <= image2).all() and (image2 <= 1.0).all(), \
+            "attack_power_mse_per_pixel expects [0,1] range; denormalize first."
+        
         diff = image1 - image2
         return diff.pow(2).mean(dim=0).mean().item()
 
@@ -165,16 +248,18 @@ class Metrics:
 
     @staticmethod
     @torch.no_grad()
-    def evaluate_attack_score(attack_results: List[AttackResult], num_classes: int) -> AttackEvaluationScore:
+    def evaluate_attack_score(attack_results: List[AttackResult], num_classes: int, 
+                             clean_accuracy: Optional[float] = None) -> AttackEvaluationScore:
         """
         Evaluate attack effectiveness by measuring model performance on adversarial examples.
         
         Args:
             attack_results: List of attack results
             num_classes: Number of classes
+            clean_accuracy: Optional clean accuracy for effectiveness metrics
             
         Returns:
-            AttackEvaluationScore: Attack evaluation metrics
+            AttackEvaluationScore: Comprehensive attack evaluation with optional effectiveness metrics
         """
         if len(attack_results) == 0:
             return AttackEvaluationScore(0.0, 0.0, 0.0, 0.0, np.zeros((num_classes, num_classes), dtype=np.int32), AttackDistanceScore(0.0, 0.0, 0.0, 0.0, 0.0))
@@ -222,102 +307,46 @@ class Metrics:
         # Calculate distance metrics
         distances = Metrics.attack_distance_score(attack_results)
 
-        return AttackEvaluationScore(acc, prec, rec, f1, conf_matrix, distances)
-
-    @staticmethod
-    @torch.no_grad()
-    def evaluate_attack(attack_results: List[AttackResult], num_classes: int, 
-                       clean_accuracy: float = None) -> dict:
-        """
-        Evaluate comprehensive attack effectiveness with standard ASR definitions.
-        
-        Args:
-            attack_results: List of attack results
-            num_classes: Number of classes
-            clean_accuracy: Model accuracy on clean images (0.0 to 1.0) - optional
-            
-        Returns:
-            dict: Comprehensive attack effectiveness metrics (all in 0-1 range)
-        """
-        if len(attack_results) == 0:
-            return {
-                'adversarial_accuracy': clean_accuracy or 0.0,
-                'asr_unconditional': 0.0,
-                'asr_conditional': float('nan'),
-                'accuracy_drop': None,
-                'relative_accuracy_drop': None,
-                'macro_precision_adv': 0.0,
-                'macro_recall_adv': 0.0,
-                'macro_f1_adv': 0.0,
-                'l0_elements': 0.0,
-                'l1': 0.0,
-                'l2': 0.0,
-                'linf': 0.0,
-                'power_mse': 0.0
-            }
-        
-        # Calculate adversarial accuracy (robust accuracy)
-        adv_correct = sum(int(r.predicted == r.actual) for r in attack_results)
-        adv_acc = adv_correct / len(attack_results)
-        
-        # Unconditional ASR: 1 - adversarial_accuracy
-        asr_uncond = 1.0 - adv_acc
-        
-        # Conditional ASR: success conditioned on clean correctness
-        # Check if AttackResult has clean prediction info
-        has_clean_info = hasattr(attack_results[0], 'clean_pred') or hasattr(attack_results[0], 'was_correct_clean')
-        
-        if has_clean_info:
-            # Count samples that were correct on clean
-            cond_den = sum(int(
-                getattr(r, 'was_correct_clean', 
-                       getattr(r, 'clean_pred', None) == r.actual)
-            ) for r in attack_results)
-            
-            if cond_den > 0:
-                # Count successful attacks on originally correct samples
-                cond_num = sum(int(
-                    getattr(r, 'was_correct_clean', 
-                           getattr(r, 'clean_pred', None) == r.actual) and
-                    (r.predicted != r.actual)
-                ) for r in attack_results)
-                asr_cond = cond_num / cond_den
-            else:
-                asr_cond = float('nan')
-        else:
-            # Fallback: compute unconditional ASR (same as asr_uncond)
-            # This is NOT conditional on clean correctness - just a fallback
-            asr_cond = sum(int(r.predicted != r.actual) for r in attack_results) / len(attack_results)
-        
-        # Accuracy drop (only meaningful if clean_accuracy provided)
+        # Calculate effectiveness metrics if clean_accuracy is provided
         if clean_accuracy is not None:
-            acc_drop = max(0.0, clean_accuracy - adv_acc)
-            rel_drop = acc_drop / clean_accuracy if clean_accuracy > 0 else 0.0
+            adversarial_accuracy = acc / 100.0  # Convert to 0-1 range
+            asr_unconditional = 1.0 - adversarial_accuracy
+            
+            # Calculate conditional ASR if clean prediction info is available
+            has_clean_info = hasattr(attack_results[0], 'clean_pred') or hasattr(attack_results[0], 'was_correct_clean')
+            if has_clean_info:
+                cond_den = sum(int(
+                    getattr(r, 'was_correct_clean', 
+                           getattr(r, 'clean_pred', None) == r.actual)
+                ) for r in attack_results)
+                
+                if cond_den > 0:
+                    cond_num = sum(int(
+                        getattr(r, 'was_correct_clean', 
+                               getattr(r, 'clean_pred', None) == r.actual) and
+                        (r.predicted != r.actual)
+                    ) for r in attack_results)
+                    asr_conditional = cond_num / cond_den
+                else:
+                    asr_conditional = float('nan')
+            else:
+                asr_conditional = None
+            
+            accuracy_drop = max(0.0, clean_accuracy - adversarial_accuracy)
+            relative_accuracy_drop = accuracy_drop / clean_accuracy if clean_accuracy > 0 else 0.0
+            
+            return AttackEvaluationScore(
+                acc, prec, rec, f1, conf_matrix, distances,
+                adversarial_accuracy=adversarial_accuracy,
+                asr_unconditional=asr_unconditional,
+                asr_conditional=asr_conditional,
+                accuracy_drop=accuracy_drop,
+                relative_accuracy_drop=relative_accuracy_drop,
+                clean_accuracy=clean_accuracy
+            )
         else:
-            acc_drop = None
-            rel_drop = None
-        
-        # Calculate traditional attack metrics
-        attack_eval = Metrics.evaluate_attack_score(attack_results, num_classes)
-        
-        # Distance metrics
-        d = attack_eval.distance_score
-        
-        return {
-            'adversarial_accuracy': adv_acc,
-            'asr_unconditional': asr_uncond,
-            'asr_conditional': asr_cond,
-            'accuracy_drop': acc_drop,
-            'relative_accuracy_drop': rel_drop,
-            'macro_precision_adv': attack_eval.prec / 100.0,
-            'macro_recall_adv': attack_eval.rec / 100.0,
-            'macro_f1_adv': attack_eval.f1 / 100.0,
-            'l0_pixels': d.l0_pixels,
-            'l1': d.l1,
-            'l2': d.l2,
-            'linf': d.linf,
-            'power_mse': d.power_mse
-        }
+            return AttackEvaluationScore(acc, prec, rec, f1, conf_matrix, distances)
+
 
     @staticmethod
     @torch.no_grad()
@@ -352,12 +381,12 @@ class Metrics:
         return acc, prec, rec, f1_score
 
     @staticmethod
-    def format_attack_metrics(metrics: Dict, precision: int = 3) -> str:
+    def format_attack_metrics(score: AttackEvaluationScore, precision: int = 3) -> str:
         """
         Format attack metrics for consistent reporting.
         
         Args:
-            metrics: Dictionary from evaluate_attack()
+            score: AttackEvaluationScore from evaluate_attack_score()
             precision: Number of decimal places
             
         Returns:
@@ -365,31 +394,37 @@ class Metrics:
         """
         lines = []
         lines.append("🎯 Attack Effectiveness Metrics:")
-        lines.append(f"   Robust Accuracy: {metrics['adversarial_accuracy']:.{precision}f}")
-        lines.append(f"   ASR (Unconditional): {metrics['asr_unconditional']:.{precision}f}")
         
-        if not np.isnan(metrics['asr_conditional']):
-            # Check if conditional ASR equals unconditional (fallback case)
-            if abs(metrics['asr_conditional'] - metrics['asr_unconditional']) < 1e-6:
-                lines.append(f"   ASR (Conditional): {metrics['asr_conditional']:.{precision}f} (fallback - no clean pred info)")
+        if score.has_effectiveness_metrics():
+            lines.append(f"   Robust Accuracy: {score.adversarial_accuracy:.{precision}f}")
+            lines.append(f"   ASR (Unconditional): {score.asr_unconditional:.{precision}f}")
+            
+            if score.asr_conditional is not None and not np.isnan(score.asr_conditional):
+                # Check if conditional ASR equals unconditional (fallback case)
+                if abs(score.asr_conditional - score.asr_unconditional) < 1e-6:
+                    lines.append(f"   ASR (Conditional): {score.asr_conditional:.{precision}f} (fallback - no clean pred info)")
+                else:
+                    lines.append(f"   ASR (Conditional): {score.asr_conditional:.{precision}f}")
             else:
-                lines.append(f"   ASR (Conditional): {metrics['asr_conditional']:.{precision}f}")
+                lines.append(f"   ASR (Conditional): N/A (no clean prediction info)")
+            
+            if score.accuracy_drop is not None:
+                lines.append(f"   Accuracy Drop: {score.accuracy_drop:.{precision}f}")
+                lines.append(f"   Relative Drop: {score.relative_accuracy_drop:.{precision}f}")
+            
+            if score.clean_accuracy is not None:
+                lines.append(f"   Clean Accuracy: {score.clean_accuracy:.{precision}f}")
         else:
-            lines.append(f"   ASR (Conditional): N/A (no clean prediction info)")
-        
-        if metrics['accuracy_drop'] is not None:
-            lines.append(f"   Accuracy Drop: {metrics['accuracy_drop']:.{precision}f}")
-            lines.append(f"   Relative Drop: {metrics['relative_accuracy_drop']:.{precision}f}")
-        
-        lines.append(f"   Macro Precision: {metrics['macro_precision_adv']:.{precision}f}")
-        lines.append(f"   Macro Recall: {metrics['macro_recall_adv']:.{precision}f}")
-        lines.append(f"   Macro F1: {metrics['macro_f1_adv']:.{precision}f}")
+            lines.append(f"   Accuracy: {score.acc:.{precision}f}%")
+            lines.append(f"   Precision: {score.prec:.{precision}f}%")
+            lines.append(f"   Recall: {score.rec:.{precision}f}%")
+            lines.append(f"   F1-Score: {score.f1:.{precision}f}%")
         
         lines.append("\n📏 Perturbation Metrics:")
-        lines.append(f"   L0 Pixels: {metrics['l0_pixels']:.0f}")
-        lines.append(f"   L1 Distance: {metrics['l1']:.{precision}f}")
-        lines.append(f"   L2 Distance: {metrics['l2']:.{precision}f}")
-        lines.append(f"   L∞ Distance: {metrics['linf']:.{precision}f}")
-        lines.append(f"   Power (MSE): {metrics['power_mse']:.{precision}e}")
+        lines.append(f"   L0 Pixels: {score.distance_score.l0_pixels:.0f}")
+        lines.append(f"   L1 Distance: {score.distance_score.l1:.{precision}f}")
+        lines.append(f"   L2 Distance: {score.distance_score.l2:.{precision}f}")
+        lines.append(f"   L∞ Distance: {score.distance_score.linf:.{precision}f}")
+        lines.append(f"   Power (MSE): {score.distance_score.power_mse:.{precision}e}")
         
         return "\n".join(lines)
