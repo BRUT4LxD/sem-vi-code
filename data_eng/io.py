@@ -69,7 +69,15 @@ def load_model_imagenette(model_path: str, model_name: str = None, device: str =
         
         # Extract model name from path if not provided
         if model_name is None:
-            model_name = os.path.basename(model_path).replace('.pt', '').split('_')[0]
+            from domain.model.model_names import ModelNames
+            # Iterate over all model names and check if the model path contains the model name
+            for model_name in ModelNames().all_model_names:
+                if model_name in model_path:
+                    model_name = model_name
+                    break
+            
+            if model_name is None:
+                raise ValueError(f"Model name not found in path: {model_path}")
         
         if verbose:
             print(f"📊 Checkpoint Information:")

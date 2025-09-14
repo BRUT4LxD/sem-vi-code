@@ -229,14 +229,13 @@ class ImageNetteValidator:
             
             result = {
                 'model_name': model_name,
-                'overall_accuracy': acc,
-                'overall_precision': prec,
-                'overall_recall': rec,
-                'overall_f1': f1,
+                'accuracy': acc,
+                'precision': prec,
+                'recall': rec,
+                'f1': f1,
                 'per_class_metrics': per_class_metrics,
                 'training_epoch': checkpoint.get('epoch', 'Unknown'),
-                'training_val_accuracy': checkpoint.get('val_accuracy', 'Unknown'),
-                'validation_timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                 'success': True
             }
             
@@ -290,9 +289,9 @@ class ImageNetteValidator:
         
         if successful:
             print(f"\n🏆 Model Performance Ranking:")
-            successful.sort(key=lambda x: x['overall_accuracy'], reverse=True)
+            successful.sort(key=lambda x: x['accuracy'], reverse=True)
             for i, result in enumerate(successful, 1):
-                print(f"   {i}. {result['model_name']}: {result['overall_accuracy']:.4f}")
+                print(f"   {i}. {result['model_name']}: {result['accuracy']:.4f}")
         
         return results
     
@@ -317,18 +316,17 @@ class ImageNetteValidator:
         for result in successful_results:
             summary_data.append({
                 'model_name': result['model_name'],
-                'overall_accuracy': result['overall_accuracy'],
-                'overall_precision': result['overall_precision'],
-                'overall_recall': result['overall_recall'],
-                'overall_f1': result['overall_f1'],
+                'accuracy': result['accuracy'],
+                'precision': result['precision'],
+                'recall': result['recall'],
+                'f1': result['f1'],
                 'training_epoch': result['training_epoch'],
-                'training_val_accuracy': result['training_val_accuracy'],
-                'validation_timestamp': result['validation_timestamp']
+                'timestamp': result['timestamp']
             })
         
         # Create DataFrame and save
         df = pd.DataFrame(summary_data)
-        df = df.sort_values('overall_accuracy', ascending=False)
+        df = df.sort_values('accuracy', ascending=False)
         
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         filename = f"imagenette_models_summary_{timestamp}.csv"
