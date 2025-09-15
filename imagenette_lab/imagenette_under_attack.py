@@ -38,23 +38,29 @@ def attack_images_imagenette(attack: Attack, data_loader: DataLoader, save_resul
             continue
 
         adv_images = attack(images, labels)
-        outputs = model(adv_images.to(device))
-        _, predicted_labels = torch.max(outputs.data, 1)
-        for i in range(len(adv_images)):
-            label = labels[i].item()
-            predicted_label = predicted_labels[i].item()
+        
+        with torch.no_grad():
+            outputs = model(adv_images)
+            _, predicted_labels = torch.max(outputs.data, 1)
+            for i in range(len(adv_images)):
+                label = labels[i].item()
+                predicted_label = predicted_labels[i].item()
 
-            att_result = AttackResult(
-                actual=label,
-                predicted=predicted_label,
-                adv_image=adv_images[i],
-                src_image=images[i],
-                model_name=attack.model_name,
-                attack_name=attack.attack)
+                att_result = AttackResult(
+                    actual=label,
+                    predicted=predicted_label,
+                    adv_image=adv_images[i].cpu(),
+                    src_image=images[i].cpu(),
+                    model_name=attack.model_name,
+                    attack_name=attack.attack)
 
-            attack_results.append(att_result)
+                attack_results.append(att_result)
     
     # 5. Calculate global evaluation scores
+    if len(attack_results) == 0:
+        print("Warning: No successful attacks generated")
+        return None
+        
     ev = Metrics.evaluate_attack_score(attack_results, num_classes)
 
     print(ev)
