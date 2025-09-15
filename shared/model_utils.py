@@ -23,3 +23,9 @@ class ModelUtils:
         labels = labels[predictions == labels].clone().to(device)
 
         return images, labels
+
+    @staticmethod
+    def remove_missclassified_imagenette(model: torch.nn.Module, images: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
+        outputs = model(images)
+        _, predictions = torch.max(outputs, 1)
+        return images[predictions == labels], labels[predictions == labels]

@@ -1,4 +1,5 @@
 from collections import defaultdict
+import datetime
 import os
 import time
 from attacks.attack import Attack
@@ -128,77 +129,62 @@ class SimpleAttacks:
                 l1 = Metrics.l1_distance(img_detached, adv_img_detached)
                 l2 = Metrics.l2_distance(img_detached, adv_img_detached)
                 lInf = Metrics.linf_distance(img_detached, adv_img_detached)
-                power = Metrics.attack_power(img_detached, adv_img_detached)
+                power = Metrics.attack_power_mse(img_detached, adv_img_detached)
                 distance_score = AttackDistanceScore(l1.item(), l2.item(), lInf.item(), power.item())
                 attack_results.append(AttackedImageResult(adv_img_detached, imagenette_label_tensor, distance_score))
 
         return attack_results
 
     @staticmethod
-    def attack_images(
-            attack: Attack,
-            model_name: str,
-            data_loader: DataLoader,
-            images_to_attack=20,
-            save_results=False,
-            save_base_path="./data/attacked_imagenette"):
+    def attack_images_imagenette(attack: Attack, data_loader: DataLoader, save_results: bool = False):
 
-        save_path = f"{save_base_path}/{model_name}/{attack.attack}"
-        if(os.path.exists(save_path)):
-            return
-
-        attack.model.eval()
-        imagenette_to_imagenet_index_map = ImageNetteClasses.get_imagenette_to_imagenet_map_by_index()
-        imagenet_to_imagenette_index_map = ImageNetClasses.get_imagenet_to_imagenette_index_map()
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
         # map for storing the counts of successful attacks for each class
         successful_attacks = defaultdict(int)
 
-        num_classes = 10
-        pbar = tqdm(total=num_classes * images_to_attack)
-        pbar.set_description(f'({attack.attack}) => ({model_name})')
+        num_classes = len(ImageNetteClasses.get_classes())
+
+        attack_results = []
 
         for images, labels in tqdm(data_loader):
-            for original, mapped in imagenette_to_imagenet_index_map.items():
-                mask = labels == original
-                labels[mask] = mapped
 
-            if sum(value for value in successful_attacks.values()) >= num_classes * images_to_attack:
-                break
+            # 1. Remove missclassified images
+            # 2. Attack the images
+            # 3. Test the attacked images
+            # 4. Collect the evaluation scores
 
-            if all(successful_attacks[label] >= images_to_attack for label in set(labels.tolist())):
-                continue
-            # remove classes that have already been attacked enough
-            for index, count in successful_attacks.items():
-                if count >= images_to_attack:
-                    mask = labels == index
-                    labels = labels[~mask]
-                    images = images[~mask]
-
-            images, labels = images.to(device), labels.to(device)
-            images, labels = ModelUtils.remove_missclassified(attack.model, images, labels, device)
+            images, labels = ModelUtils.remove_missclassified_imagenette(attack.model, images.to(device), labels.to(device))
             if labels.numel() == 0:
                 continue
 
             adv_images = attack(images, labels)
-            adv_images = adv_images.to(device)
-            outputs = attack.model(adv_images)
+            outputs = attack.model(adv_images.to(device))
             _, predicted_labels = torch.max(outputs.data, 1)
             for i in range(len(adv_images)):
                 label = labels[i].item()
-                if predicted_labels[i] != labels[i] and successful_attacks[label] < images_to_attack:
-                    successful_attacks[label] += 1
-                    pbar.update(1)
-                    if save_results:
-                        path = f'{save_path}/{imagenet_to_imagenette_index_map[label]}'
-                        if not os.path.exists(path):
-                            os.makedirs(path)
+                predicted_label = predicted_labels[i].item()
 
-                        ss = f'{path}/{successful_attacks[label]}.png'
-                        save_image(adv_images[i], ss)
+                att_result = AttackResult(
+                    actual=label,
+                    predicted=predicted_label,
+                    adv_image=adv_images[i],
+                    src_image=images[i],
+                    model_name=attack.model_name,
+                    attack_name=attack.attack)
 
-            del adv_images, images, labels
+                attack_results.append(att_result)
+        
+        # 5. Calculate global evaluation scores
+        ev = Metrics.evaluate_attack_score(attack_results, num_classes)
+
+        if save_results:
+            save_path = f'{attack.model_name}_{attack.attack}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.txt'
+            with open(save_path, 'w') as file:
+                file.write(str(ev))
+        
+        return ev
+
 
     @staticmethod
     def multiattack(

@@ -21,7 +21,7 @@ class SystemUnderAttack:
             save_results=False,
             save_base_path="./data/attacked_imagenette"):
 
-        return SimpleAttacks.attack_images(attack, model_name, data_loader, images_to_attack, save_results, save_base_path)
+        return SimpleAttacks.attack_images_imagenette(attack, model_name, data_loader, images_to_attack, save_results, save_base_path)
 
     @staticmethod
     def multiattack(attacks: List[Attack], test_loader: DataLoader, device='cuda', print_results=True, iterations=10, save_results=False) -> MultiattackResult:

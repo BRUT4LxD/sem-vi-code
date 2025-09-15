@@ -103,6 +103,7 @@ def load_model_imagenette(model_path: str, model_name: str = None, device: str =
             print(f"🔧 Creating {model_name} model instance...")
         
         model = ImageNetModels.get_model(model_name)
+        model.__class__.__name__ = model_name
         
         # Setup model for ImageNette (CRITICAL STEP!)
         if verbose:
