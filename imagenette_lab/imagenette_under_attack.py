@@ -1,4 +1,5 @@
 import datetime
+import time
 import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -24,6 +25,7 @@ def attack_images_imagenette(attack: Attack, data_loader: DataLoader, save_resul
     num_classes = len(ImageNetteClasses.get_classes())
 
     attack_results = []
+    start_time = time.time()
 
     for images, labels in tqdm(data_loader):
 
@@ -60,22 +62,15 @@ def attack_images_imagenette(attack: Attack, data_loader: DataLoader, save_resul
     if len(attack_results) == 0:
         print("Warning: No successful attacks generated")
         return None
-        
+
     ev = Metrics.evaluate_attack_score(attack_results, num_classes)
+    ev.set_after_attack(time.time() - start_time, len(attack_results))
 
-    print(ev)
-
-    if save_results:
-        save_path = f'{attack.model_name}_{attack.attack}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.txt'
-        with open(save_path, 'w') as file:
-            file.write(str(ev))
-    
     return ev
 
 
-# Load your trained ResNet18 model
-model_path = "./models/imagenette/resnet18_advanced.pt"
 model_name = ModelNames().resnet18
+model_path = f"./models/imagenette/{model_name}_advanced.pt"
 result = load_model_imagenette(model_path, model_name, device='cuda')
 
 if not result['success']:
@@ -89,6 +84,6 @@ print(f"✅ Loaded model: {result['model_name']}")
 attack = FGSM(model)
 
 # Get test data (small subset for quick testing)
-_, test_loader = load_imagenette(batch_size=1, test_subset_size=-1)
+_, test_loader = load_imagenette(batch_size=16, test_subset_size=200)  # Increased batch size for better efficiency
 
 attack_images_imagenette(attack, test_loader, save_results=False)

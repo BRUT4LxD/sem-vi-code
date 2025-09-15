@@ -41,9 +41,10 @@ class AttackEvaluationScore:
     f1: float
     conf_matrix: np.ndarray
     distance_score: AttackDistanceScore
-    
+    attack_name: str
+    model_name: str
+
     # Optional metadata
-    attack_name: Optional[str] = None
     time: Optional[float] = None
     n_samples: Optional[int] = None
     
@@ -55,7 +56,7 @@ class AttackEvaluationScore:
     relative_accuracy_drop: Optional[float] = None
     clean_accuracy: Optional[float] = None
 
-    def set_after_attack(self, attack_name: str, time: int, n_samples: int):
+    def set_after_attack(self, time: int, n_samples: int):
         """
         Sets the attack name, time, and number of samples.
 
@@ -64,7 +65,6 @@ class AttackEvaluationScore:
             time: The time taken for the attack.
             n_samples: The number of samples in the dataset.
         """
-        self.attack_name = attack_name
         self.time = time
         self.n_samples = n_samples
 
@@ -122,6 +122,7 @@ class AttackEvaluationScore:
                 'power_mse': self.distance_score.power_mse
             },
             'attack_name': self.attack_name,
+            'model_name': self.model_name,
             'time': self.time,
             'n_samples': self.n_samples,
             'adversarial_accuracy': self.adversarial_accuracy,
@@ -139,7 +140,6 @@ class AttackEvaluationScore:
         Returns:
             str: A string representation of the evaluation scores.
         """
-        model_name = f'{self.attack_name}' if self.attack_name is not None else ""
         acc = f'acc: {self.acc}% '
         prec = f'prec: {self.prec}% '
         rec = f'rec: {self.rec}% '
@@ -152,7 +152,7 @@ class AttackEvaluationScore:
         n_samples = f'n_samples: {self.n_samples}' if self.n_samples is not None else ""
 
         # Basic metrics line
-        basic_line = f"{model_name:12s}{acc:13s}{prec:13s}{rec:13s}{f1:13s}{self.distance_score}{time:25s}{n_samples:13s}"
+        basic_line = f"{self.model_name:12s}{self.attack_name:12s}{acc:13s}{prec:13s}{rec:13s}{f1:13s}{self.distance_score}{time:25s}{n_samples:13s}"
         
         # Add effectiveness metrics if available
         if self.has_effectiveness_metrics():

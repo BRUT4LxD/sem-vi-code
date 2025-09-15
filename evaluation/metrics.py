@@ -264,7 +264,13 @@ class Metrics:
             Effectiveness metrics are stored as ratios (0-1).
         """
         if len(attack_results) == 0:
-            return AttackEvaluationScore(0.0, 0.0, 0.0, 0.0, np.zeros((num_classes, num_classes), dtype=np.int32), AttackDistanceScore(0.0, 0.0, 0.0, 0.0, 0.0))
+            return AttackEvaluationScore(0.0, 0.0, 0.0, 0.0, 
+            np.zeros((num_classes, num_classes), dtype=np.int32), 
+            AttackDistanceScore(0.0, 0.0, 0.0, 0.0, 0.0), 
+            "UNKNOWN_ATTACK", "UNKNOWN_MODEL")
+
+        model_name = attack_results[0].model_name
+        attack_name = attack_results[0].attack_name
 
         # Extract true labels and adversarial predictions
         true_labels = [result.actual for result in attack_results]
@@ -338,7 +344,7 @@ class Metrics:
             relative_accuracy_drop = accuracy_drop / clean_accuracy if clean_accuracy > 0 else 0.0
             
             return AttackEvaluationScore(
-                acc, prec, rec, f1, conf_matrix, distances,
+                acc, prec, rec, f1, conf_matrix, distances, model_name, attack_name,
                 adversarial_accuracy=adversarial_accuracy,
                 asr_unconditional=asr_unconditional,
                 asr_conditional=asr_conditional,
@@ -347,7 +353,7 @@ class Metrics:
                 clean_accuracy=clean_accuracy
             )
         else:
-            return AttackEvaluationScore(acc, prec, rec, f1, conf_matrix, distances)
+            return AttackEvaluationScore(acc, prec, rec, f1, conf_matrix, distances, model_name, attack_name)
 
 
     @staticmethod
