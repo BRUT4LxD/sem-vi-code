@@ -344,7 +344,7 @@ class Metrics:
             relative_accuracy_drop = accuracy_drop / clean_accuracy if clean_accuracy > 0 else 0.0
             
             return AttackEvaluationScore(
-                acc, prec, rec, f1, conf_matrix, distances, model_name, attack_name,
+                acc, prec, rec, f1, conf_matrix, distances, attack_name, model_name,
                 adversarial_accuracy=adversarial_accuracy,
                 asr_unconditional=asr_unconditional,
                 asr_conditional=asr_conditional,
@@ -353,7 +353,7 @@ class Metrics:
                 clean_accuracy=clean_accuracy
             )
         else:
-            return AttackEvaluationScore(acc, prec, rec, f1, conf_matrix, distances, model_name, attack_name)
+            return AttackEvaluationScore(acc, prec, rec, f1, conf_matrix, distances, attack_name, model_name)
 
 
     @staticmethod
