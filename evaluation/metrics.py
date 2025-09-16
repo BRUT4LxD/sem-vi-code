@@ -317,8 +317,7 @@ class Metrics:
 
         # Calculate effectiveness metrics if clean_accuracy is provided
         if clean_accuracy is not None:
-            adversarial_accuracy = acc / 100.0  # Convert to 0-1 range
-            asr_unconditional = 1.0 - adversarial_accuracy
+            asr_unconditional = 1.0 - (acc / 100.0)  # Convert acc to 0-1 range and calculate ASR
             
             # Calculate conditional ASR if clean prediction info is available
             has_clean_info = hasattr(attack_results[0], 'clean_pred') or hasattr(attack_results[0], 'was_correct_clean')
@@ -340,12 +339,11 @@ class Metrics:
             else:
                 asr_conditional = None
             
-            accuracy_drop = max(0.0, clean_accuracy - adversarial_accuracy)
+            accuracy_drop = max(0.0, clean_accuracy - (acc / 100.0))
             relative_accuracy_drop = accuracy_drop / clean_accuracy if clean_accuracy > 0 else 0.0
             
             return AttackEvaluationScore(
                 acc, prec, rec, f1, conf_matrix, distances, attack_name, model_name,
-                adversarial_accuracy=adversarial_accuracy,
                 asr_unconditional=asr_unconditional,
                 asr_conditional=asr_conditional,
                 accuracy_drop=accuracy_drop,
@@ -404,7 +402,7 @@ class Metrics:
         lines.append("🎯 Attack Effectiveness Metrics:")
         
         if score.has_effectiveness_metrics():
-            lines.append(f"   Robust Accuracy: {score.adversarial_accuracy:.{precision}f}")
+            lines.append(f"   Robust Accuracy: {score.acc/100.0:.{precision}f}")
             lines.append(f"   ASR (Unconditional): {score.asr_unconditional:.{precision}f}")
             
             if score.asr_conditional is not None and not np.isnan(score.asr_conditional):

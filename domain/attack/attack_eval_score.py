@@ -26,7 +26,6 @@ class AttackEvaluationScore:
         n_samples: The number of samples in the dataset.
         
         # Attack effectiveness metrics (optional) - stored as ratios (0-1)
-        adversarial_accuracy: Robust accuracy on adversarial examples (0-1).
         asr_unconditional: Unconditional Attack Success Rate (0-1).
         asr_conditional: Conditional Attack Success Rate (0-1).
         accuracy_drop: Accuracy drop from clean to adversarial (0-1).
@@ -49,7 +48,6 @@ class AttackEvaluationScore:
     n_samples: Optional[int] = None
     
     # Optional effectiveness metrics
-    adversarial_accuracy: Optional[float] = None
     asr_unconditional: Optional[float] = None
     asr_conditional: Optional[float] = None
     accuracy_drop: Optional[float] = None
@@ -68,21 +66,19 @@ class AttackEvaluationScore:
         self.time = time
         self.n_samples = n_samples
 
-    def set_effectiveness_metrics(self, adversarial_accuracy: float, asr_unconditional: float, 
+    def set_effectiveness_metrics(self, asr_unconditional: float, 
                                  asr_conditional: Optional[float] = None, accuracy_drop: Optional[float] = None,
                                  relative_accuracy_drop: Optional[float] = None, clean_accuracy: Optional[float] = None):
         """
         Sets the attack effectiveness metrics.
 
         Args:
-            adversarial_accuracy: Robust accuracy on adversarial examples (0-1).
             asr_unconditional: Unconditional Attack Success Rate (0-1).
             asr_conditional: Conditional Attack Success Rate (0-1).
             accuracy_drop: Accuracy drop from clean to adversarial (0-1).
             relative_accuracy_drop: Relative accuracy drop (0-1).
             clean_accuracy: Clean accuracy for comparison (0-1).
         """
-        self.adversarial_accuracy = adversarial_accuracy
         self.asr_unconditional = asr_unconditional
         self.asr_conditional = asr_conditional
         self.accuracy_drop = accuracy_drop
@@ -96,7 +92,7 @@ class AttackEvaluationScore:
         Returns:
             True if effectiveness metrics are set, False otherwise.
         """
-        return self.adversarial_accuracy is not None and self.asr_unconditional is not None
+        return self.clean_accuracy is not None
 
     def to_dict(self) -> dict:
         """
@@ -125,7 +121,6 @@ class AttackEvaluationScore:
             'model_name': self.model_name,
             'time': self.time,
             'n_samples': self.n_samples,
-            'adversarial_accuracy': self.adversarial_accuracy,
             'asr_unconditional': self.asr_unconditional,
             'asr_conditional': self.asr_conditional,
             'accuracy_drop': self.accuracy_drop,

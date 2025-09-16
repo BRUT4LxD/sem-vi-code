@@ -167,7 +167,6 @@ def run_attacks_on_models(
 
                     # Add accuracy drop metrics
                     result_dict['clean_accuracy'] = ev.clean_accuracy
-                    result_dict['adversarial_accuracy'] = ev.adversarial_accuracy
                     result_dict['accuracy_drop'] = ev.accuracy_drop
                     result_dict['relative_accuracy_drop'] = ev.relative_accuracy_drop
                     result_dict['asr_unconditional'] = ev.asr_unconditional
@@ -266,7 +265,7 @@ if __name__ == "__main__":
     attack_names = AttackNames().all_attack_names
     
     # Get test data
-    _, test_loader = load_imagenette(batch_size=2, test_subset_size=1000)
+    _, test_loader = load_imagenette(batch_size=2, test_subset_size=100)
     
     # Run comprehensive attack evaluation
     results = run_attacks_on_models(
