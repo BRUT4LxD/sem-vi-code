@@ -3,6 +3,7 @@ import time
 import torch
 import os
 import csv
+import traceback
 from typing import List
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -86,6 +87,43 @@ def attack_images_imagenette(attack: Attack, data_loader: DataLoader):
     ev.set_after_attack(time.time() - start_time, len(attack_results))
 
     return ev
+
+
+def save_failure_log(model_name: str, attack_name: str, exception: Exception, results_folder: str):
+    """
+    Save failure log to a file with detailed exception information.
+    
+    Args:
+        model_name: Name of the model that failed
+        attack_name: Name of the attack that failed
+        exception: The exception that occurred
+        results_folder: Folder to save the failure log
+    """
+    
+    # Create failure logs directory
+    failure_logs_dir = os.path.join(results_folder, "failure_logs")
+    os.makedirs(failure_logs_dir, exist_ok=True)
+    
+    # Create filename
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"failure_log_{model_name}_{attack_name}_{timestamp}.txt"
+    filepath = os.path.join(failure_logs_dir, filename)
+    
+    # Write failure log
+    with open(filepath, 'w', encoding='utf-8') as f:
+        f.write(f"FAILURE LOG\n")
+        f.write(f"=" * 50 + "\n")
+        f.write(f"Model: {model_name}\n")
+        f.write(f"Attack: {attack_name}\n")
+        f.write(f"Timestamp: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+        f.write(f"Exception Type: {type(exception).__name__}\n")
+        f.write(f"Exception Message: {str(exception)}\n")
+        f.write(f"\nFull Traceback:\n")
+        f.write(f"{'=' * 50}\n")
+        f.write(traceback.format_exc())
+        f.write(f"\n{'=' * 50}\n")
+    
+    print(f"    📝 Failure log saved to: {filepath}")
 
 
 def run_attacks_on_models(
@@ -184,6 +222,8 @@ def run_attacks_on_models(
                     
             except Exception as e:
                 print(f"    ❌ {attack_name} failed: {str(e)}")
+                if save_results:
+                    save_failure_log(model_name, attack_name, e, results_folder)
                 continue
         
         # Store results for this model
@@ -265,7 +305,7 @@ if __name__ == "__main__":
     attack_names = AttackNames().all_attack_names
     
     # Get test data
-    _, test_loader = load_imagenette(batch_size=2, test_subset_size=100)
+    _, test_loader = load_imagenette(batch_size=2, test_subset_size=1000)
     
     # Run comprehensive attack evaluation
     results = run_attacks_on_models(
