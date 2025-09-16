@@ -6,6 +6,7 @@ import csv
 from typing import List
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+from attacks import get_all_attacks
 from attacks.attack import Attack
 from attacks.system_under_attack import SystemUnderAttack
 from attacks.white_box.fgsm import FGSM
@@ -32,6 +33,9 @@ def attack_images_imagenette(attack: Attack, data_loader: DataLoader):
     attack_results = []
     start_time = time.time()
 
+    clean_correct = 0
+    clean_total = 0
+
     for images, labels in tqdm(data_loader):
 
         # 1. Remove missclassified images
@@ -40,7 +44,16 @@ def attack_images_imagenette(attack: Attack, data_loader: DataLoader):
         # 4. Collect the evaluation scores
         images, labels = images.to(device), labels.to(device)
 
-        images, labels = ModelUtils.remove_missclassified_imagenette(attack.model, images, labels)
+        outputs = model(images)
+        _, predictions = torch.max(outputs, 1)
+        
+        # Calculate clean accuracy
+        clean_total += labels.size(0)
+        clean_correct += (predictions == labels).sum().item()
+
+        # Remove missclassified images
+        images, labels = images[predictions == labels], labels[predictions == labels]
+
         if labels.numel() == 0:
             continue
 
@@ -68,7 +81,8 @@ def attack_images_imagenette(attack: Attack, data_loader: DataLoader):
         print("Warning: No successful attacks generated")
         return None
 
-    ev = Metrics.evaluate_attack_score(attack_results, num_classes)
+    clean_accuracy = 100.0 * clean_correct / clean_total if clean_total > 0 else 0.0
+    ev = Metrics.evaluate_attack_score(attack_results, num_classes, clean_accuracy=clean_accuracy)
     ev.set_after_attack(time.time() - start_time, len(attack_results))
 
     return ev
@@ -151,8 +165,19 @@ def run_attacks_on_models(
                     result_dict['linf'] = distance_score.get('linf', 0)
                     result_dict['power_mse'] = distance_score.get('power_mse', 0)
 
+                    # Add accuracy drop metrics
+                    result_dict['clean_accuracy'] = ev.clean_accuracy
+                    result_dict['adversarial_accuracy'] = ev.adversarial_accuracy
+                    result_dict['accuracy_drop'] = ev.accuracy_drop
+                    result_dict['relative_accuracy_drop'] = ev.relative_accuracy_drop
+                    result_dict['asr_unconditional'] = ev.asr_unconditional
+                    result_dict['asr_conditional'] = ev.asr_conditional
+
+
                     result_dict['time'] = ev.time
                     result_dict['n_samples'] = ev.n_samples
+
+
                     model_results.append(result_dict)
                     print(f"    ✅ {attack_name}: {ev.acc:.2f}% accuracy")
                 else:
@@ -223,26 +248,25 @@ def save_model_results_to_csv(model_name: str, results: List[dict], results_fold
     
     print(f"    💾 Saved results to: {csv_path}")
 
-
-def run_simple_example():
-    """
-    Simple example with just 2 models and 2 attacks for quick testing.
-    """
-    print("🧪 Running simple example...")
+# Example usage of the comprehensive attack evaluation
+if __name__ == "__main__":
     
-    # Simple test with fewer models and attacks
+    # Run simple example for testing
+    print(f"\n🎉 Simple example completed!")
+    print(f"📁 Results saved to: results/attacks/imagenette_models/")
+    
     model_names = [
         ModelNames().resnet18,
-        ModelNames().vgg16
+        ModelNames().vgg16,
+        ModelNames().densenet121,
+        ModelNames().mobilenet_v2,
+        ModelNames().efficientnet_b0
     ]
     
-    attack_names = [
-        AttackNames().FGSM,
-        AttackNames().PGD
-    ]
+    attack_names = AttackNames().all_attack_names
     
-    # Get test data (very small for quick testing)
-    _, test_loader = load_imagenette(batch_size=2, test_subset_size=50)
+    # Get test data
+    _, test_loader = load_imagenette(batch_size=2, test_subset_size=1000)
     
     # Run comprehensive attack evaluation
     results = run_attacks_on_models(
@@ -253,68 +277,3 @@ def run_simple_example():
         save_results=True,
         results_folder="results/attacks/imagenette_models"
     )
-    
-    return results
-
-
-# Example usage of the comprehensive attack evaluation
-if __name__ == "__main__":
-    
-    # Run simple example for testing
-    results = run_simple_example()
-    
-    print(f"\n🎉 Simple example completed!")
-    print(f"📁 Results saved to: results/attacks/imagenette_models/")
-    
-    # Uncomment below for full evaluation with more models and attacks:
-    # 
-    # # Define models and attacks to test
-    # model_names = [
-    #     ModelNames().resnet18,
-    #     ModelNames().vgg16,
-    #     ModelNames().densenet121,
-    #     ModelNames().mobilenet_v2,
-    #     ModelNames().efficientnet_b0
-    # ]
-    # 
-    # attack_names = [
-    #     AttackNames().FGSM,
-    #     AttackNames().PGD,
-    #     AttackNames().BIM,
-    #     AttackNames().CW,
-    #     AttackNames().DeepFool,
-    #     AttackNames().APGD
-    # ]
-    # 
-    # # Get test data
-    # _, test_loader = load_imagenette(batch_size=8, test_subset_size=200)
-    # 
-    # # Run comprehensive attack evaluation
-    # results = run_attacks_on_models(
-    #     model_names=model_names,
-    #     attack_names=attack_names,
-    #     data_loader=test_loader,
-    #     device='cuda',
-    #     save_results=True,
-    #     results_folder="results/attacks/imagenette_models"
-    # )
-    
-    # Example: Run single attack on single model (original functionality)
-    # model_name = ModelNames().resnet18
-    # model_path = f"./models/imagenette/{model_name}_advanced.pt"
-    # result = load_model_imagenette(model_path, model_name, device='cuda')
-    # 
-    # if not result['success']:
-    #     print(f"❌ Failed to load model: {result['error']}")
-    #     exit()
-    # 
-    # model = result['model']
-    # print(f"✅ Loaded model: {result['model_name']}")
-    # 
-    # # Create FGSM attack
-    # attack = FGSM(model)
-    # 
-    # # Get test data (small subset for quick testing)
-    # _, test_loader = load_imagenette(batch_size=16, test_subset_size=200)
-    # 
-    # attack_images_imagenette(attack, test_loader, save_results=False)
