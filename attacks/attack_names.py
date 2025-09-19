@@ -55,7 +55,8 @@ class AttackNames():
         self.FGSM,
         self.GN,
         self.Jitter,
-        self.JSMA,
+        #  CUDA out of memory
+        # self.JSMA,
         self.MIFGSM,
         self.NIFGSM,
         self.PGD,
@@ -64,7 +65,7 @@ class AttackNames():
         self.PGDRSL2,
         self.RFGSM,
         self.SINIFGSM,
-        self.SparseFool,
+        # self.SparseFool,
         self.SPSA,
         self.TIFGSM,
         self.TPGD,
