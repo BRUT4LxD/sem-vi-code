@@ -7,6 +7,7 @@ import traceback
 from typing import List
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+from torchvision.transforms import ToPILImage
 from attacks import get_all_attacks
 from attacks.attack import Attack
 from attacks.system_under_attack import SystemUnderAttack
@@ -21,7 +22,7 @@ from attacks.attack_names import AttackNames
 from evaluation.metrics import Metrics
 from shared.model_utils import ModelUtils
 
-def attack_images_imagenette(attack: Attack, data_loader: DataLoader):
+def attack_images_imagenette(attack: Attack, data_loader: DataLoader, successfully_attacked_images_folder: str = ""):
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = attack.model
@@ -89,6 +90,88 @@ def attack_images_imagenette(attack: Attack, data_loader: DataLoader):
     return ev
 
 
+def attack_and_save_images(attack: Attack, data_loader: DataLoader, images_per_attack = 100, successfully_attacked_images_folder: str = ""):
+
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model = attack.model
+
+    # create folder if doesn't exist
+    if not os.path.exists(successfully_attacked_images_folder):
+        os.makedirs(successfully_attacked_images_folder, exist_ok=True)
+
+    model.eval()
+    model.to(device)
+    attacked_images_count = 0
+
+    for images, labels in tqdm(data_loader):
+        if attacked_images_count >= images_per_attack:
+            break
+
+        images, labels = images.to(device), labels.to(device)
+        outputs = model(images)
+        _, predictions = torch.max(outputs, 1)
+        
+        # Remove missclassified images
+        images, labels = images[predictions == labels], labels[predictions == labels]
+
+        if labels.numel() == 0:
+            continue
+
+        adv_images = attack(images, labels)
+        
+        with torch.no_grad():
+            outputs = model(adv_images)
+            _, predicted_labels = torch.max(outputs.data, 1)
+            for i in range(len(adv_images)):
+                label = labels[i].item()
+                predicted_label = predicted_labels[i].item()
+
+                if predicted_label == label:
+                    continue
+
+                attacked_images_count += 1
+
+                if attacked_images_count >= images_per_attack:
+                    break
+
+                # Path: successfully_attacked_images_folder/model_name/attack_name/label/timestamp.png
+                timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                
+                # Create directory structure
+                save_dir = os.path.join(successfully_attacked_images_folder, attack.model_name, attack.attack, str(label))
+                os.makedirs(save_dir, exist_ok=True)
+                
+                attcked_image_save_path = os.path.join(save_dir, f"{timestamp}.png")
+                source_image_save_path = os.path.join(save_dir, f"src_{timestamp}.png")
+                
+                # Convert tensors to PIL Images and save as actual PNG files
+                to_pil = ToPILImage()
+                
+                # Convert adversarial image tensor to PIL Image and save
+                adv_pil = to_pil(adv_images[i].cpu())
+                adv_pil.save(attcked_image_save_path)
+                
+                # Convert source image tensor to PIL Image and save
+                src_pil = to_pil(images[i].cpu())
+                src_pil.save(source_image_save_path)
+
+def attack_and_save_images_multiple(model_names: List[str], attack_names: List[str], images_per_attack = 100, successfully_attacked_images_folder: str = ""):
+    for model_name in model_names:
+        model_path = f"./models/imagenette/{model_name}_advanced.pt"
+        result = load_model_imagenette(model_path, model_name, device='cuda')
+        model = result['model']
+        for attack_name in attack_names:
+            print(f"🔍 Running {attack_name} attack on {model_name}...")
+            _, test_loader = load_imagenette(batch_size=1, test_subset_size=-1)
+            attack = AttackFactory.get_attack(attack_name, model)
+            try:
+                attack_and_save_images(attack, test_loader, images_per_attack=images_per_attack, successfully_attacked_images_folder=successfully_attacked_images_folder)
+            except Exception as e:
+                print(f"❌ {attack_name} attack on {model_name} failed: {str(e)}")
+                save_failure_log(model_name, attack_name, e, f"{successfully_attacked_images_folder}/{model_name}/{attack_name}")
+                continue
+            print(f"✅ {attack_name} attack on {model_name} completed!")
+
 def save_failure_log(model_name: str, attack_name: str, exception: Exception, results_folder: str):
     """
     Save failure log to a file with detailed exception information.
@@ -131,8 +214,7 @@ def run_attacks_on_models(
     attack_names: List[str], 
     data_loader: DataLoader,
     device: str = 'cuda',
-    save_results: bool = True,
-    results_folder: str = "results/attacks/imagenette_models"
+    results_folder: str = "",
 ):
     """
     Run attacks on multiple models and save results to CSV files.
@@ -145,11 +227,13 @@ def run_attacks_on_models(
         save_results: Whether to save results to CSV files
         results_folder: Folder to save CSV files
     """
+
+    save_results = results_folder != ""
     
     # Create results directory if it doesn't exist
     if save_results:
         os.makedirs(results_folder, exist_ok=True)
-    
+
     print(f"🚀 Starting comprehensive attack evaluation...")
     print(f"📊 Models: {len(model_names)}")
     print(f"⚔️  Attacks: {len(attack_names)}")
@@ -164,7 +248,7 @@ def run_attacks_on_models(
         
         # Load model
         model_path = f"./models/imagenette/{model_name}_advanced.pt"
-        result = load_model_imagenette(model_path, model_name, device=device, verbose=False)
+        result = load_model_imagenette(model_path, model_name, device=device)
         
         if not result['success']:
             print(f"❌ Failed to load model {model_name}: {result['error']}")
@@ -303,16 +387,6 @@ if __name__ == "__main__":
     ]
     
     attack_names = AttackNames().all_attack_names
-    
-    # Get test data
-    _, test_loader = load_imagenette(batch_size=2, test_subset_size=1000)
-    
-    # Run comprehensive attack evaluation
-    results = run_attacks_on_models(
-        model_names=model_names,
-        attack_names=attack_names,
-        data_loader=test_loader,
-        device='cuda',
-        save_results=True,
-        results_folder="results/attacks/imagenette_models"
-    )
+    save_folder = "data/attacks/imagenette_models"
+
+    attack_and_save_images_multiple(model_names, attack_names, images_per_attack=100, successfully_attacked_images_folder=save_folder)

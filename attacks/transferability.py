@@ -331,7 +331,7 @@ class Transferability():
         #     "model_name": {
         #         "model_name": [0,0,1,0,1,1,0,1]
         #     }
-        # }
+        # }  
 
         if len(model_names) == 0:
             raise ValueError("No transferability models provided")

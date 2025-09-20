@@ -47,16 +47,23 @@ class AttackNames():
         self.CW,
         self.DeepFool,
         self.DIFGSM,
+       
+        # output is not normalized after the attack
         self.EADEN,
+        
+        # output is not normalized after the attack
         self.EADL1,
+       
         self.EOTPGD,
         self.FAB,
         self.FFGSM,
         self.FGSM,
         self.GN,
         self.Jitter,
+       
         #  CUDA out of memory
         # self.JSMA,
+       
         self.MIFGSM,
         self.NIFGSM,
         self.PGD,
@@ -65,6 +72,7 @@ class AttackNames():
         self.PGDRSL2,
         self.RFGSM,
         self.SINIFGSM,
+        #  CUDA out of memory
         # self.SparseFool,
         self.SPSA,
         self.TIFGSM,
