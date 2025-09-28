@@ -387,6 +387,8 @@ if __name__ == "__main__":
     ]
     
     attack_names = AttackNames().all_attack_names
+    attack_names = [AttackNames().PGDRS, AttackNames().PGDRSL2, AttackNames().SPSA]
     save_folder = "data/attacks/imagenette_models"
 
     attack_and_save_images_multiple(model_names, attack_names, images_per_attack=100, successfully_attacked_images_folder=save_folder)
+s
