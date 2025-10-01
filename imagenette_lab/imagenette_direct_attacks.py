@@ -22,6 +22,21 @@ from attacks.attack_names import AttackNames
 from evaluation.metrics import Metrics
 from shared.model_utils import ModelUtils
 
+
+def normalize_adversarial_image(adv_image: torch.Tensor) -> torch.Tensor:
+    """
+    Normalize adversarial image to [0,1] range if it exceeds boundaries.
+    Some attacks may produce values outside [0,1] range, this function clamps them.
+    
+    Args:
+        adv_image: Adversarial image tensor
+        
+    Returns:
+        Normalized image tensor in [0,1] range
+    """
+    return torch.clamp(adv_image, min=0.0, max=1.0)
+
+
 def attack_images_imagenette(attack: Attack, data_loader: DataLoader, successfully_attacked_images_folder: str = ""):
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -60,6 +75,9 @@ def attack_images_imagenette(attack: Attack, data_loader: DataLoader, successful
             continue
 
         adv_images = attack(images, labels)
+        
+        # Normalize adversarial images to [0,1] range (some attacks may exceed boundaries)
+        adv_images = normalize_adversarial_image(adv_images)
         
         with torch.no_grad():
             outputs = model(adv_images)
@@ -118,6 +136,9 @@ def attack_and_save_images(attack: Attack, data_loader: DataLoader, images_per_a
             continue
 
         adv_images = attack(images, labels)
+        
+        # Normalize adversarial images to [0,1] range (some attacks may exceed boundaries)
+        adv_images = normalize_adversarial_image(adv_images)
         
         with torch.no_grad():
             outputs = model(adv_images)
@@ -386,9 +407,8 @@ if __name__ == "__main__":
         ModelNames().efficientnet_b0
     ]
     
-    attack_names = AttackNames().all_attack_names
     attack_names = [AttackNames().PGDRS, AttackNames().PGDRSL2, AttackNames().SPSA]
-    save_folder = "data/attacks/imagenette_models"
+    save_folder = "results/attacks/imagenette_models_rest"
+    _, data_loader = load_imagenette(batch_size=1, test_subset_size=1000)
 
-    attack_and_save_images_multiple(model_names, attack_names, images_per_attack=100, successfully_attacked_images_folder=save_folder)
-s
+    run_attacks_on_models(model_names, attack_names, data_loader, results_folder=save_folder)

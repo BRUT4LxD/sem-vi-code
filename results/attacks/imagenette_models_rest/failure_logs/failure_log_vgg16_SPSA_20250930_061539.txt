@@ -1,0 +1,30 @@
+FAILURE LOG
+==================================================
+Model: vgg16
+Attack: SPSA
+Timestamp: 2025-09-30 06:15:39
+Exception Type: AssertionError
+Exception Message: l0_pixels expects [0,1] range; denormalize first.
+
+Full Traceback:
+==================================================
+Traceback (most recent call last):
+  File ".\imagenette_lab\imagenette_direct_attacks.py", line 272, in run_attacks_on_models
+    ev = attack_images_imagenette(attack, data_loader)
+  File ".\imagenette_lab\imagenette_direct_attacks.py", line 87, in attack_images_imagenette
+    ev = Metrics.evaluate_attack_score(attack_results, num_classes, clean_accuracy=clean_accuracy)
+  File "C:\Users\BRUT4LxD\OneDrive - Wojskowa Akademia Techniczna\Pulpit\Moje\Uczelnia\Studia doktoranckie\SEM VI\sem-vi-code\venv\lib\site-packages\torch\utils\_contextlib.py", line 116, in decorate_context
+    return func(*args, **kwargs)
+  File "C:\Users\BRUT4LxD\OneDrive - Wojskowa Akademia Techniczna\Pulpit\Moje\Uczelnia\Studia doktoranckie\SEM VI\sem-vi-code\evaluation\metrics.py", line 316, in evaluate_attack_score
+    distances = Metrics.attack_distance_score(attack_results)
+  File "C:\Users\BRUT4LxD\OneDrive - Wojskowa Akademia Techniczna\Pulpit\Moje\Uczelnia\Studia doktoranckie\SEM VI\sem-vi-code\venv\lib\site-packages\torch\utils\_contextlib.py", line 116, in decorate_context
+    return func(*args, **kwargs)
+  File "C:\Users\BRUT4LxD\OneDrive - Wojskowa Akademia Techniczna\Pulpit\Moje\Uczelnia\Studia doktoranckie\SEM VI\sem-vi-code\evaluation\metrics.py", line 235, in attack_distance_score
+    l0_pixels += Metrics.l0_pixels(result.src_image, result.adv_image)
+  File "C:\Users\BRUT4LxD\OneDrive - Wojskowa Akademia Techniczna\Pulpit\Moje\Uczelnia\Studia doktoranckie\SEM VI\sem-vi-code\venv\lib\site-packages\torch\utils\_contextlib.py", line 116, in decorate_context
+    return func(*args, **kwargs)
+  File "C:\Users\BRUT4LxD\OneDrive - Wojskowa Akademia Techniczna\Pulpit\Moje\Uczelnia\Studia doktoranckie\SEM VI\sem-vi-code\evaluation\metrics.py", line 95, in l0_pixels
+    assert (0.0 <= image2).all() and (image2 <= 1.0).all(), \
+AssertionError: l0_pixels expects [0,1] range; denormalize first.
+
+==================================================

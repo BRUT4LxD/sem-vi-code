@@ -1,0 +1,3 @@
+model_name,attack_name,acc,prec,rec,f1,l0_pixels,l1,l2,linf,power_mse,clean_accuracy,accuracy_drop,relative_accuracy_drop,asr_unconditional,asr_conditional,time,n_samples
+densenet121,PGDRS,0.0,0.0,0.0,0.0,0,0,0,0,0,98.8,98.8,1.0,1.0,,2231.4442200660706,988
+densenet121,PGDRSL2,54.95951417004049,60.07939178377233,54.81522623854468,56.45561856783409,0,0,0,0,0,98.8,98.25040485829959,0.9944372961366356,0.4504048582995951,,2271.6158723831177,988
