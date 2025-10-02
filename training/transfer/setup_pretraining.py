@@ -41,6 +41,44 @@ class SetupPretraining:
     return model
   
   @staticmethod
+  def setup_binary(model: torch.nn.Module, num_last_layers_to_unfreeze: int = 2):
+    """
+    Setup model for binary classification with proper layer freezing and classifier replacement.
+    
+    Args:
+        model: Pretrained ImageNet model
+        num_last_layers_to_unfreeze: Number of last layers to unfreeze (default: 2)
+    
+    Returns:
+        Model configured for binary classification (2 classes or 1 output with sigmoid)
+    """
+    
+    # Store original classifier info for debugging
+    original_classifier_info = SetupPretraining._get_classifier_info(model)
+    print(f"Original classifier: {original_classifier_info}")
+    
+    # Freeze all parameters first
+    for param in model.parameters():
+        param.requires_grad = False
+    
+    # Unfreeze specific layers based on model architecture
+    SetupPretraining._unfreeze_layers(model, num_last_layers_to_unfreeze)
+    
+    # Replace classifier with binary-specific one (1 output for sigmoid)
+    SetupPretraining._replace_classifier_binary(model)
+    
+    # Verify the setup
+    new_classifier_info = SetupPretraining._get_classifier_info(model)
+    print(f"New classifier: {new_classifier_info}")
+    
+    # Count trainable parameters
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    total_params = sum(p.numel() for p in model.parameters())
+    print(f"Trainable parameters: {trainable_params:,} / {total_params:,} ({100 * trainable_params / total_params:.1f}%)")
+    
+    return model
+  
+  @staticmethod
   def _get_classifier_info(model):
     """Get information about the current classifier layer."""
     if hasattr(model, 'fc'):
@@ -134,6 +172,50 @@ class SetupPretraining:
         in_features = model._fc.in_features
         model._fc = nn.Linear(in_features, 10).to(device)
         print(f"Replaced _fc layer: {in_features} -> 10")
+        
+    else:
+        raise ValueError("Model type not recognized. Can't replace the classifier.")
+  
+  @staticmethod
+  def _replace_classifier_binary(model):
+    """Replace the classifier layer with binary classification-specific one (1 output)."""
+    device = next(model.parameters()).device
+    
+    if hasattr(model, 'fc'):
+        # ResNet models
+        in_features = model.fc.in_features
+        model.fc = nn.Linear(in_features, 1).to(device)
+        print(f"Replaced fc layer for binary classification: {in_features} -> 1")
+        
+    elif hasattr(model, 'classifier'):
+        if isinstance(model.classifier, nn.Linear):
+            # Single linear layer (some models)
+            in_features = model.classifier.in_features
+            model.classifier = nn.Linear(in_features, 1).to(device)
+            print(f"Replaced classifier (Linear) for binary classification: {in_features} -> 1")
+            
+        elif isinstance(model.classifier, nn.Sequential):
+            # Sequential classifier (VGG, DenseNet, MobileNet)
+            # Find the last linear layer
+            last_linear_idx = -1
+            for i, layer in enumerate(model.classifier):
+                if isinstance(layer, nn.Linear):
+                    last_linear_idx = i
+            
+            if last_linear_idx != -1:
+                in_features = model.classifier[last_linear_idx].in_features
+                model.classifier[last_linear_idx] = nn.Linear(in_features, 1).to(device)
+                print(f"Replaced classifier[{last_linear_idx}] (Sequential) for binary classification: {in_features} -> 1")
+            else:
+                raise ValueError("No linear layer found in classifier")
+        else:
+            raise ValueError(f"Unknown classifier type: {type(model.classifier)}")
+            
+    elif hasattr(model, '_fc'):
+        # EfficientNet models
+        in_features = model._fc.in_features
+        model._fc = nn.Linear(in_features, 1).to(device)
+        print(f"Replaced _fc layer for binary classification: {in_features} -> 1")
         
     else:
         raise ValueError("Model type not recognized. Can't replace the classifier.")

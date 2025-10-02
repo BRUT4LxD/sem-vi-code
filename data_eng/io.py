@@ -180,3 +180,98 @@ def load_model_imagenette(model_path: str, model_name: str = None, device: str =
             'error': error_msg,
             'success': False
         }
+
+
+def load_model_binary(model_path: str, model_name: str = None, device: str = 'cuda', verbose: bool = True) -> dict:
+    """
+    Properly load a binary classification-trained model with full checkpoint information.
+    
+    Args:
+        model_path (str): Path to the saved model checkpoint (.pt file)
+        model_name (str, optional): Name of the model. If None, extracted from path.
+        device (str): Device to load the model on ('cuda' or 'cpu')
+        verbose (bool): Whether to print loading information
+        
+    Returns:
+        dict: Dictionary containing model, metadata, and success status
+    """
+    
+    # Import here to avoid circular imports
+    from config.imagenet_models import ImageNetModels
+    from training.transfer.setup_pretraining import SetupPretraining
+    
+    if verbose:
+        print(f"\n{'='*60}")
+        print(f"📥 Loading Binary Classification Model: {model_path}")
+        print(f"{'='*60}")
+    
+    try:
+        # Check if file exists
+        if not os.path.exists(model_path):
+            raise FileNotFoundError(f"Model file not found: {model_path}")
+        
+        # Load checkpoint
+        checkpoint = torch.load(model_path, map_location=device, weights_only=False)
+        
+        # Extract model name from path if not provided
+        if model_name is None:
+            from domain.model.model_names import ModelNames
+            for mn in ModelNames().all_model_names:
+                if mn in model_path:
+                    model_name = mn
+                    break
+            
+            if model_name is None:
+                raise ValueError(f"Model name not found in path: {model_path}")
+        
+        if verbose:
+            print(f"📊 Checkpoint Information:")
+            print(f"   Model: {model_name}")
+            print(f"   Epoch: {checkpoint.get('epoch', 'Unknown')}")
+            
+            val_acc = checkpoint.get('val_accuracy', 'Unknown')
+            if val_acc != 'Unknown':
+                print(f"   Validation Accuracy: {val_acc:.2f}%")
+        
+        # Create model instance
+        if verbose:
+            print(f"🔧 Creating {model_name} model instance...")
+        
+        model = ImageNetModels.get_model(model_name)
+        model.__class__.__name__ = model_name
+        
+        # Setup model for binary classification
+        if verbose:
+            print(f"⚙️ Setting up model for binary classification (1 output)...")
+        
+        model = SetupPretraining.setup_binary(model)
+        model = model.to(device)
+        
+        # Load the saved state
+        if verbose:
+            print(f"📥 Loading trained weights...")
+        
+        model.load_state_dict(checkpoint['model_state_dict'])
+        model.eval()
+        
+        if verbose:
+            print(f"✅ Model loaded successfully!")
+        
+        return {
+            'model': model,
+            'model_name': model_name,
+            'checkpoint': checkpoint,
+            'device': device,
+            'success': True
+        }
+        
+    except Exception as e:
+        error_msg = f"Error loading binary model: {str(e)}"
+        if verbose:
+            print(f"❌ {error_msg}")
+        return {
+            'model': None,
+            'model_name': model_name,
+            'error': error_msg,
+            'success': False
+        }
