@@ -1,3 +1,0 @@
-model_name,attack_name,acc,prec,rec,f1,l0_pixels,l1,l2,linf,power_mse,clean_accuracy,accuracy_drop,relative_accuracy_drop,asr_unconditional,asr_conditional,time,n_samples
-mobilenet_v2,PGDRS,0.0,0.0,0.0,0.0,0,0,0,0,0,99.2,99.2,1.0,1.0,,747.6473553180695,992
-mobilenet_v2,PGDRSL2,56.25,58.764350473040636,56.52064626344539,57.260467870981444,0,0,0,0,0,99.2,98.6375,0.9943296370967742,0.4375,,775.5399024486542,992

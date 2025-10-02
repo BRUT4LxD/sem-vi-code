@@ -407,7 +407,7 @@ if __name__ == "__main__":
         ModelNames().efficientnet_b0
     ]
     
-    attack_names = [AttackNames().PGDRS, AttackNames().PGDRSL2, AttackNames().SPSA]
+    attack_names = [AttackNames().SPSA, AttackNames().EADEN, AttackNames().EADL1]
     save_folder = "results/attacks/imagenette_models_rest"
     _, data_loader = load_imagenette(batch_size=1, test_subset_size=1000)
 

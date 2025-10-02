@@ -1,3 +1,0 @@
-model_name,attack_name,acc,prec,rec,f1,l0_pixels,l1,l2,linf,power_mse,clean_accuracy,accuracy_drop,relative_accuracy_drop,asr_unconditional,asr_conditional,time,n_samples
-resnet18,PGDRS,0.0,0.0,0.0,0.0,0,0,0,0,0,97.0,97.0,1.0,1.0,,372.65839076042175,970
-resnet18,PGDRSL2,49.69072164948454,56.1327446758155,49.946112555955416,52.06157257723255,0,0,0,0,0,97.0,96.50309278350515,0.9948772451907748,0.5030927835051546,,387.45148968696594,970
