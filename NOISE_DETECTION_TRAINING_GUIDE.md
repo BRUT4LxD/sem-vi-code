@@ -41,7 +41,6 @@ train_loader, test_loader = load_attacked_imagenette(
     attacked_images_folder="data/attacks/imagenette_models",
     clean_train_folder="./data/imagenette/train",
     clean_test_folder="./data/imagenette/val",
-    test_images_per_attack=2,
     batch_size=32
 )
 
@@ -112,6 +111,7 @@ if result['success']:
 ### Data Sources
 - **Adversarial Images**: From `data/attacks/imagenette_models/`
   - Generated using `attack_and_save_images_multiple()` from `imagenette_direct_attacks.py`
+  - Organized in `train/` and `test/` folders
   - Combines images from **all models** and **all attacks**
   - Skips `src_` prefixed images (clean source images)
 
@@ -122,12 +122,12 @@ if result['success']:
 
 ### Dataset Splits
 - **Training Set**:
-  - Adversarial images (label=1): All except `test_images_per_attack` per attack
+  - Adversarial images (label=1): All images from `train` folder
   - Clean images (label=0): **2x** the number of adversarial images (from train folder)
   - Ratio: 2:1 (clean:adversarial)
 
 - **Test Set**:
-  - Adversarial images (label=1): `test_images_per_attack` per attack
+  - Adversarial images (label=1): All images from `test` folder
   - Clean images (label=0): Equal to adversarial images (from val folder)
   - Ratio: **50:50** (balanced)
 
@@ -142,7 +142,6 @@ if result['success']:
 attacked_images_folder = "data/attacks/imagenette_models"
 clean_train_folder = "./data/imagenette/train"
 clean_test_folder = "./data/imagenette/val"
-test_images_per_attack = 2
 batch_size = 32
 learning_rate = 0.001
 num_epochs = 20
@@ -271,7 +270,6 @@ training_result = trainer.train_noise_detection_model(
     attacked_images_folder='data/attacks/imagenette_models',
     clean_train_folder='./data/imagenette/train',
     clean_test_folder='./data/imagenette/val',
-    test_images_per_attack=2,
     batch_size=32,
     learning_rate=0.001,
     num_epochs=20,

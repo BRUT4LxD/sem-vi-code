@@ -3,6 +3,7 @@ from torch.utils.data import DataLoader, Subset, SubsetRandomSampler, Dataset
 from attacks.attack_names import AttackNames
 from data_eng.transforms import mnist_transformer, cifar_transformer, imagenette_transformer, no_transformer
 from domain.model.model_names import ModelNames
+from config.imagenette_classes import ImageNetteClasses
 import torch
 import random
 import os
@@ -136,11 +137,65 @@ def load_empty_dataloader():
     return DataLoader(EmptyDataset(), batch_size=1)
 
 
+def _load_adversarial_images_from_folder(folder_path: str):
+    """
+    Load all adversarial images from a folder structure.
+    
+    Args:
+        folder_path: Path to folder containing model/attack/class structure
+        
+    Returns:
+        List of PIL Images
+    """
+    from PIL import Image
+    adversarial_images = []
+    
+    # Get all model folders
+    model_folders = [d for d in os.listdir(folder_path) 
+                    if os.path.isdir(os.path.join(folder_path, d))]
+    
+    print(f"   📊 Found {len(model_folders)} model folders")
+    
+    for model_folder in model_folders:
+        model_path = os.path.join(folder_path, model_folder)
+        
+        # Get all attack folders for this model
+        attack_folders = [d for d in os.listdir(model_path) 
+                         if os.path.isdir(os.path.join(model_path, d))]
+        
+        print(f"      📊 {model_folder}: {len(attack_folders)} attacks")
+        
+        for attack_folder in attack_folders:
+            attack_path = os.path.join(model_path, attack_folder)
+            
+            # Get all class folders
+            class_folders = [d for d in os.listdir(attack_path) 
+                           if os.path.isdir(os.path.join(attack_path, d))]
+            
+            for class_folder in class_folders:
+                class_path = os.path.join(attack_path, class_folder)
+                
+                # Get all adversarial images (skip src_ images)
+                image_files = [f for f in os.listdir(class_path) 
+                             if f.endswith('.png') and not f.startswith('src_')]
+                
+                for image_file in image_files:
+                    image_path = os.path.join(class_path, image_file)
+                    try:
+                        # Load image
+                        image = Image.open(image_path).convert('RGB')
+                        adversarial_images.append(image)
+                    except Exception as e:
+                        print(f"⚠️ Error loading {image_path}: {e}")
+                        continue
+    
+    return adversarial_images
+
+
 def load_attacked_imagenette(
     attacked_images_folder: str = "data/attacks/imagenette_models",
     clean_train_folder: str = "./data/imagenette/train",
     clean_test_folder: str = "./data/imagenette/val",
-    test_images_per_attack: int = 2,
     batch_size: int = 32,
     shuffle: bool = True,
     transform=None
@@ -149,22 +204,26 @@ def load_attacked_imagenette(
     Load attacked ImageNette images from all models and attacks for binary classification.
     
     Creates balanced datasets:
-    - Train: adversarial images (label=1) + 2x clean images (label=0) from train folder
-    - Test: test_images_per_attack adversarial per attack (label=1) + equal clean images (label=0) from val folder
+    - Train: adversarial images (label=1) from train folder + 2x clean images (label=0) from train folder
+    - Test: adversarial images (label=1) from test folder + equal clean images (label=0) from val folder
     
     Folder structure expected:
         attacked_images_folder/
-            model_name/
-                attack_name/
-                    class_label/
-                        timestamp.png (adversarial)
-                        src_timestamp.png (clean - ignored)
+            train/
+                model_name/
+                    attack_name/
+                        class_label/
+                            timestamp.png (adversarial)
+            test/
+                model_name/
+                    attack_name/
+                        class_label/
+                            timestamp.png (adversarial)
     
     Args:
-        attacked_images_folder: Root folder containing attacked images
+        attacked_images_folder: Root folder containing attacked images with train/test subfolders
         clean_train_folder: Folder containing clean ImageNette training images
         clean_test_folder: Folder containing clean ImageNette validation images
-        test_images_per_attack: Number of adversarial images per attack to use for testing
         batch_size: Batch size for dataloaders
         shuffle: Whether to shuffle the data
         transform: Image transformation to apply (default: imagenette_transformer)
@@ -180,7 +239,6 @@ def load_attacked_imagenette(
     print(f"   Attacked images folder: {attacked_images_folder}")
     print(f"   Clean train images folder: {clean_train_folder}")
     print(f"   Clean test images folder: {clean_test_folder}")
-    print(f"   Test images per attack: {test_images_per_attack}")
     
     trans = transform if transform is not None else imagenette_transformer()
     
@@ -188,62 +246,30 @@ def load_attacked_imagenette(
     train_adversarial = []
     test_adversarial = []
     
-    # Collect adversarial images from all models and attacks
+    # Collect adversarial images from train and test folders
     if not os.path.exists(attacked_images_folder):
         raise FileNotFoundError(f"Attacked images folder not found: {attacked_images_folder}")
     
-    # Get all model folders
-    model_folders = [d for d in os.listdir(attacked_images_folder) 
-                    if os.path.isdir(os.path.join(attacked_images_folder, d))]
+    # Load adversarial images from train folder
+    train_folder = os.path.join(attacked_images_folder, "train")
+    if os.path.exists(train_folder):
+        print(f"🔍 Loading adversarial images from train folder...")
+        train_adversarial = _load_adversarial_images_from_folder(train_folder)
+        print(f"✅ Loaded {len(train_adversarial)} training adversarial images")
+    else:
+        print(f"⚠️ Train folder not found: {train_folder}")
     
-    print(f"🔍 Found {len(model_folders)} model folders")
+    # Load adversarial images from test folder
+    test_folder = os.path.join(attacked_images_folder, "test")
+    if os.path.exists(test_folder):
+        print(f"🔍 Loading adversarial images from test folder...")
+        test_adversarial = _load_adversarial_images_from_folder(test_folder)
+        print(f"✅ Loaded {len(test_adversarial)} test adversarial images")
+    else:
+        print(f"⚠️ Test folder not found: {test_folder}")
     
-    for model_folder in model_folders:
-        model_path = os.path.join(attacked_images_folder, model_folder)
-        
-        # Get all attack folders for this model
-        attack_folders = [d for d in os.listdir(model_path) 
-                         if os.path.isdir(os.path.join(model_path, d))]
-        
-        print(f"   📊 {model_folder}: {len(attack_folders)} attacks")
-        
-        for attack_folder in attack_folders:
-            attack_path = os.path.join(model_path, attack_folder)
-            
-            # Get all class folders
-            class_folders = [d for d in os.listdir(attack_path) 
-                           if os.path.isdir(os.path.join(attack_path, d))]
-            
-            # Collect adversarial images for this attack
-            attack_adversarial_images = []
-            
-            for class_folder in class_folders:
-                class_path = os.path.join(attack_path, class_folder)
-                
-                # Get all adversarial images (skip src_ images)
-                image_files = [f for f in os.listdir(class_path) 
-                             if f.endswith('.png') and not f.startswith('src_')]
-                
-                for image_file in image_files:
-                    image_path = os.path.join(class_path, image_file)
-                    try:
-                        # Load image
-                        image = Image.open(image_path).convert('RGB')
-                        attack_adversarial_images.append(image)
-                    except Exception as e:
-                        print(f"⚠️ Error loading {image_path}: {e}")
-                        continue
-            
-            # Split images for this attack into train/test
-            if len(attack_adversarial_images) > test_images_per_attack:
-                test_adversarial.extend(attack_adversarial_images[:test_images_per_attack])
-                train_adversarial.extend(attack_adversarial_images[test_images_per_attack:])
-            else:
-                # If not enough images, put all in train
-                train_adversarial.extend(attack_adversarial_images)
-    
-    print(f"✅ Loaded {len(train_adversarial)} training adversarial images")
-    print(f"✅ Loaded {len(test_adversarial)} test adversarial images")
+    if len(train_adversarial) == 0 and len(test_adversarial) == 0:
+        raise FileNotFoundError(f"No adversarial images found in {attacked_images_folder}/train or {attacked_images_folder}/test")
     
     # Load clean images from separate train and test folders
     print("📁 Loading clean ImageNette images...")

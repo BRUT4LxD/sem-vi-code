@@ -108,7 +108,7 @@ def attack_images_imagenette(attack: Attack, data_loader: DataLoader, successful
     return ev
 
 
-def attack_and_save_images(attack: Attack, data_loader: DataLoader, images_per_attack = 10, successfully_attacked_images_folder: str = "", attack_test_dataset: bool = False):
+def attack_and_save_images(attack: Attack, data_loader: DataLoader, images_per_class = 1, successfully_attacked_images_folder: str = "", attack_test_dataset: bool = False):
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = attack.model
@@ -120,10 +120,16 @@ def attack_and_save_images(attack: Attack, data_loader: DataLoader, images_per_a
 
     model.eval()
     model.to(device)
-    attacked_images_count = 0
+    
+    # Track attacked images per class
+    attacked_images_per_class = {}
+    num_classes = len(ImageNetteClasses.get_classes())
+    total_images_needed = images_per_class * num_classes
 
     for images, labels in tqdm(data_loader):
-        if attacked_images_count >= images_per_attack:
+        # Check if we have enough images for all classes
+        total_attacked = sum(attacked_images_per_class.values())
+        if total_attacked >= total_images_needed:
             break
 
         images, labels = images.to(device), labels.to(device)
@@ -151,10 +157,12 @@ def attack_and_save_images(attack: Attack, data_loader: DataLoader, images_per_a
                 if predicted_label == label:
                     continue
 
-                attacked_images_count += 1
+                # Check if we still need images for this class
+                if attacked_images_per_class.get(label, 0) >= images_per_class:
+                    continue
 
-                if attacked_images_count >= images_per_attack:
-                    break
+                # Increment counter for this class
+                attacked_images_per_class[label] = attacked_images_per_class.get(label, 0) + 1
 
                 # Path: successfully_attacked_images_folder/dataset_name/model_name/attack_name/label/timestamp.png
                 timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -172,11 +180,16 @@ def attack_and_save_images(attack: Attack, data_loader: DataLoader, images_per_a
                 adv_pil = to_pil(adv_images[i].cpu())
                 adv_pil.save(attcked_image_save_path)
                 
+                # Check if we have enough images for all classes
+                total_attacked = sum(attacked_images_per_class.values())
+                if total_attacked >= total_images_needed:
+                    break
+                
 
 def attack_and_save_images_multiple(
     model_names: List[str],
     attack_names: List[str], 
-    images_per_attack = 10, 
+    images_per_class = 1, 
     successfully_attacked_images_folder: str = "", 
     attack_test_dataset: bool = False):
     for model_name in model_names:
@@ -193,7 +206,7 @@ def attack_and_save_images_multiple(
 
             attack = AttackFactory.get_attack(attack_name, model)
             try:
-                attack_and_save_images(attack, data_loader, images_per_attack=images_per_attack, successfully_attacked_images_folder=successfully_attacked_images_folder, attack_test_dataset=attack_test_dataset)
+                attack_and_save_images(attack, data_loader, images_per_class=images_per_class, successfully_attacked_images_folder=successfully_attacked_images_folder, attack_test_dataset=attack_test_dataset)
             except Exception as e:
                 print(f"❌ {attack_name} attack on {model_name} failed: {str(e)}")
                 save_failure_log(model_name, attack_name, e, f"{successfully_attacked_images_folder}/{model_name}/{attack_name}")
@@ -419,13 +432,13 @@ if __name__ == "__main__":
     attack_and_save_images_multiple(
         model_names, 
         attack_names, 
-        images_per_attack=10, 
+        images_per_class=10, 
         successfully_attacked_images_folder="data/attacks/imagenette_models",
         attack_test_dataset=False)
 
     attack_and_save_images_multiple(
         model_names, 
         attack_names, 
-        images_per_attack=10, 
+        images_per_class=10, 
         successfully_attacked_images_folder="data/attacks/imagenette_models",
         attack_test_dataset=True)

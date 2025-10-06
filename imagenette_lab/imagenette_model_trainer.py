@@ -437,7 +437,6 @@ class ImageNetteModelTrainer:
         attacked_images_folder: str = "data/attacks/imagenette_models",
         clean_train_folder: str = "./data/imagenette/train",
         clean_test_folder: str = "./data/imagenette/val",
-        test_images_per_attack: int = 2,
         batch_size: int = 32,
         learning_rate: float = 0.001,
         num_epochs: int = 20,
@@ -458,7 +457,6 @@ class ImageNetteModelTrainer:
             attacked_images_folder: Folder containing attacked images from all models
             clean_train_folder: Folder containing clean ImageNette training images
             clean_test_folder: Folder containing clean ImageNette validation images
-            test_images_per_attack: Number of images per attack for test set
             batch_size: Batch size for training
             learning_rate: Initial learning rate
             num_epochs: Maximum number of training epochs
@@ -487,7 +485,6 @@ class ImageNetteModelTrainer:
                 attacked_images_folder=attacked_images_folder,
                 clean_train_folder=clean_train_folder,
                 clean_test_folder=clean_test_folder,
-                test_images_per_attack=test_images_per_attack,
                 batch_size=batch_size,
                 shuffle=True
             )
@@ -680,7 +677,6 @@ class ImageNetteModelTrainer:
                 attacked_images_folder=attacked_images_folder,
                 clean_train_folder="./data/imagenette/train",
                 clean_test_folder=clean_test_folder,
-                test_images_per_attack=2,
                 batch_size=batch_size,
                 shuffle=False
             )

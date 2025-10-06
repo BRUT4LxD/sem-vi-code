@@ -507,7 +507,6 @@ class ImageNetteValidator:
                 attacked_images_folder=attacked_images_folder,
                 clean_train_folder="./data/imagenette/train",  # Not used for test
                 clean_test_folder=clean_test_folder,
-                test_images_per_attack=2,
                 batch_size=batch_size,
                 shuffle=False
             )
