@@ -29,7 +29,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config.imagenette_classes import ImageNetteClasses
 from domain.model.model_names import ModelNames
 from data_eng.dataset_loader import load_imagenette
-from data_eng.io import load_model_imagenette
+from data_eng.io import load_model_imagenette, load_model_binary
+from data_eng.dataset_loader import load_attacked_imagenette
 from evaluation.metrics import Metrics
 
 class ImageNetteValidator:
@@ -42,13 +43,17 @@ class ImageNetteValidator:
     
     def __init__(self, models_dir: str = './models/imagenette', 
                  results_dir: str = './results/imagenette_trained_models',
+                 noise_detection_models_dir: str = './models/noise_detection',
+                 noise_detection_results_dir: str = './results/noise_detection_models',
                  device: str = 'auto'):
         """
         Initialize the ImageNetteValidator.
         
         Args:
-            models_dir: Directory containing trained models
-            results_dir: Directory to save validation results
+            models_dir: Directory containing trained ImageNette classification models
+            results_dir: Directory to save ImageNette validation results
+            noise_detection_models_dir: Directory containing trained noise detection models
+            noise_detection_results_dir: Directory to save noise detection validation results
             device: Device to use for validation
         """
         # Setup device
@@ -59,7 +64,10 @@ class ImageNetteValidator:
         
         self.models_dir = models_dir
         self.results_dir = results_dir
+        self.noise_detection_models_dir = noise_detection_models_dir
+        self.noise_detection_results_dir = noise_detection_results_dir
         os.makedirs(self.results_dir, exist_ok=True)
+        os.makedirs(self.noise_detection_results_dir, exist_ok=True)
         
         # Available models to validate
         self.available_models = ImageNetteTrainingConfigs.AVAILABLE_MODELS
@@ -68,8 +76,10 @@ class ImageNetteValidator:
         self.imagenette_classes = ImageNetteClasses.get_classes()
         
         print(f"🚀 ImageNetteValidator initialized on device: {self.device}")
-        print(f"📁 Models directory: {self.models_dir}")
-        print(f"📊 Results directory: {self.results_dir}")
+        print(f"📁 ImageNette models directory: {self.models_dir}")
+        print(f"📁 Noise detection models directory: {self.noise_detection_models_dir}")
+        print(f"📊 ImageNette results directory: {self.results_dir}")
+        print(f"📊 Noise detection results directory: {self.noise_detection_results_dir}")
         print(f"🎯 Dataset: ImageNette (10 classes)")
         print(f"🤖 Models to validate: {len(self.available_models)}")
     
@@ -380,7 +390,6 @@ class ImageNetteValidator:
         
         return filepath
     
-    
     def run_full_validation(self) -> Dict[str, str]:
         """
         Run complete validation pipeline.
@@ -416,32 +425,360 @@ class ImageNetteValidator:
             'summary_csv': summary_file,
             'per_class_csv_files': per_class_files
         }
+    
+    # ===== NOISE DETECTION VALIDATION METHODS =====
+    
+    def _get_noise_detection_model_path(self, model_name: str) -> str:
+        """
+        Get the path to a trained noise detection model.
+        
+        Args:
+            model_name: Name of the model
+            
+        Returns:
+            str: Path to the noise detection model file
+        """
+        return os.path.join(self.noise_detection_models_dir, f"{model_name}_noise_detector.pt")
+    
+    def _noise_detection_model_exists(self, model_name: str) -> bool:
+        """
+        Check if a trained noise detection model exists.
+        
+        Args:
+            model_name: Name of the model
+            
+        Returns:
+            bool: True if model exists, False otherwise
+        """
+        model_path = self._get_noise_detection_model_path(model_name)
+        return os.path.exists(model_path)
+    
+    def _get_available_noise_detection_models(self) -> List[str]:
+        """
+        Get list of noise detection models that have been trained.
+        
+        Returns:
+            List[str]: List of available trained noise detection model names
+        """
+        available_models = []
+        for model_name in self.available_models:
+            if self._noise_detection_model_exists(model_name):
+                available_models.append(model_name)
+            else:
+                print(f"⚠️ Noise detection model not found: {model_name}_noise_detector.pt")
+        
+        return available_models
+    
+    def validate_noise_detection_model(self, model_name: str, 
+                                     attacked_images_folder: str = "data/attacks/imagenette_models",
+                                     clean_test_folder: str = "./data/imagenette/val",
+                                     batch_size: int = 32) -> Dict:
+        """
+        Validate a single trained noise detection model.
+        
+        Args:
+            model_name: Name of the noise detection model to validate
+            attacked_images_folder: Folder containing attacked images
+            clean_test_folder: Folder containing clean test images
+            batch_size: Batch size for validation
+            
+        Returns:
+            dict: Validation results including confusion matrix and metrics
+        """
+        print(f"\n🔍 Validating noise detection model: {model_name}...")
+        
+        try:
+            # Check if model exists
+            if not self._noise_detection_model_exists(model_name):
+                raise FileNotFoundError(f"Noise detection model {model_name}_noise_detector.pt not found")
+            
+            # Load model
+            model_path = self._get_noise_detection_model_path(model_name)
+            model_info = load_model_binary(model_path, device=str(self.device), verbose=False)
+            
+            if not model_info['success']:
+                raise RuntimeError(f"Failed to load noise detection model: {model_info['error']}")
+            
+            model = model_info['model']
+            
+            # Load test dataset
+            print(f"   Loading test dataset...")
+            _, test_loader = load_attacked_imagenette(
+                attacked_images_folder=attacked_images_folder,
+                clean_train_folder="./data/imagenette/train",  # Not used for test
+                clean_test_folder=clean_test_folder,
+                test_images_per_attack=2,
+                batch_size=batch_size,
+                shuffle=False
+            )
+            
+            # Evaluate model
+            print(f"   Running evaluation...")
+            model.eval()
+            correct = 0
+            total = 0
+            true_positives = 0
+            false_positives = 0
+            true_negatives = 0
+            false_negatives = 0
+            
+            with torch.no_grad():
+                for images, labels in test_loader:
+                    images = images.to(self.device)
+                    labels = labels.to(self.device).float().unsqueeze(1)
+                    
+                    outputs = model(images)
+                    predicted = (torch.sigmoid(outputs) > 0.5).float()
+                    
+                    total += labels.size(0)
+                    correct += (predicted == labels).sum().item()
+                    
+                    # Confusion matrix
+                    true_positives += ((predicted == 1) & (labels == 1)).sum().item()
+                    false_positives += ((predicted == 1) & (labels == 0)).sum().item()
+                    true_negatives += ((predicted == 0) & (labels == 0)).sum().item()
+                    false_negatives += ((predicted == 0) & (labels == 1)).sum().item()
+            
+            # Calculate metrics
+            accuracy = 100. * correct / total
+            precision = true_positives / (true_positives + false_positives) if (true_positives + false_positives) > 0 else 0.0
+            recall = true_positives / (true_positives + false_negatives) if (true_positives + false_negatives) > 0 else 0.0
+            f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0.0
+            
+            # Get checkpoint info
+            checkpoint = model_info['checkpoint']
+            
+            result = {
+                'model_name': model_name,
+                'task': 'noise_detection',
+                'accuracy': accuracy,
+                'precision': precision * 100,
+                'recall': recall * 100,
+                'f1': f1 * 100,
+                'true_positives': true_positives,
+                'false_positives': false_positives,
+                'true_negatives': true_negatives,
+                'false_negatives': false_negatives,
+                'total_samples': total,
+                'training_epoch': checkpoint.get('epoch', 'Unknown'),
+                'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'success': True
+            }
+            
+            print(f"   ✅ {model_name}: Accuracy = {accuracy:.2f}%, F1 = {f1*100:.2f}%")
+            return result
+            
+        except Exception as e:
+            error_msg = f"Noise detection validation failed for {model_name}: {str(e)}"
+            print(f"   ❌ {error_msg}")
+            return {
+                'model_name': model_name,
+                'task': 'noise_detection',
+                'error': error_msg,
+                'success': False
+            }
+    
+    def validate_all_noise_detection_models(self) -> List[Dict]:
+        """
+        Validate all available trained noise detection models.
+        
+        Returns:
+            List[Dict]: List of validation results for all noise detection models
+        """
+        print(f"\n{'='*70}")
+        print(f"🚀 Validating All Trained Noise Detection Models")
+        print(f"{'='*70}")
+        
+        # Get available trained noise detection models
+        available_models = self._get_available_noise_detection_models()
+        
+        if not available_models:
+            print("❌ No trained noise detection models found!")
+            return []
+        
+        print(f"📊 Found {len(available_models)} trained noise detection models:")
+        for model_name in available_models:
+            print(f"   - {model_name}")
+        
+        # Validate each model
+        results = []
+        for model_name in available_models:
+            result = self.validate_noise_detection_model(model_name)
+            results.append(result)
+        
+        # Summary
+        successful = [r for r in results if r['success']]
+        failed = [r for r in results if not r['success']]
+        
+        print(f"\n📈 Noise Detection Validation Summary:")
+        print(f"   Successful: {len(successful)}/{len(results)}")
+        print(f"   Failed: {len(failed)}/{len(results)}")
+        
+        if successful:
+            print(f"\n🏆 Noise Detection Model Performance Ranking:")
+            successful.sort(key=lambda x: x['f1'], reverse=True)
+            for i, result in enumerate(successful, 1):
+                print(f"   {i}. {result['model_name']}: "
+                      f"Acc={result['accuracy']:.2f}%, "
+                      f"F1={result['f1']:.2f}%, "
+                      f"Precision={result['precision']:.2f}%, "
+                      f"Recall={result['recall']:.2f}%")
+        
+        return results
+    
+    def save_noise_detection_summary(self, results: List[Dict]) -> str:
+        """
+        Save summary results for all noise detection models in a single CSV file.
+        
+        Args:
+            results: List of noise detection validation results
+            
+        Returns:
+            str: Path to saved file
+        """
+        successful_results = [r for r in results if r['success']]
+        
+        if not successful_results:
+            print("❌ No successful noise detection results to save")
+            return ""
+        
+        # Prepare data for summary CSV
+        summary_data = []
+        for result in successful_results:
+            summary_data.append({
+                'model_name': result['model_name'],
+                'task': result['task'],
+                'accuracy': result['accuracy'],
+                'precision': result['precision'],
+                'recall': result['recall'],
+                'f1': result['f1'],
+                'true_positives': result['true_positives'],
+                'false_positives': result['false_positives'],
+                'true_negatives': result['true_negatives'],
+                'false_negatives': result['false_negatives'],
+                'total_samples': result['total_samples'],
+                'training_epoch': result['training_epoch'],
+                'timestamp': result['timestamp']
+            })
+        
+        # Create DataFrame and save
+        df = pd.DataFrame(summary_data)
+        df = df.sort_values('f1', ascending=False)
+        
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"noise_detection_models_summary_{timestamp}.csv"
+        filepath = os.path.join(self.noise_detection_results_dir, filename)
+        
+        df.to_csv(filepath, index=False)
+        print(f"📊 Noise detection summary results for all models saved to: {filepath}")
+        
+        return filepath
+    
+    def run_noise_detection_validation(self) -> Dict[str, str]:
+        """
+        Run complete noise detection validation pipeline.
+        
+        Returns:
+            dict: Path to generated summary file
+        """
+        print(f"\n{'='*70}")
+        print(f"🚀 Running Full Noise Detection Validation Pipeline")
+        print(f"{'='*70}")
+        
+        # Validate all noise detection models
+        results = self.validate_all_noise_detection_models()
+        
+        if not results:
+            print("❌ No noise detection models to validate")
+            return {}
+        
+        # Save summary file for all models
+        summary_file = self.save_noise_detection_summary(results)
+        
+        print(f"\n📁 Generated noise detection summary file")
+        
+        return {
+            'noise_detection_summary_csv': summary_file
+        }
+    
+    def run_complete_validation(self) -> Dict[str, str]:
+        """
+        Run complete validation pipeline for both ImageNette classification and noise detection models.
+        
+        Returns:
+            dict: Paths to all generated files
+        """
+        print(f"\n{'='*70}")
+        print(f"🚀 Running Complete Validation Pipeline")
+        print(f"{'='*70}")
+        print(f"   - ImageNette Classification Models")
+        print(f"   - Noise Detection Models")
+        
+        # Validate ImageNette classification models
+        imagenette_results = self.validate_all_models()
+        imagenette_summary = self.save_all_models_summary(imagenette_results) if imagenette_results else ""
+        
+        # Validate noise detection models
+        noise_detection_results = self.validate_all_noise_detection_models()
+        noise_detection_summary = self.save_noise_detection_summary(noise_detection_results) if noise_detection_results else ""
+        
+        # Save per-class results for ImageNette models
+        per_class_files = []
+        for result in imagenette_results:
+            if result['success']:
+                per_class_file = self.save_model_per_class_results(result)
+                if per_class_file:
+                    per_class_files.append(per_class_file)
+        
+        print(f"\n📁 Generated files:")
+        print(f"   - 1 ImageNette classification summary")
+        print(f"   - 1 noise detection summary")
+        print(f"   - {len(per_class_files)} per-class ImageNette files")
+        
+        return {
+            'imagenette_summary_csv': imagenette_summary,
+            'noise_detection_summary_csv': noise_detection_summary,
+            'per_class_csv_files': per_class_files
+        }
 
 
 if __name__ == "__main__":
     # Example usage
     validator = ImageNetteValidator()
     
-    # Run full validation pipeline
-    files = validator.run_full_validation()
+    # ===== ImageNette Classification Validation =====
+    # Run full ImageNette validation pipeline
+    # files = validator.run_full_validation()
     
-    print(f"\n✅ Validation complete! Generated files:")
+    # ===== Noise Detection Validation =====
+    # Run noise detection validation pipeline
+    noise_files = validator.run_noise_detection_validation()
     
-    # Display summary file
-    if files.get('summary_csv'):
-        print(f"\n📊 Summary file:")
-        print(f"   📄 {files['summary_csv']}")
+    print(f"\n✅ Noise Detection Validation complete! Generated files:")
     
-    # Display per-class files
-    if files.get('per_class_csv_files'):
-        print(f"\n📊 Per-class files ({len(files['per_class_csv_files'])}):")
-        for file_path in files['per_class_csv_files']:
-            print(f"   📄 {file_path}")
+    # Display noise detection summary file
+    if noise_files.get('noise_detection_summary_csv'):
+        print(f"\n📊 Noise Detection Summary file:")
+        print(f"   📄 {noise_files['noise_detection_summary_csv']}")
     
-    # Example: Validate specific model
+    # ===== Complete Validation (Both Types) =====
+    # Run complete validation for both ImageNette and noise detection
+    # all_files = validator.run_complete_validation()
+    
+    # ===== Individual Model Validation Examples =====
+    # Example: Validate specific ImageNette model
     # result = validator.validate_model('resnet18')
-    # print(f"ResNet18 accuracy: {result['overall_accuracy']:.4f}")
+    # print(f"ResNet18 accuracy: {result['accuracy']:.4f}")
     
-    # Example: Get available trained models
+    # Example: Validate specific noise detection model
+    # result = validator.validate_noise_detection_model('resnet18')
+    # print(f"ResNet18 noise detector F1: {result['f1']:.2f}%")
+    
+    # ===== Check Available Models =====
+    # Example: Get available trained ImageNette models
     # available_models = validator._get_available_trained_models()
-    # print(f"Available models: {available_models}")
+    # print(f"Available ImageNette models: {available_models}")
+    
+    # Example: Get available noise detection models
+    # available_noise_models = validator._get_available_noise_detection_models()
+    # print(f"Available noise detection models: {available_noise_models}")

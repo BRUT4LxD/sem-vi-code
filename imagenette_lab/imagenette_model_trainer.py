@@ -21,6 +21,8 @@ import sys
 from datetime import datetime
 from typing import List, Dict, Optional, Literal
 
+from domain.model.model_names import ModelNames
+
 # Add project root to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -433,7 +435,8 @@ class ImageNetteModelTrainer:
         self, 
         model_name: str,
         attacked_images_folder: str = "data/attacks/imagenette_models",
-        clean_images_folder: str = "./data/imagenette/val",
+        clean_train_folder: str = "./data/imagenette/train",
+        clean_test_folder: str = "./data/imagenette/val",
         test_images_per_attack: int = 2,
         batch_size: int = 32,
         learning_rate: float = 0.001,
@@ -453,7 +456,8 @@ class ImageNetteModelTrainer:
         Args:
             model_name: Name of the model architecture to use
             attacked_images_folder: Folder containing attacked images from all models
-            clean_images_folder: Folder containing clean ImageNette images
+            clean_train_folder: Folder containing clean ImageNette training images
+            clean_test_folder: Folder containing clean ImageNette validation images
             test_images_per_attack: Number of images per attack for test set
             batch_size: Batch size for training
             learning_rate: Initial learning rate
@@ -481,7 +485,8 @@ class ImageNetteModelTrainer:
             print(f"\n📁 Loading attacked ImageNette dataset for binary classification...")
             train_loader, test_loader = load_attacked_imagenette(
                 attacked_images_folder=attacked_images_folder,
-                clean_images_folder=clean_images_folder,
+                clean_train_folder=clean_train_folder,
+                clean_test_folder=clean_test_folder,
                 test_images_per_attack=test_images_per_attack,
                 batch_size=batch_size,
                 shuffle=True
@@ -537,6 +542,8 @@ class ImageNetteModelTrainer:
                 'training_time': training_time,
                 'save_path': save_path,
                 'attacked_images_folder': attacked_images_folder,
+                'clean_train_folder': clean_train_folder,
+                'clean_test_folder': clean_test_folder,
                 'batch_size': batch_size,
                 'learning_rate': learning_rate,
                 'num_epochs': num_epochs,
@@ -563,6 +570,8 @@ class ImageNetteModelTrainer:
         self,
         model_names: List[str],
         attacked_images_folder: str = "data/attacks/imagenette_models",
+        clean_train_folder: str = "./data/imagenette/train",
+        clean_test_folder: str = "./data/imagenette/val",
         batch_size: int = 32,
         learning_rate: float = 0.001,
         num_epochs: int = 20
@@ -573,6 +582,8 @@ class ImageNetteModelTrainer:
         Args:
             model_names: List of model names to train
             attacked_images_folder: Folder containing attacked images
+            clean_train_folder: Folder containing clean training images
+            clean_test_folder: Folder containing clean validation images
             batch_size: Batch size for training
             learning_rate: Learning rate for all models
             num_epochs: Number of epochs for all models
@@ -594,6 +605,8 @@ class ImageNetteModelTrainer:
             result = self.train_noise_detection_model(
                 model_name=model_name,
                 attacked_images_folder=attacked_images_folder,
+                clean_train_folder=clean_train_folder,
+                clean_test_folder=clean_test_folder,
                 batch_size=batch_size,
                 learning_rate=learning_rate,
                 num_epochs=num_epochs,
@@ -631,6 +644,7 @@ class ImageNetteModelTrainer:
         self,
         model_path: str,
         attacked_images_folder: str = "data/attacks/imagenette_models",
+        clean_test_folder: str = "./data/imagenette/val",
         batch_size: int = 32,
         verbose: bool = True
     ) -> Dict:
@@ -640,6 +654,7 @@ class ImageNetteModelTrainer:
         Args:
             model_path: Path to the saved noise detection model
             attacked_images_folder: Folder containing attacked images
+            clean_test_folder: Folder containing clean validation images
             batch_size: Batch size for validation
             verbose: Whether to print detailed results
             
@@ -663,7 +678,8 @@ class ImageNetteModelTrainer:
             print(f"\n📁 Loading test dataset...")
             _, test_loader = load_attacked_imagenette(
                 attacked_images_folder=attacked_images_folder,
-                clean_images_folder="./data/imagenette/val",
+                clean_train_folder="./data/imagenette/train",
+                clean_test_folder=clean_test_folder,
                 test_images_per_attack=2,
                 batch_size=batch_size,
                 shuffle=False
@@ -764,21 +780,25 @@ if __name__ == "__main__":
     
     # ===== Noise Detection Examples =====
     # Example: Train single noise detection model
-    result = trainer.train_noise_detection_model(
-        model_name='resnet18',
-        attacked_images_folder='data/attacks/imagenette_models',
-        batch_size=32,
-        learning_rate=0.001,
-        num_epochs=20
-    )
-    
-    # Example: Train multiple noise detection models
-    # results = trainer.train_multiple_noise_detectors(
-    #     model_names=['resnet18', 'densenet121', 'mobilenet_v2'],
+    # result = trainer.train_noise_detection_model(
+    #     model_name='resnet18',
     #     attacked_images_folder='data/attacks/imagenette_models',
+    #     clean_train_folder='./data/imagenette/train',
+    #     clean_test_folder='./data/imagenette/val',
     #     batch_size=32,
+    #     learning_rate=0.001,
     #     num_epochs=20
     # )
+    
+    # Example: Train multiple noise detection models
+    models_names = ModelNames().all_model_names
+    
+    results = trainer.train_multiple_noise_detectors(
+        model_names=models_names,
+        attacked_images_folder='data/attacks/imagenette_models',
+        batch_size=32,
+        num_epochs=20
+    )
     
     # Example: Validate noise detector
     # result = trainer.validate_noise_detector(

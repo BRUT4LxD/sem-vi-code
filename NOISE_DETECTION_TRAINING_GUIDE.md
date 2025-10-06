@@ -39,7 +39,8 @@ from training.train import Training
 # Load dataset
 train_loader, test_loader = load_attacked_imagenette(
     attacked_images_folder="data/attacks/imagenette_models",
-    clean_images_folder="./data/imagenette/val",
+    clean_train_folder="./data/imagenette/train",
+    clean_test_folder="./data/imagenette/val",
     test_images_per_attack=2,
     batch_size=32
 )
@@ -114,18 +115,20 @@ if result['success']:
   - Combines images from **all models** and **all attacks**
   - Skips `src_` prefixed images (clean source images)
 
-- **Clean Images**: From `./data/imagenette/val/`
+- **Clean Training Images**: From `./data/imagenette/train/`
+  - Original ImageNette training set
+- **Clean Test Images**: From `./data/imagenette/val/`
   - Original ImageNette validation set
 
 ### Dataset Splits
 - **Training Set**:
   - Adversarial images (label=1): All except `test_images_per_attack` per attack
-  - Clean images (label=0): **2x** the number of adversarial images
+  - Clean images (label=0): **2x** the number of adversarial images (from train folder)
   - Ratio: 2:1 (clean:adversarial)
 
 - **Test Set**:
   - Adversarial images (label=1): `test_images_per_attack` per attack
-  - Clean images (label=0): Equal to adversarial images
+  - Clean images (label=0): Equal to adversarial images (from val folder)
   - Ratio: **50:50** (balanced)
 
 ### Labels
@@ -137,7 +140,8 @@ if result['success']:
 ### Default Parameters
 ```python
 attacked_images_folder = "data/attacks/imagenette_models"
-clean_images_folder = "./data/imagenette/val"
+clean_train_folder = "./data/imagenette/train"
+clean_test_folder = "./data/imagenette/val"
 test_images_per_attack = 2
 batch_size = 32
 learning_rate = 0.001
@@ -265,7 +269,8 @@ print("Training noise detection model...")
 training_result = trainer.train_noise_detection_model(
     model_name=ModelNames().resnet18,
     attacked_images_folder='data/attacks/imagenette_models',
-    clean_images_folder='./data/imagenette/val',
+    clean_train_folder='./data/imagenette/train',
+    clean_test_folder='./data/imagenette/val',
     test_images_per_attack=2,
     batch_size=32,
     learning_rate=0.001,

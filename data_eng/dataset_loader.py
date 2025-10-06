@@ -138,7 +138,8 @@ def load_empty_dataloader():
 
 def load_attacked_imagenette(
     attacked_images_folder: str = "data/attacks/imagenette_models",
-    clean_images_folder: str = "./data/imagenette/val",
+    clean_train_folder: str = "./data/imagenette/train",
+    clean_test_folder: str = "./data/imagenette/val",
     test_images_per_attack: int = 2,
     batch_size: int = 32,
     shuffle: bool = True,
@@ -148,8 +149,8 @@ def load_attacked_imagenette(
     Load attacked ImageNette images from all models and attacks for binary classification.
     
     Creates balanced datasets:
-    - Train: adversarial images (label=1) + 2x clean images (label=0)
-    - Test: test_images_per_attack adversarial per attack (label=1) + equal clean images (label=0)
+    - Train: adversarial images (label=1) + 2x clean images (label=0) from train folder
+    - Test: test_images_per_attack adversarial per attack (label=1) + equal clean images (label=0) from val folder
     
     Folder structure expected:
         attacked_images_folder/
@@ -161,7 +162,8 @@ def load_attacked_imagenette(
     
     Args:
         attacked_images_folder: Root folder containing attacked images
-        clean_images_folder: Folder containing clean ImageNette validation images
+        clean_train_folder: Folder containing clean ImageNette training images
+        clean_test_folder: Folder containing clean ImageNette validation images
         test_images_per_attack: Number of adversarial images per attack to use for testing
         batch_size: Batch size for dataloaders
         shuffle: Whether to shuffle the data
@@ -176,7 +178,8 @@ def load_attacked_imagenette(
     
     print("📁 Loading attacked ImageNette dataset for binary classification...")
     print(f"   Attacked images folder: {attacked_images_folder}")
-    print(f"   Clean images folder: {clean_images_folder}")
+    print(f"   Clean train images folder: {clean_train_folder}")
+    print(f"   Clean test images folder: {clean_test_folder}")
     print(f"   Test images per attack: {test_images_per_attack}")
     
     trans = transform if transform is not None else imagenette_transformer()
@@ -242,30 +245,34 @@ def load_attacked_imagenette(
     print(f"✅ Loaded {len(train_adversarial)} training adversarial images")
     print(f"✅ Loaded {len(test_adversarial)} test adversarial images")
     
-    # Load clean images (2x for train, equal to test_adversarial for test)
+    # Load clean images from separate train and test folders
     print("📁 Loading clean ImageNette images...")
     
-    clean_dataset = datasets.ImageFolder(root=clean_images_folder, transform=None)
+    # Load clean training images
+    clean_train_dataset = datasets.ImageFolder(root=clean_train_folder, transform=None)
+    # Load clean test images  
+    clean_test_dataset = datasets.ImageFolder(root=clean_test_folder, transform=None)
     
     # Calculate how many clean images we need
     num_clean_train = len(train_adversarial) * 2  # 2x adversarial for balance
     num_clean_test = len(test_adversarial)  # Equal to adversarial for test
-    total_clean_needed = num_clean_train + num_clean_test
     
-    if len(clean_dataset) < total_clean_needed:
-        print(f"⚠️ Warning: Not enough clean images. Need {total_clean_needed}, have {len(clean_dataset)}")
-        num_clean_train = min(num_clean_train, len(clean_dataset) - num_clean_test)
+    if len(clean_train_dataset) < num_clean_train:
+        print(f"⚠️ Warning: Not enough clean training images. Need {num_clean_train}, have {len(clean_train_dataset)}")
+        num_clean_train = len(clean_train_dataset)
+    
+    if len(clean_test_dataset) < num_clean_test:
+        print(f"⚠️ Warning: Not enough clean test images. Need {num_clean_test}, have {len(clean_test_dataset)}")
+        num_clean_test = len(clean_test_dataset)
     
     # Sample clean images
     import random
     random.seed(42)
-    clean_indices = random.sample(range(len(clean_dataset)), min(total_clean_needed, len(clean_dataset)))
+    clean_train_indices = random.sample(range(len(clean_train_dataset)), num_clean_train)
+    clean_test_indices = random.sample(range(len(clean_test_dataset)), num_clean_test)
     
-    clean_train_indices = clean_indices[:num_clean_train]
-    clean_test_indices = clean_indices[num_clean_train:num_clean_train + num_clean_test]
-    
-    train_clean = [clean_dataset[i][0] for i in clean_train_indices]
-    test_clean = [clean_dataset[i][0] for i in clean_test_indices]
+    train_clean = [clean_train_dataset[i][0] for i in clean_train_indices]
+    test_clean = [clean_test_dataset[i][0] for i in clean_test_indices]
     
     print(f"✅ Loaded {len(train_clean)} clean training images")
     print(f"✅ Loaded {len(test_clean)} clean test images")
