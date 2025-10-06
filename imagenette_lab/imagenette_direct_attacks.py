@@ -108,10 +108,11 @@ def attack_images_imagenette(attack: Attack, data_loader: DataLoader, successful
     return ev
 
 
-def attack_and_save_images(attack: Attack, data_loader: DataLoader, images_per_attack = 100, successfully_attacked_images_folder: str = ""):
+def attack_and_save_images(attack: Attack, data_loader: DataLoader, images_per_attack = 10, successfully_attacked_images_folder: str = "", attack_test_dataset: bool = False):
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = attack.model
+    dataset_name = "test" if attack_test_dataset else "train"
 
     # create folder if doesn't exist
     if not os.path.exists(successfully_attacked_images_folder):
@@ -155,16 +156,15 @@ def attack_and_save_images(attack: Attack, data_loader: DataLoader, images_per_a
                 if attacked_images_count >= images_per_attack:
                     break
 
-                # Path: successfully_attacked_images_folder/model_name/attack_name/label/timestamp.png
+                # Path: successfully_attacked_images_folder/dataset_name/model_name/attack_name/label/timestamp.png
                 timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
                 
                 # Create directory structure
-                save_dir = os.path.join(successfully_attacked_images_folder, attack.model_name, attack.attack, str(label))
+                save_dir = os.path.join(successfully_attacked_images_folder, dataset_name, attack.model_name, attack.attack, str(label))
                 os.makedirs(save_dir, exist_ok=True)
                 
                 attcked_image_save_path = os.path.join(save_dir, f"{timestamp}.png")
-                source_image_save_path = os.path.join(save_dir, f"src_{timestamp}.png")
-                
+
                 # Convert tensors to PIL Images and save as actual PNG files
                 to_pil = ToPILImage()
                 
@@ -172,21 +172,28 @@ def attack_and_save_images(attack: Attack, data_loader: DataLoader, images_per_a
                 adv_pil = to_pil(adv_images[i].cpu())
                 adv_pil.save(attcked_image_save_path)
                 
-                # Convert source image tensor to PIL Image and save
-                src_pil = to_pil(images[i].cpu())
-                src_pil.save(source_image_save_path)
 
-def attack_and_save_images_multiple(model_names: List[str], attack_names: List[str], images_per_attack = 100, successfully_attacked_images_folder: str = ""):
+def attack_and_save_images_multiple(
+    model_names: List[str],
+    attack_names: List[str], 
+    images_per_attack = 10, 
+    successfully_attacked_images_folder: str = "", 
+    attack_test_dataset: bool = False):
     for model_name in model_names:
         model_path = f"./models/imagenette/{model_name}_advanced.pt"
         result = load_model_imagenette(model_path, model_name, device='cuda')
         model = result['model']
         for attack_name in attack_names:
             print(f"🔍 Running {attack_name} attack on {model_name}...")
-            _, test_loader = load_imagenette(batch_size=1, test_subset_size=-1)
+            data_loader = None
+            if attack_test_dataset:
+                _, data_loader = load_imagenette(batch_size=1, test_subset_size=-1)
+            else:
+                data_loader, _ = load_imagenette(batch_size=1, train_subset_size=-1)
+
             attack = AttackFactory.get_attack(attack_name, model)
             try:
-                attack_and_save_images(attack, test_loader, images_per_attack=images_per_attack, successfully_attacked_images_folder=successfully_attacked_images_folder)
+                attack_and_save_images(attack, data_loader, images_per_attack=images_per_attack, successfully_attacked_images_folder=successfully_attacked_images_folder, attack_test_dataset=attack_test_dataset)
             except Exception as e:
                 print(f"❌ {attack_name} attack on {model_name} failed: {str(e)}")
                 save_failure_log(model_name, attack_name, e, f"{successfully_attacked_images_folder}/{model_name}/{attack_name}")
@@ -407,8 +414,18 @@ if __name__ == "__main__":
         ModelNames().efficientnet_b0
     ]
     
-    attack_names = [AttackNames().SPSA, AttackNames().EADEN, AttackNames().EADL1]
-    save_folder = "results/attacks/imagenette_models_rest"
-    _, data_loader = load_imagenette(batch_size=1, test_subset_size=1000)
+    attack_names = AttackNames().all_attack_names
 
-    run_attacks_on_models(model_names, attack_names, data_loader, results_folder=save_folder)
+    attack_and_save_images_multiple(
+        model_names, 
+        attack_names, 
+        images_per_attack=10, 
+        successfully_attacked_images_folder="data/attacks/imagenette_models",
+        attack_test_dataset=False)
+
+    attack_and_save_images_multiple(
+        model_names, 
+        attack_names, 
+        images_per_attack=10, 
+        successfully_attacked_images_folder="data/attacks/imagenette_models",
+        attack_test_dataset=True)
