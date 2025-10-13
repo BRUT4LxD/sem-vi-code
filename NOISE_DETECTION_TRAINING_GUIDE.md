@@ -127,9 +127,9 @@ if result['success']:
   - Ratio: 2:1 (clean:adversarial)
 
 - **Test Set**:
-  - Adversarial images (label=1): All images from `test` folder
-  - Clean images (label=0): Equal to adversarial images (from val folder)
-  - Ratio: **50:50** (balanced)
+  - Adversarial images (label=1): Limited to match number of clean validation images
+  - Clean images (label=0): All available images from val folder
+  - Ratio: **50:50** (balanced - adversarial count is automatically adjusted to match clean count)
 
 ### Labels
 - **0 = Clean Image** (not attacked)

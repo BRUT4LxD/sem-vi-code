@@ -279,17 +279,25 @@ def load_attacked_imagenette(
     # Load clean test images  
     clean_test_dataset = datasets.ImageFolder(root=clean_test_folder, transform=None)
     
+    print(f"📊 Available clean images: {len(clean_train_dataset)} train, {len(clean_test_dataset)} test")
+    
+    # IMPORTANT: For test set, match adversarial images to available clean validation images for 50:50 split
+    # Limit test adversarial images to the number of available clean validation images
+    if len(test_adversarial) > len(clean_test_dataset):
+        print(f"⚠️ Limiting test adversarial images from {len(test_adversarial)} to {len(clean_test_dataset)} to match clean validation images")
+        # Randomly sample to match clean validation set size
+        import random
+        random.seed(42)
+        sampled_indices = random.sample(range(len(test_adversarial)), len(clean_test_dataset))
+        test_adversarial = [test_adversarial[i] for i in sampled_indices]
+    
     # Calculate how many clean images we need
     num_clean_train = len(train_adversarial) * 2  # 2x adversarial for balance
-    num_clean_test = len(test_adversarial)  # Equal to adversarial for test
+    num_clean_test = len(test_adversarial)  # Equal to adversarial for test (guaranteed to be <= clean_test_dataset size)
     
     if len(clean_train_dataset) < num_clean_train:
         print(f"⚠️ Warning: Not enough clean training images. Need {num_clean_train}, have {len(clean_train_dataset)}")
         num_clean_train = len(clean_train_dataset)
-    
-    if len(clean_test_dataset) < num_clean_test:
-        print(f"⚠️ Warning: Not enough clean test images. Need {num_clean_test}, have {len(clean_test_dataset)}")
-        num_clean_test = len(clean_test_dataset)
     
     # Sample clean images
     import random
@@ -337,7 +345,8 @@ def load_attacked_imagenette(
     print(f"📊 Dataset Summary:")
     print(f"   Train: {len(train_dataset)} total ({len(train_adversarial)} adv + {len(train_clean)} clean)")
     print(f"   Test: {len(test_dataset)} total ({len(test_adversarial)} adv + {len(test_clean)} clean)")
-    print(f"   Train ratio: {len(train_clean)}/{len(train_adversarial)} = {len(train_clean)/len(train_adversarial):.2f}x")
+    print(f"   Train ratio (clean:adv): {len(train_clean)}:{len(train_adversarial)} = {len(train_clean)/len(train_adversarial):.2f}x")
+    print(f"   Test ratio (clean:adv): {len(test_clean)}:{len(test_adversarial)} = {len(test_clean)/len(test_adversarial) if len(test_adversarial) > 0 else 0:.2f}x (should be 1.0 for 50:50)")
     
     # Create dataloaders
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=shuffle)

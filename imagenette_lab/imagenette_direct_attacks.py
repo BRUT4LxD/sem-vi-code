@@ -124,12 +124,11 @@ def attack_and_save_images(attack: Attack, data_loader: DataLoader, images_per_c
     # Track attacked images per class
     attacked_images_per_class = {}
     num_classes = len(ImageNetteClasses.get_classes())
-    total_images_needed = images_per_class * num_classes
 
     for images, labels in tqdm(data_loader):
-        # Check if we have enough images for all classes
-        total_attacked = sum(attacked_images_per_class.values())
-        if total_attacked >= total_images_needed:
+        # Check if all classes have exactly the required number of images
+        all_classes_complete = all(attacked_images_per_class.get(i, 0) >= images_per_class for i in range(num_classes))
+        if all_classes_complete:
             break
 
         images, labels = images.to(device), labels.to(device)
@@ -165,7 +164,7 @@ def attack_and_save_images(attack: Attack, data_loader: DataLoader, images_per_c
                 attacked_images_per_class[label] = attacked_images_per_class.get(label, 0) + 1
 
                 # Path: successfully_attacked_images_folder/dataset_name/model_name/attack_name/label/timestamp.png
-                timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S_%f")  # Include microseconds
                 
                 # Create directory structure
                 save_dir = os.path.join(successfully_attacked_images_folder, dataset_name, attack.model_name, attack.attack, str(label))
@@ -180,9 +179,11 @@ def attack_and_save_images(attack: Attack, data_loader: DataLoader, images_per_c
                 adv_pil = to_pil(adv_images[i].cpu())
                 adv_pil.save(attcked_image_save_path)
                 
-                # Check if we have enough images for all classes
-                total_attacked = sum(attacked_images_per_class.values())
-                if total_attacked >= total_images_needed:
+                
+                # Check if all classes have exactly the required number of images
+                all_classes_complete = all(attacked_images_per_class.get(i, 0) >= images_per_class for i in range(num_classes))
+                if all_classes_complete:
+                    print(f"🎉 All classes completed! Stopping collection.")
                     break
                 
 
@@ -418,6 +419,7 @@ if __name__ == "__main__":
     # Run simple example for testing
     print(f"\n🎉 Simple example completed!")
     print(f"📁 Results saved to: results/attacks/imagenette_models/")
+    print(len(ImageNetteClasses.get_classes()))
     
     model_names = [
         ModelNames().resnet18,

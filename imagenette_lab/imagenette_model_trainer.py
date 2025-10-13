@@ -787,7 +787,13 @@ if __name__ == "__main__":
     # )
     
     # Example: Train multiple noise detection models
-    models_names = ModelNames().all_model_names
+    models_names = [
+        ModelNames().resnet18,
+        ModelNames().vgg16,
+        ModelNames().densenet121,
+        ModelNames().mobilenet_v2,
+        ModelNames().efficientnet_b0
+    ]
     
     results = trainer.train_multiple_noise_detectors(
         model_names=models_names,
