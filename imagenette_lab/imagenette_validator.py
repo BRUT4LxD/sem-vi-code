@@ -45,6 +45,8 @@ class ImageNetteValidator:
                  results_dir: str = './results/imagenette_trained_models',
                  noise_detection_models_dir: str = './models/noise_detection',
                  noise_detection_results_dir: str = './results/noise_detection_models',
+                 adversarial_models_dir: str = './models/imagenette_adversarial',
+                 adversarial_results_dir: str = './results/adversarial_models',
                  device: str = 'auto'):
         """
         Initialize the ImageNetteValidator.
@@ -66,8 +68,11 @@ class ImageNetteValidator:
         self.results_dir = results_dir
         self.noise_detection_models_dir = noise_detection_models_dir
         self.noise_detection_results_dir = noise_detection_results_dir
+        self.adversarial_models_dir = adversarial_models_dir
+        self.adversarial_results_dir = adversarial_results_dir
         os.makedirs(self.results_dir, exist_ok=True)
         os.makedirs(self.noise_detection_results_dir, exist_ok=True)
+        os.makedirs(self.adversarial_results_dir, exist_ok=True)
         
         # Available models to validate
         self.available_models = ImageNetteTrainingConfigs.AVAILABLE_MODELS
@@ -700,6 +705,298 @@ class ImageNetteValidator:
             'noise_detection_summary_csv': summary_file
         }
     
+    def validate_adversarial_model(
+        self,
+        model_name: str,
+        attack_names: List[str],
+        batch_size: int = 32,
+        attack_epsilon: float = 0.03,
+        attack_alpha: float = 0.01,
+        attack_steps: int = 10
+    ) -> Dict:
+        """
+        Validate a trained adversarial model on clean and adversarial test sets.
+        
+        Args:
+            model_name: Name of the adversarial model to validate
+            attack_names: List of attack names to test robustness
+            batch_size: Batch size for validation
+            attack_epsilon: Maximum perturbation for attacks
+            attack_alpha: Step size for iterative attacks
+            attack_steps: Number of steps for iterative attacks
+            
+        Returns:
+            dict: Validation results including clean and adversarial accuracy
+        """
+        from attacks.attack_factory import AttackFactory
+        
+        print(f"\n🛡️ Validating adversarial model: {model_name}...")
+        
+        try:
+            # Load model (try both pre-attacked and on-the-fly versions)
+            model_path_preattacked = os.path.join(self.adversarial_models_dir, f"{model_name}_adv_preattacked.pt")
+            model_path_onthefly = os.path.join(self.adversarial_models_dir, f"{model_name}_adv_onthefly.pt")
+            
+            if os.path.exists(model_path_preattacked):
+                model_path = model_path_preattacked
+                training_mode = "preattacked"
+            elif os.path.exists(model_path_onthefly):
+                model_path = model_path_onthefly
+                training_mode = "onthefly"
+            else:
+                raise FileNotFoundError(f"Adversarial model not found. Tried:\n  {model_path_preattacked}\n  {model_path_onthefly}")
+            
+            print(f"   Loading model from: {model_path}")
+            model_info = load_model_imagenette(model_path, device=str(self.device), verbose=False)
+            
+            if not model_info['success']:
+                raise RuntimeError(f"Failed to load adversarial model: {model_info['error']}")
+            
+            model = model_info['model']
+            model.eval()
+            
+            # Load clean test dataset
+            print(f"   Loading clean test dataset...")
+            _, test_loader = load_imagenette(batch_size=batch_size, shuffle=False)
+            
+            # Evaluate on clean images
+            print(f"   Evaluating on clean images...")
+            clean_correct = 0
+            clean_total = 0
+            
+            with torch.no_grad():
+                for images, labels in test_loader:
+                    images, labels = images.to(self.device), labels.to(self.device)
+                    outputs = model(images)
+                    _, predicted = torch.max(outputs, 1)
+                    clean_total += labels.size(0)
+                    clean_correct += (predicted == labels).sum().item()
+            
+            clean_accuracy = 100. * clean_correct / clean_total
+            print(f"   ✅ Clean accuracy: {clean_accuracy:.2f}%")
+            
+            # Evaluate on adversarial images for each attack
+            attack_accuracies = {}
+            
+            for attack_name in attack_names:
+                print(f"   Evaluating robustness against {attack_name}...")
+                
+                adv_correct = 0
+                adv_total = 0
+                
+                for images, labels in test_loader:
+                    images, labels = images.to(self.device), labels.to(self.device)
+                    
+                    # Generate adversarial examples
+                    attack = AttackFactory.create_attack(
+                        attack_name=attack_name,
+                        model=model,
+                        eps=attack_epsilon,
+                        alpha=attack_alpha,
+                        steps=attack_steps
+                    )
+                    
+                    with torch.enable_grad():
+                        adv_images = attack(images, labels)
+                    
+                    # Evaluate
+                    with torch.no_grad():
+                        outputs = model(adv_images)
+                        _, predicted = torch.max(outputs, 1)
+                        adv_total += labels.size(0)
+                        adv_correct += (predicted == labels).sum().item()
+                
+                attack_accuracy = 100. * adv_correct / adv_total
+                attack_accuracies[attack_name] = attack_accuracy
+                print(f"   ✅ {attack_name} robustness: {attack_accuracy:.2f}%")
+            
+            # Calculate average adversarial accuracy
+            avg_adv_accuracy = sum(attack_accuracies.values()) / len(attack_accuracies) if attack_accuracies else 0.0
+            
+            result = {
+                'model_name': model_name,
+                'task': 'adversarial_validation',
+                'training_mode': training_mode,
+                'clean_accuracy': clean_accuracy,
+                'adversarial_accuracy': avg_adv_accuracy,
+                'attack_accuracies': attack_accuracies,
+                'total_samples': clean_total,
+                'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'success': True
+            }
+            
+            print(f"   📊 Summary: Mode={training_mode}, Clean={clean_accuracy:.2f}%, Avg Adv={avg_adv_accuracy:.2f}%")
+            return result
+            
+        except Exception as e:
+            error_msg = f"Adversarial validation failed for {model_name}: {str(e)}"
+            print(f"   ❌ {error_msg}")
+            import traceback
+            traceback.print_exc()
+            return {
+                'model_name': model_name,
+                'task': 'adversarial_validation',
+                'error': error_msg,
+                'success': False
+            }
+    
+    def validate_all_adversarial_models(
+        self,
+        attack_names: List[str],
+        batch_size: int = 32
+    ) -> List[Dict]:
+        """
+        Validate all trained adversarial models.
+        
+        Args:
+            attack_names: List of attacks to test robustness
+            batch_size: Batch size for validation
+            
+        Returns:
+            List of validation results for each model
+        """
+        print(f"\n{'='*70}")
+        print(f"🛡️ Validating All Adversarial Models")
+        print(f"{'='*70}")
+        
+        # Get all adversarial models
+        if not os.path.exists(self.adversarial_models_dir):
+            print(f"⚠️ Adversarial models directory not found: {self.adversarial_models_dir}")
+            return []
+        
+        model_files = [f for f in os.listdir(self.adversarial_models_dir) if f.endswith('.pt')]
+        
+        if not model_files:
+            print(f"⚠️ No adversarial models found in {self.adversarial_models_dir}")
+            return []
+        
+        print(f"   Found {len(model_files)} adversarial models")
+        
+        # Extract unique model names (handle both _preattacked and _onthefly suffixes)
+        model_names_set = set()
+        for model_file in model_files:
+            # Remove _adv_preattacked.pt or _adv_onthefly.pt
+            model_name = model_file.replace('_adv_preattacked.pt', '').replace('_adv_onthefly.pt', '')
+            model_names_set.add(model_name)
+        
+        results = []
+        
+        for i, model_name in enumerate(sorted(model_names_set), 1):
+            print(f"\n📊 Validating {i}/{len(model_names_set)}: {model_name}")
+            
+            result = self.validate_adversarial_model(
+                model_name=model_name,
+                attack_names=attack_names,
+                batch_size=batch_size
+            )
+            
+            results.append(result)
+        
+        # Summary
+        successful = [r for r in results if r['success']]
+        failed = [r for r in results if not r['success']]
+        
+        print(f"\n📈 Adversarial Validation Summary:")
+        print(f"   Successful: {len(successful)}/{len(results)}")
+        print(f"   Failed: {len(failed)}/{len(results)}")
+        
+        if successful:
+            print(f"\n🏆 Best Adversarial Models (by average adversarial accuracy):")
+            successful.sort(key=lambda x: x['adversarial_accuracy'], reverse=True)
+            for i, result in enumerate(successful[:5], 1):
+                print(f"   {i}. {result['model_name']}: "
+                      f"Clean={result['clean_accuracy']:.2f}%, "
+                      f"Avg Adv={result['adversarial_accuracy']:.2f}%")
+        
+        return results
+    
+    def save_adversarial_validation_summary(self, results: List[Dict]) -> str:
+        """
+        Save adversarial validation results to CSV.
+        
+        Args:
+            results: List of validation results from validate_all_adversarial_models
+            
+        Returns:
+            str: Path to saved CSV file
+        """
+        import csv
+        
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"adversarial_models_summary_{timestamp}.csv"
+        filepath = os.path.join(self.adversarial_results_dir, filename)
+        
+        with open(filepath, 'w', newline='') as f:
+            # Get all attack names from first successful result
+            attack_names = []
+            for result in results:
+                if result['success'] and 'attack_accuracies' in result:
+                    attack_names = list(result['attack_accuracies'].keys())
+                    break
+            
+            # Build fieldnames
+            fieldnames = ['model_name', 'training_mode', 'clean_accuracy', 'avg_adversarial_accuracy']
+            for attack_name in attack_names:
+                fieldnames.append(f'{attack_name}_accuracy')
+            fieldnames.extend(['total_samples', 'timestamp'])
+            
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            
+            for result in results:
+                if result['success']:
+                    row = {
+                        'model_name': result['model_name'],
+                        'training_mode': result.get('training_mode', 'unknown'),
+                        'clean_accuracy': result['clean_accuracy'],
+                        'avg_adversarial_accuracy': result['adversarial_accuracy'],
+                        'total_samples': result['total_samples'],
+                        'timestamp': result['timestamp']
+                    }
+                    
+                    # Add individual attack accuracies
+                    for attack_name in attack_names:
+                        row[f'{attack_name}_accuracy'] = result['attack_accuracies'].get(attack_name, 0.0)
+                    
+                    writer.writerow(row)
+        
+        print(f"💾 Saved adversarial validation summary to: {filepath}")
+        return filepath
+    
+    def run_adversarial_validation(
+        self,
+        attack_names: List[str],
+        batch_size: int = 32
+    ) -> Dict:
+        """
+        Run complete validation pipeline for adversarial models.
+        
+        Args:
+            attack_names: List of attacks to test robustness
+            batch_size: Batch size for validation
+            
+        Returns:
+            dict: Paths to generated files
+        """
+        print(f"\n{'='*70}")
+        print(f"🛡️ Running Adversarial Models Validation Pipeline")
+        print(f"{'='*70}")
+        
+        # Validate all adversarial models
+        results = self.validate_all_adversarial_models(
+            attack_names=attack_names,
+            batch_size=batch_size
+        )
+        
+        # Save summary
+        summary_file = self.save_adversarial_validation_summary(results)
+        
+        print(f"\n📁 Generated adversarial validation summary file")
+        
+        return {
+            'adversarial_summary_csv': summary_file
+        }
+    
     def run_complete_validation(self) -> Dict[str, str]:
         """
         Run complete validation pipeline for both ImageNette classification and noise detection models.
@@ -760,8 +1057,17 @@ if __name__ == "__main__":
         print(f"\n📊 Noise Detection Summary file:")
         print(f"   📄 {noise_files['noise_detection_summary_csv']}")
     
-    # ===== Complete Validation (Both Types) =====
-    # Run complete validation for both ImageNette and noise detection
+    # ===== Adversarial Models Validation =====
+    # Example: Validate adversarial models
+    # from attacks.attack_names import AttackNames
+    # attack_names = ['FGSM', 'PGD', 'BIM', 'DeepFool']
+    # adv_files = validator.run_adversarial_validation(
+    #     attack_names=attack_names,
+    #     batch_size=32
+    # )
+    
+    # ===== Complete Validation (All Types) =====
+    # Run complete validation for ImageNette, noise detection, and adversarial models
     # all_files = validator.run_complete_validation()
     
     # ===== Individual Model Validation Examples =====
@@ -772,6 +1078,10 @@ if __name__ == "__main__":
     # Example: Validate specific noise detection model
     # result = validator.validate_noise_detection_model('resnet18')
     # print(f"ResNet18 noise detector F1: {result['f1']:.2f}%")
+    
+    # Example: Validate specific adversarial model
+    # result = validator.validate_adversarial_model('resnet18', ['FGSM', 'PGD'])
+    # print(f"ResNet18 adversarial: Clean={result['clean_accuracy']:.2f}%, Adv={result['adversarial_accuracy']:.2f}%")
     
     # ===== Check Available Models =====
     # Example: Get available trained ImageNette models

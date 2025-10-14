@@ -355,3 +355,156 @@ def load_attacked_imagenette(
     print("✅ Binary classification dataloaders created successfully!")
     
     return train_loader, test_loader
+
+
+def load_attacked_imagenette_for_adversarial_training(
+    attacked_images_folder: str = "data/attacks/imagenette_models",
+    clean_images_folder: str = "./data/imagenette/train",
+    batch_size: int = 32,
+    shuffle: bool = True,
+    transform=None,
+    train_dataset: bool = True
+):
+    """
+    Load attacked and clean ImageNette images for adversarial training.
+    
+    This creates a mixed dataset of adversarial and clean images for robust model training.
+    Unlike noise detection (binary classification), this maintains original ImageNette class labels (0-9).
+    
+    Folder structure expected:
+        attacked_images_folder/
+            train/ or test/
+                model_name/
+                    attack_name/
+                        class_label/
+                            timestamp.png (adversarial)
+    
+    Args:
+        attacked_images_folder: Root folder containing attacked images with train/test subfolders
+        clean_images_folder: Folder containing clean ImageNette images  
+        batch_size: Batch size for dataloader
+        shuffle: Whether to shuffle the data
+        transform: Image transformation to apply (default: imagenette_transformer)
+        train_dataset: If True, load from train folder; if False, load from test folder
+        
+    Returns:
+        DataLoader with mixed adversarial and clean images (ImageNette class labels 0-9 preserved)
+    """
+    from PIL import Image
+    
+    dataset_type = "train" if train_dataset else "test"
+    print(f"📁 Loading attacked ImageNette for adversarial training ({dataset_type})...")
+    print(f"   Attacked images folder: {attacked_images_folder}/{dataset_type}")
+    print(f"   Clean images folder: {clean_images_folder}")
+    
+    trans = transform if transform is not None else imagenette_transformer()
+    
+    # Load adversarial images with labels from folder structure
+    attacked_folder = os.path.join(attacked_images_folder, dataset_type)
+    if not os.path.exists(attacked_folder):
+        raise FileNotFoundError(f"Attacked images folder not found: {attacked_folder}")
+    
+    print(f"🔍 Loading adversarial images with class labels...")
+    # Use ImageFolder to automatically get labels from directory structure
+    # Note: We need a modified loader that gets labels from the innermost class folder
+    adversarial_dataset = _load_adversarial_with_labels(attacked_folder, trans)
+    
+    print(f"✅ Loaded {len(adversarial_dataset)} adversarial images")
+    
+    # Load clean images
+    print(f"📁 Loading clean ImageNette images...")
+    clean_dataset = datasets.ImageFolder(root=clean_images_folder, transform=trans)
+    
+    # Sample clean images to match adversarial count (1:1 ratio for balanced training)
+    num_clean = len(adversarial_dataset)
+    
+    if len(clean_dataset) < num_clean:
+        print(f"⚠️ Warning: Not enough clean images. Need {num_clean}, have {len(clean_dataset)}")
+        num_clean = len(clean_dataset)
+    
+    import random
+    random.seed(42)
+    clean_indices = random.sample(range(len(clean_dataset)), num_clean)
+    
+    print(f"✅ Sampled {num_clean} clean images")
+    
+    # Create combined dataset
+    from torch.utils.data import ConcatDataset, Subset
+    clean_subset = Subset(clean_dataset, clean_indices)
+    combined_dataset = ConcatDataset([adversarial_dataset, clean_subset])
+    
+    print(f"📊 Dataset Summary:")
+    print(f"   Total: {len(combined_dataset)} images ({len(adversarial_dataset)} adv + {num_clean} clean)")
+    print(f"   Ratio: 1:1 (adversarial:clean)")
+    print(f"   Labels: ImageNette classes (0-9)")
+    
+    # Create dataloader
+    dataloader = DataLoader(combined_dataset, batch_size=batch_size, shuffle=shuffle)
+    
+    print("✅ Adversarial training dataloader created successfully!")
+    
+    return dataloader
+
+
+def _load_adversarial_with_labels(folder_path: str, transform=None):
+    """
+    Load adversarial images with their class labels from folder structure.
+    
+    Args:
+        folder_path: Path to folder containing model/attack/class structure
+        transform: Transform to apply to images
+        
+    Returns:
+        Dataset with (image, label) pairs
+    """
+    from PIL import Image
+    from torch.utils.data import Dataset
+    
+    class AdversarialDataset(Dataset):
+        def __init__(self, samples, transform=None):
+            self.samples = samples
+            self.transform = transform
+        
+        def __len__(self):
+            return len(self.samples)
+        
+        def __getitem__(self, idx):
+            img_path, label = self.samples[idx]
+            image = Image.open(img_path).convert('RGB')
+            if self.transform:
+                image = self.transform(image)
+            return image, label
+    
+    samples = []
+    
+    # Get all model folders
+    model_folders = [d for d in os.listdir(folder_path) 
+                    if os.path.isdir(os.path.join(folder_path, d))]
+    
+    for model_folder in model_folders:
+        model_path = os.path.join(folder_path, model_folder)
+        
+        # Get all attack folders for this model
+        attack_folders = [d for d in os.listdir(model_path) 
+                         if os.path.isdir(os.path.join(model_path, d))]
+        
+        for attack_folder in attack_folders:
+            attack_path = os.path.join(model_path, attack_folder)
+            
+            # Get all class folders (these are the class labels)
+            class_folders = [d for d in os.listdir(attack_path) 
+                           if os.path.isdir(os.path.join(attack_path, d))]
+            
+            for class_folder in class_folders:
+                class_path = os.path.join(attack_path, class_folder)
+                class_label = int(class_folder)  # Folder name is the class label
+                
+                # Get all adversarial images (skip src_ images)
+                image_files = [f for f in os.listdir(class_path) 
+                             if f.endswith('.png') and not f.startswith('src_')]
+                
+                for image_file in image_files:
+                    image_path = os.path.join(class_path, image_file)
+                    samples.append((image_path, class_label))
+    
+    return AdversarialDataset(samples, transform)
