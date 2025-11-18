@@ -709,10 +709,7 @@ class ImageNetteValidator:
         self,
         model_name: str,
         attack_names: List[str],
-        batch_size: int = 32,
-        attack_epsilon: float = 0.03,
-        attack_alpha: float = 0.01,
-        attack_steps: int = 10
+        batch_size: int = 32
     ) -> Dict:
         """
         Validate a trained adversarial model on clean and adversarial test sets.
@@ -721,9 +718,6 @@ class ImageNetteValidator:
             model_name: Name of the adversarial model to validate
             attack_names: List of attack names to test robustness
             batch_size: Batch size for validation
-            attack_epsilon: Maximum perturbation for attacks
-            attack_alpha: Step size for iterative attacks
-            attack_steps: Number of steps for iterative attacks
             
         Returns:
             dict: Validation results including clean and adversarial accuracy
@@ -788,12 +782,9 @@ class ImageNetteValidator:
                     images, labels = images.to(self.device), labels.to(self.device)
                     
                     # Generate adversarial examples
-                    attack = AttackFactory.create_attack(
+                    attack = AttackFactory.get_attack(
                         attack_name=attack_name,
-                        model=model,
-                        eps=attack_epsilon,
-                        alpha=attack_alpha,
-                        steps=attack_steps
+                        model=model
                     )
                     
                     with torch.enable_grad():

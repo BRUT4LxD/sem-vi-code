@@ -1,0 +1,2 @@
+model_name,training_mode,total_epochs,best_val_accuracy,best_epoch,final_train_loss,final_train_accuracy,final_val_accuracy,total_training_time,total_params,trainable_params,device
+resnet18,onthefly,13,95.0828025477707,6,0.9394260506976295,72.76375541239835,94.95541401273886,63570.632209,11181642,8398858,cuda

@@ -154,8 +154,7 @@ class Training:
             print(f"🚀 Training on device: {device}")
         
         # Setup model name
-        if model_name is None:
-            model_name = model.__class__.__name__
+        model_name = model.__class__.__name__
         
         # Setup TensorBoard logging
         if writer is None and verbose:
@@ -522,8 +521,7 @@ class Training:
             print(f"Device: {device}")
         
         # Setup model name
-        if model_name is None:
-            model_name = model.__class__.__name__
+        model_name = model.__class__.__name__
         
         # Setup TensorBoard logging
         if writer is None:
@@ -805,9 +803,7 @@ class Training:
         num_epochs: int = 20,
         device: str = 'cuda',
         save_model_path: str = None,
-        model_name: str = None,
         writer: SummaryWriter = None,
-        setup_model: bool = True,
         validation_frequency: int = 1,
         early_stopping_patience: int = 7,
         min_delta: float = 0.001,
@@ -815,9 +811,6 @@ class Training:
         scheduler_params: dict = None,
         gradient_clip_norm: float = None,
         weight_decay: float = 0.0,
-        attack_epsilon: float = 0.03,
-        attack_alpha: float = 0.01,
-        attack_steps: int = 10,
         adversarial_ratio: float = 0.5,
         use_preattacked_images: bool = False,
         verbose: bool = True) -> dict:
@@ -837,9 +830,7 @@ class Training:
             num_epochs: Number of training epochs
             device: Device to train on ('cuda' or 'cpu')
             save_model_path: Path to save the trained model
-            model_name: Name of the model for logging
             writer: TensorBoard writer for logging
-            setup_model: Whether to setup model for ImageNette (10 classes)
             validation_frequency: How often to run validation (every N epochs)
             early_stopping_patience: Number of epochs without improvement before stopping
             min_delta: Minimum change to qualify as improvement
@@ -847,9 +838,6 @@ class Training:
             scheduler_params: Parameters for the scheduler
             gradient_clip_norm: Gradient clipping norm (None to disable)
             weight_decay: L2 regularization weight
-            attack_epsilon: Maximum perturbation for on-the-fly attacks
-            attack_alpha: Step size for iterative on-the-fly attacks
-            attack_steps: Number of steps for iterative on-the-fly attacks
             adversarial_ratio: Ratio of adversarial to clean examples for on-the-fly mode (0.5 = 50/50)
             use_preattacked_images: If True, use pre-attacked images from train_loader
             verbose: Whether to print training progress
@@ -884,10 +872,7 @@ class Training:
             print(f"{'='*70}")
             print(f"Device: {device}")
         
-        # Setup model name
-        if model_name is None:
-            model_name = model.__class__.__name__
-        
+        model_name = model.__class__.__name__
         # Setup TensorBoard logging
         if writer is None:
             date = datetime.now().strftime("%d-%m-%Y_%H-%M")
@@ -895,17 +880,6 @@ class Training:
             writer = SummaryWriter(log_dir=log_dir)
             if verbose:
                 print(f"📊 TensorBoard logging to: {log_dir}")
-        
-        # Setup model for ImageNette if requested
-        if setup_model:
-            if verbose:
-                print(f"⚙️ Setting up {model_name} for ImageNette training...")
-            try:
-                model = SetupPretraining.setup_imagenette(model)
-                if verbose:
-                    print(f"✅ Model setup complete - ready for ImageNette (10 classes)")
-            except Exception as e:
-                raise RuntimeError(f"Failed to setup model for ImageNette: {str(e)}")
         
         # Move model to device
         model = model.to(device)
@@ -950,7 +924,6 @@ class Training:
             if not use_preattacked_images:
                 print(f"   Attacks: {', '.join(attack_names)}")
                 print(f"   Adversarial Ratio: {adversarial_ratio:.1%}")
-                print(f"   Attack Epsilon: {attack_epsilon}")
             print(f"   Scheduler: {scheduler_type}")
             print(f"   Early Stopping: {early_stopping_patience} epochs")
         
@@ -964,15 +937,13 @@ class Training:
             if use_preattacked_images:
                 # Train on pre-attacked images
                 train_metrics = Training._train_preattacked_epoch(
-                    model, train_loader, criterion, optimizer, device,
-                    gradient_clip_norm, verbose, epoch, num_epochs
+                    model, train_loader, criterion, optimizer, device, verbose, epoch, num_epochs
                 )
             else:
                 # Train with on-the-fly adversarial generation
                 train_metrics = Training._train_adversarial_epoch(
                     model, train_loader, attack_names, criterion, optimizer, device,
-                    adversarial_ratio, attack_epsilon, attack_alpha, attack_steps,
-                    gradient_clip_norm, verbose, epoch, num_epochs
+                    adversarial_ratio, verbose, epoch, num_epochs
                 )
             
             # Validation phase (if test_loader provided)
@@ -1137,8 +1108,7 @@ class Training:
         print(f"💾 Training summary saved to: {summary_path}")
     
     @staticmethod
-    def _train_preattacked_epoch(model, train_loader, criterion, optimizer, device,
-                                  gradient_clip_norm, verbose, epoch, num_epochs):
+    def _train_preattacked_epoch(model, train_loader, criterion, optimizer, device, verbose, epoch, num_epochs):
         """Train one epoch with pre-attacked images (standard training on adversarial dataset)."""
         model.train()
         total_loss = 0.0
@@ -1158,10 +1128,6 @@ class Training:
             
             # Backward pass
             loss.backward()
-            
-            # Gradient clipping
-            if gradient_clip_norm is not None:
-                torch.nn.utils.clip_grad_norm_(model.parameters(), gradient_clip_norm)
             
             optimizer.step()
             
@@ -1220,8 +1186,7 @@ class Training:
     
     @staticmethod
     def _train_adversarial_epoch(model, train_loader, attack_names, criterion, optimizer, device,
-                                  adversarial_ratio, attack_epsilon, attack_alpha, attack_steps,
-                                  gradient_clip_norm, verbose, epoch, num_epochs):
+                                  adversarial_ratio, verbose, epoch, num_epochs):
         """Train one epoch with adversarial examples."""
         model.train()
         total_loss = 0.0
@@ -1249,13 +1214,7 @@ class Training:
                 attack_name = random.choice(attack_names)
                 
                 # Create attack
-                attack = AttackFactory.create_attack(
-                    attack_name=attack_name,
-                    model=model,
-                    eps=attack_epsilon,
-                    alpha=attack_alpha,
-                    steps=attack_steps
-                )
+                attack = AttackFactory.get_attack(attack_name=attack_name, model=model)
                 
                 # Generate adversarial examples
                 model.eval()
@@ -1281,10 +1240,6 @@ class Training:
             
             # Backward pass
             loss.backward()
-            
-            # Gradient clipping
-            if gradient_clip_norm is not None:
-                torch.nn.utils.clip_grad_norm_(model.parameters(), gradient_clip_norm)
             
             optimizer.step()
             

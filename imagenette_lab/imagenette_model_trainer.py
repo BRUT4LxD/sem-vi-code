@@ -19,7 +19,7 @@ import torch
 import os
 import sys
 from datetime import datetime
-from typing import List, Dict, Optional, Literal
+from typing import List, Dict, Optional, Literal, Tuple
 
 from domain.model.model_names import ModelNames
 
@@ -643,15 +643,12 @@ class ImageNetteModelTrainer:
     
     def train_adversarial_model(
         self,
-        model_name: str,
+        model: torch.nn.Module = None,
         attack_names: List[str] = None,
         learning_rate: float = 0.001,
         num_epochs: int = 20,
         batch_size: int = 32,
         adversarial_ratio: float = 0.5,
-        attack_epsilon: float = 0.03,
-        attack_alpha: float = 0.01,
-        attack_steps: int = 10,
         early_stopping_patience: int = 7,
         scheduler_type: str = 'step',
         weight_decay: float = 0.0001,
@@ -669,15 +666,12 @@ class ImageNetteModelTrainer:
         2. Pre-attacked: Use pre-generated adversarial images from disk
         
         Args:
-            model_name: Name of the model architecture to use
+            model: Model to train
             attack_names: List of attacks for on-the-fly mode (required if use_preattacked_images=False)
             learning_rate: Learning rate for optimizer
             num_epochs: Number of training epochs
             batch_size: Batch size for training
             adversarial_ratio: Ratio of adversarial to clean examples for on-the-fly mode (0.5 = 50/50)
-            attack_epsilon: Maximum perturbation for on-the-fly attacks
-            attack_alpha: Step size for iterative on-the-fly attacks
-            attack_steps: Number of steps for iterative on-the-fly attacks
             early_stopping_patience: Epochs to wait before early stopping
             scheduler_type: Learning rate scheduler type ('step', 'plateau', 'cosine')
             weight_decay: L2 regularization weight
@@ -690,15 +684,14 @@ class ImageNetteModelTrainer:
         Returns:
             dict: Training results including model, metrics, and metadata
         """
+
+        model_name = model.__class__.__name__
+
         print(f"\n{'='*70}")
         print(f"🛡️ Adversarial Training: {model_name}")
         print(f"{'='*70}")
         
         try:
-            # Validate model name
-            if model_name not in self.AVAILABLE_MODELS:
-                available_models = ', '.join(self.AVAILABLE_MODELS)
-                raise ValueError(f"Model '{model_name}' not available. Available models: {available_models}")
             
             # Validate attack names (only for on-the-fly mode)
             if not use_preattacked_images:
@@ -716,14 +709,10 @@ class ImageNetteModelTrainer:
             if not use_preattacked_images:
                 print(f"   Attacks: {', '.join(attack_names)}")
                 print(f"   Adversarial ratio: {adversarial_ratio:.1%}")
-                print(f"   Attack epsilon: {attack_epsilon}")
             print(f"   Learning Rate: {learning_rate}")
             print(f"   Epochs: {num_epochs}")
             print(f"   Batch size: {batch_size}")
             
-            # Create fresh model instance
-            print(f"\n🔧 Creating {model_name} model instance...")
-            model = ImageNetModels.get_model(model_name)
             
             # Load dataset based on mode
             print(f"\n📁 Loading dataset...")
@@ -768,9 +757,7 @@ class ImageNetteModelTrainer:
                 num_epochs=num_epochs,
                 device=str(self.device),
                 save_model_path=save_path,
-                model_name=model_name,
                 writer=None,  # Will be created automatically
-                setup_model=True,  # Automatically setup for ImageNette
                 validation_frequency=1,
                 early_stopping_patience=early_stopping_patience,
                 min_delta=0.001,
@@ -778,9 +765,6 @@ class ImageNetteModelTrainer:
                 scheduler_params=None,
                 gradient_clip_norm=gradient_clip_norm,
                 weight_decay=weight_decay,
-                attack_epsilon=attack_epsilon,
-                attack_alpha=attack_alpha,
-                attack_steps=attack_steps,
                 adversarial_ratio=adversarial_ratio,
                 use_preattacked_images=use_preattacked_images,
                 verbose=verbose
@@ -822,7 +806,7 @@ class ImageNetteModelTrainer:
     
     def train_multiple_adversarial_models(
         self,
-        model_names: List[str],
+        models: List[torch.nn.Module],
         attack_names: List[str] = None,
         learning_rate: float = 0.001,
         num_epochs: int = 20,
@@ -835,7 +819,7 @@ class ImageNetteModelTrainer:
         Train multiple models using adversarial training.
         
         Args:
-            model_names: List of model names to train
+            models: List of preloaded ImageNette models to train adversarially
             attack_names: List of attacks for on-the-fly mode (required if use_preattacked_images=False)
             learning_rate: Learning rate for all models
             num_epochs: Number of training epochs
@@ -850,7 +834,7 @@ class ImageNetteModelTrainer:
         print(f"\n{'='*70}")
         print(f"🚀 Training Multiple Adversarial Models")
         print(f"{'='*70}")
-        print(f"   Models: {len(model_names)}")
+        print(f"   Models: {len(models)}")
         print(f"   Mode: {'Pre-attacked Images' if use_preattacked_images else 'On-the-fly Generation'}")
         if not use_preattacked_images:
             print(f"   Attacks: {', '.join(attack_names)}")
@@ -859,11 +843,12 @@ class ImageNetteModelTrainer:
         
         results = []
         
-        for i, model_name in enumerate(model_names, 1):
-            print(f"\n📊 Model {i}/{len(model_names)}: {model_name}")
+        for i, model in enumerate(models, 1):
+            model_name = model.__class__.__name__
+            print(f"\n📊 Model {i}/{len(models)}: {model_name}")
             
             result = self.train_adversarial_model(
-                model_name=model_name,
+                model=model,
                 attack_names=attack_names,
                 learning_rate=learning_rate,
                 num_epochs=num_epochs,
@@ -901,11 +886,6 @@ class ImageNetteModelTrainer:
 if __name__ == "__main__":
     # Example usage
     trainer = ImageNetteModelTrainer()
-    
-    # Show available options
-    trainer.list_available_models()
-    trainer.list_available_configs()
-    trainer.list_imagenette_classes()
     
     # ===== ImageNette Classification Examples =====
     # Example: Train and validate a model using strongly typed config names
@@ -987,18 +967,32 @@ if __name__ == "__main__":
     # )
     # 
     # # Pre-attacked images mode
-    model_names = [
-        ModelNames().resnet18,
-        ModelNames().vgg16,
-        ModelNames().densenet121,
-        ModelNames().mobilenet_v2,
-        ModelNames().efficientnet_b0
-    ]
-    results = trainer.train_multiple_adversarial_models(
-        model_names=model_names,
+    trained_models_base_path = "./models/imagenette"
+    
+    # local function that produces the path from model name
+    def get_model_path(model_name: str) -> str:
+        return f"{trained_models_base_path}/{model_name}_advanced.pt"
+
+    resnet = load_model_imagenette(get_model_path(ModelNames().resnet18));
+    model = resnet['model']
+
+    attack_names = AttackNames().all_attack_names
+
+    results = trainer.train_adversarial_model(
+        model=model,
+        attack_names=attack_names,
         learning_rate=0.001,
         num_epochs=20,
         batch_size=64,
         use_preattacked_images=False,
-        attacked_images_folder='data/attacks/imagenette_models'
     )
+
+    # results = trainer.train_multiple_adversarial_models(
+    #     models=models,
+    #     attack_names=attack_names,
+    #     learning_rate=0.001,
+    #     num_epochs=20,
+    #     batch_size=64,
+    #     use_preattacked_images=False,
+    #     attacked_images_folder='data/attacks/imagenette_models'
+    # )
