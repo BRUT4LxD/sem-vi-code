@@ -3,9 +3,9 @@
 ImageNette Model Trainer - facade for standard, noise-detection, and adversarial training.
 """
 
-from imagenette_lab.imagenette_adversarial_trainer import ImageNetteAdversarialTrainer
-from imagenette_lab.imagenette_noise_detection_trainer import ImageNetteNoiseDetectionTrainer
-from imagenette_lab.imagenette_standard_trainer import ImageNetteStandardTrainer
+from imagenette_adversarial_trainer import ImageNetteAdversarialTrainer
+from imagenette_noise_detection_trainer import ImageNetteNoiseDetectionTrainer
+from imagenette_standard_trainer import ImageNetteStandardTrainer
 
 
 class ImageNetteModelTrainer(
