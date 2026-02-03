@@ -109,8 +109,10 @@ if result['success']:
 ## Dataset Details
 
 ### Data Sources
+
 - **Adversarial Images**: From `data/attacks/imagenette_models/`
-  - Generated using `attack_and_save_images_multiple()` from `imagenette_direct_attacks.py`
+- Generated using `attack_and_save_images_multiple()` from `imagenette_adv_imgs_generator.py`
+
   - Organized in `train/` and `test/` folders
   - Combines images from **all models** and **all attacks**
   - Skips `src_` prefixed images (clean source images)
@@ -121,7 +123,9 @@ if result['success']:
   - Original ImageNette validation set
 
 ### Dataset Splits
+
 - **Training Set**:
+
   - Adversarial images (label=1): All images from `train` folder
   - Clean images (label=0): **2x** the number of adversarial images (from train folder)
   - Ratio: 2:1 (clean:adversarial)
@@ -132,12 +136,14 @@ if result['success']:
   - Ratio: **50:50** (balanced - adversarial count is automatically adjusted to match clean count)
 
 ### Labels
+
 - **0 = Clean Image** (not attacked)
 - **1 = Adversarial Image** (attacked)
 
 ## Training Parameters
 
 ### Default Parameters
+
 ```python
 attacked_images_folder = "data/attacks/imagenette_models"
 clean_train_folder = "./data/imagenette/train"
@@ -154,6 +160,7 @@ gradient_clip_norm = 1.0
 ### Recommended Configurations
 
 #### Fast Training (Testing)
+
 ```python
 result = trainer.train_noise_detection_model(
     model_name='resnet18',
@@ -165,6 +172,7 @@ result = trainer.train_noise_detection_model(
 ```
 
 #### Balanced Training (Recommended)
+
 ```python
 result = trainer.train_noise_detection_model(
     model_name='resnet18',
@@ -176,6 +184,7 @@ result = trainer.train_noise_detection_model(
 ```
 
 #### High Accuracy Training
+
 ```python
 result = trainer.train_noise_detection_model(
     model_name='efficientnet_b0',
@@ -191,9 +200,11 @@ result = trainer.train_noise_detection_model(
 ## Output Structure
 
 ### Saved Models
+
 Models are saved to: `./models/noise_detection/{model_name}_noise_detector.pt`
 
 ### Checkpoint Contents
+
 ```python
 checkpoint = {
     'model_state_dict': model.state_dict(),
@@ -219,6 +230,7 @@ checkpoint = {
 ```
 
 ### Training Results Dictionary
+
 ```python
 result = {
     'model_name': 'resnet18',
@@ -237,19 +249,23 @@ result = {
 ## Metrics Explained
 
 ### Confusion Matrix
+
 - **True Positives (TP)**: Adversarial images correctly detected
 - **False Positives (FP)**: Clean images incorrectly flagged as adversarial
 - **True Negatives (TN)**: Clean images correctly identified
 - **False Negatives (FN)**: Adversarial images missed
 
 ### Key Metrics
+
 - **Accuracy**: Overall correctness = (TP + TN) / Total
 - **Precision**: When we predict adversarial, how often correct = TP / (TP + FP)
 - **Recall**: Of all adversarial images, how many detected = TP / (TP + FN)
-- **F1 Score**: Harmonic mean of precision and recall = 2 * (P * R) / (P + R)
+- **F1 Score**: Harmonic mean of precision and recall = 2 _ (P _ R) / (P + R)
 
 ### Why F1 Matters
+
 For noise detection, F1 is often more important than accuracy because:
+
 - High precision: Minimizes false alarms
 - High recall: Catches most adversarial examples
 - F1 balances both concerns
@@ -287,14 +303,14 @@ if training_result['success']:
     print(f"   Accuracy: {training_result['best_val_accuracy']:.2f}%")
     print(f"   F1 Score: {training_result['best_f1']:.2f}%")
     print(f"   Saved to: {training_result['save_path']}")
-    
+
     # Step 4: Validate the trained model
     validation_result = trainer.validate_noise_detector(
         model_path=training_result['save_path'],
         attacked_images_folder='data/attacks/imagenette_models',
         batch_size=32
     )
-    
+
     if validation_result['success']:
         metrics = validation_result['evaluation_metrics']
         print(f"\n📊 Validation Metrics:")
@@ -316,6 +332,7 @@ tensorboard --logdir=runs/binary_training
 ```
 
 **Logged Metrics:**
+
 - Train/Validation Loss
 - Train/Validation Accuracy
 - Precision, Recall, F1 Score
@@ -342,24 +359,31 @@ runs/
 ## Troubleshooting
 
 ### Issue: Not enough clean images
+
 **Solution**: Reduce the number of adversarial images or use a different clean dataset
 
 ### Issue: Low accuracy
+
 **Solutions**:
+
 - Increase number of epochs
 - Adjust learning rate (try 0.0001 or 0.01)
 - Increase weight_decay for regularization
 - Use gradient clipping (gradient_clip_norm=1.0)
 
 ### Issue: Overfitting
+
 **Solutions**:
+
 - Increase weight_decay (try 0.001)
 - Reduce num_epochs
 - Increase early_stopping_patience
 - Use data augmentation in transforms
 
 ### Issue: Training too slow
+
 **Solutions**:
+
 - Increase batch_size (if GPU memory allows)
 - Reduce number of models/attacks in dataset
 - Use fewer epochs for initial testing
@@ -367,6 +391,7 @@ runs/
 ## Advanced Usage
 
 ### Custom Transform
+
 ```python
 from torchvision import transforms
 
@@ -383,6 +408,7 @@ train_loader, test_loader = load_attacked_imagenette(
 ```
 
 ### Using Trained Model for Inference
+
 ```python
 from data_eng.io import load_model_binary
 import torch
@@ -418,6 +444,7 @@ print(f"Is adversarial: {is_adversarial}")
 ## Expected Results
 
 Based on typical adversarial detection tasks:
+
 - **Accuracy**: 85-95%
 - **Precision**: 80-95%
 - **Recall**: 85-98%
@@ -428,11 +455,11 @@ Higher scores indicate better adversarial detection capability.
 ## Summary
 
 **Complete Workflow:**
-1. Generate adversarial images → `attack_and_save_images_multiple()`
+
+1. Generate adversarial images → `attack_and_save_images_multiple()` from `imagenette_adv_imgs_generator.py`
 2. Load dataset → `load_attacked_imagenette()`
 3. Train detector → `trainer.train_noise_detection_model()`
 4. Validate → `trainer.validate_noise_detector()`
 5. Deploy → Use trained model for inference
 
 Your noise detection system is ready for production! 🎯
-

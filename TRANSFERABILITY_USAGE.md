@@ -49,16 +49,19 @@ for result in results:
 ## Test Scripts
 
 ### Quick Test
+
 ```bash
 python quick_test_transferability.py
 ```
 
 ### Comprehensive Test Suite
+
 ```bash
 python test_transferability_attacks.py
 ```
 
 ### Interactive Examples
+
 ```bash
 jupyter notebook transferability_examples.ipynb
 ```
@@ -66,10 +69,11 @@ jupyter notebook transferability_examples.ipynb
 ## Parameters
 
 ### `model_names`
+
 - **Type**: List[str]
 - **Description**: List of model names to test
 - **Example**: `[ModelNames().resnet18, ModelNames().densenet121]`
-- **Available Models**: 
+- **Available Models**:
   - `ModelNames().resnet18`
   - `ModelNames().densenet121`
   - `ModelNames().mobilenet_v2`
@@ -78,6 +82,7 @@ jupyter notebook transferability_examples.ipynb
   - And more...
 
 ### `attack_names`
+
 - **Type**: List[str]
 - **Description**: List of attack names to test
 - **Example**: `[AttackNames().FGSM, AttackNames().PGD]`
@@ -90,18 +95,21 @@ jupyter notebook transferability_examples.ipynb
   - And more...
 
 ### `images_per_attack`
+
 - **Type**: int
 - **Description**: Number of successful adversarial examples to generate per attack
 - **Default**: 100
 - **Note**: Only successful attacks (that fool the source model) are counted
 
 ### `batch_size`
+
 - **Type**: int
 - **Description**: Batch size for processing images
 - **Default**: 1
 - **Recommendation**: Use 1-4 depending on GPU memory
 
 ### `results_folder`
+
 - **Type**: str
 - **Description**: Folder to save CSV results and failure logs
 - **Default**: "results/transferability"
@@ -109,15 +117,18 @@ jupyter notebook transferability_examples.ipynb
 ## Output Files
 
 ### CSV Results
+
 - `model2model_transferability_in_memory.csv`
 - `attack2model_transferability_in_memory.csv`
 
 ### Failure Logs
+
 - `failure_logs/failure_log_[details]_[timestamp].txt`
 
 ## Understanding Results
 
 ### TransferabilityResult Object
+
 ```python
 result.source_model        # Source model name
 result.target_model        # Target model name
@@ -130,6 +141,7 @@ result.source_success_rate # source_success / total_images
 ```
 
 ### Key Metrics
+
 - **Transfer Rate**: Percentage of successful attacks that also fool the target model
 - **Source Success Rate**: Percentage of attacks that successfully fool the source model
 - **Transfer Success**: Absolute number of successful transfers
@@ -137,6 +149,7 @@ result.source_success_rate # source_success / total_images
 ## Examples
 
 ### Example 1: Minimal Test
+
 ```python
 # Test with minimal setup
 results = imagenette_transferability_model2model_in_memory(
@@ -149,6 +162,7 @@ results = imagenette_transferability_model2model_in_memory(
 ```
 
 ### Example 2: Comprehensive Analysis
+
 ```python
 # Test with multiple models and attacks
 model_names = [
@@ -175,6 +189,7 @@ results = imagenette_transferability_model2model_in_memory(
 ```
 
 ### Example 3: Custom Analysis
+
 ```python
 # Custom model and attack selection
 custom_models = [ModelNames().resnet18, ModelNames().efficientnet_b0]
@@ -194,11 +209,13 @@ results = imagenette_transferability_attack2model_in_memory(
 ### Common Issues
 
 1. **CUDA Out of Memory**
+
    - Reduce `batch_size` to 1
    - Reduce `images_per_attack`
    - Use fewer models/attacks
 
 2. **No Results Generated**
+
    - Check if models exist in `models/imagenette/`
    - Verify attack names are correct
    - Check failure logs in `results_folder/failure_logs/`
@@ -209,6 +226,7 @@ results = imagenette_transferability_attack2model_in_memory(
    - Consider using file-based methods for large-scale analysis
 
 ### Debug Mode
+
 ```python
 # Use minimal parameters for debugging
 results = imagenette_transferability_model2model_in_memory(
@@ -247,4 +265,4 @@ results = imagenette_transferability_model2model_from_files(
 )
 ```
 
-This is useful when you have already generated and saved adversarial examples using `imagenette_direct_attacks.py`.
+This is useful when you have already generated and saved adversarial examples using `imagenette_adv_imgs_generator.py`.
