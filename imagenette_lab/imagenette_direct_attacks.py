@@ -56,7 +56,6 @@ def attack_images_imagenette(attack: Attack, data_loader: DataLoader, successful
 
         outputs = model(images)
         _, predictions = torch.max(outputs, 1)
-        
         # Calculate clean accuracy
         clean_total += labels.size(0)
         clean_correct += (predictions == labels).sum().item()
