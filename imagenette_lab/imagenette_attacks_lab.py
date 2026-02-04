@@ -7,15 +7,15 @@ from imagenette_lab.imagenette_direct_attacks import ImageNetteDirectAttacks
 if __name__ == "__main__":
     model_names = [
         ModelNames().resnet18,
-        # ModelNames().vgg16,
-        # ModelNames().densenet121,
-        # ModelNames().mobilenet_v2,
-        # ModelNames().efficientnet_b0
+        ModelNames().vgg16,
+        ModelNames().densenet121,
+        ModelNames().mobilenet_v2,
+        ModelNames().efficientnet_b0
     ]
 
     # attack_names = AttackNames().all_attack_names
-    attack_names = [AttackNames.FGSM]
-    _, test_loader = load_imagenette(batch_size=16, test_subset_size=-1)
+    attack_names = [AttackNames.OnePixel]
+    _, test_loader = load_imagenette(batch_size=3, test_subset_size=6)
     direct_attacks = ImageNetteDirectAttacks(device='auto')
     results = direct_attacks.run_attacks_on_models(
       model_names=model_names,

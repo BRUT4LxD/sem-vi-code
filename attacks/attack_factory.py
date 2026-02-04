@@ -78,6 +78,10 @@ class AttackFactory:
       from attacks.white_box.nifgsm import NIFGSM
       return NIFGSM(model)
 
+    if attack_name == AttackNames.OnePixel:
+      from attacks.white_box.onepixel import OnePixel
+      return OnePixel(model)
+      
     if attack_name == AttackNames.PGD:
       from attacks.white_box.pgd import PGD
       return PGD(model)

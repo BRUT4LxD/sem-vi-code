@@ -170,12 +170,12 @@ class ImageNetteDirectAttacks:
                         result_dict['rec'] = ev.rec
                         result_dict['f1'] = ev.f1
 
-                        distance_score = result_dict.pop('distance_score', {})
-                        result_dict['l0_pixels'] = distance_score.get('l0_pixels', 0)
-                        result_dict['l1'] = distance_score.get('l1', 0)
-                        result_dict['l2'] = distance_score.get('l2', 0)
-                        result_dict['linf'] = distance_score.get('linf', 0)
-                        result_dict['power_mse'] = distance_score.get('power_mse', 0)
+                        distance_score = ev.distance_score
+                        result_dict['l0_pixels'] = distance_score.l0_pixels
+                        result_dict['l1'] = distance_score.l1
+                        result_dict['l2'] = distance_score.l2
+                        result_dict['linf'] = distance_score.linf
+                        result_dict['power_mse'] = distance_score.power_mse
 
                         # Add accuracy drop metrics
                         result_dict['clean_accuracy'] = ev.clean_accuracy

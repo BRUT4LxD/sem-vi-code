@@ -20,6 +20,7 @@ class AttackNames():
   JSMA = "JSMA"
   MIFGSM = "MIFGSM"
   NIFGSM = "NIFGSM"
+  OnePixel = "OnePixel"
   PGD = "PGD"
   PGDL2 = "PGDL2"
   PGDRS = "PGDRS"
@@ -66,6 +67,7 @@ class AttackNames():
        
         self.MIFGSM,
         self.NIFGSM,
+        self.OnePixel,
         self.PGD,
         self.PGDL2,
         self.PGDRS,
