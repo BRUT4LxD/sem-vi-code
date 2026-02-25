@@ -6,10 +6,10 @@ from imagenette_lab.imagenette_direct_attacks import ImageNetteDirectAttacks
 
 if __name__ == "__main__":
     model_names = [
-        # ModelNames().resnet18,
-        # ModelNames().vgg16,
-        # ModelNames().densenet121,
-        # ModelNames().mobilenet_v2,
+        ModelNames().resnet18,
+        ModelNames().vgg16,
+        ModelNames().densenet121,
+        ModelNames().mobilenet_v2,
         ModelNames().efficientnet_b0
     ]
 
