@@ -252,12 +252,13 @@ class Metrics:
                              clean_accuracy: Optional[float] = None) -> AttackEvaluationScore:
         """
         Evaluate attack effectiveness by measuring model performance on adversarial examples.
-        
+
         Args:
             attack_results: List of attack results
             num_classes: Number of classes
-            clean_accuracy: Optional clean accuracy for effectiveness metrics (0-1)
-            
+            clean_accuracy: Optional clean accuracy for effectiveness metrics.
+                Accepts either 0-1 (ratio) or 0-100 (percentage); values > 1 are normalized to 0-1.
+
         Returns:
             AttackEvaluationScore: Comprehensive attack evaluation with optional effectiveness metrics.
             Core metrics (acc, prec, rec, f1) are stored as percentages (0-100).
@@ -317,19 +318,23 @@ class Metrics:
 
         # Calculate effectiveness metrics if clean_accuracy is provided
         if clean_accuracy is not None:
-            asr_unconditional = 1.0 - (acc / 100.0)  # Convert acc to 0-1 range and calculate ASR
-            
+            # Normalize clean_accuracy to 0-1 (callers may pass 0-100)
+            clean_ratio = clean_accuracy / 100.0 if clean_accuracy > 1.0 else clean_accuracy
+            robust_ratio = acc / 100.0
+
+            asr_unconditional = 1.0 - robust_ratio
+
             # Calculate conditional ASR if clean prediction info is available
             has_clean_info = hasattr(attack_results[0], 'clean_pred') or hasattr(attack_results[0], 'was_correct_clean')
             if has_clean_info:
                 cond_den = sum(int(
-                    getattr(r, 'was_correct_clean', 
+                    getattr(r, 'was_correct_clean',
                            getattr(r, 'clean_pred', None) == r.actual)
                 ) for r in attack_results)
-                
+
                 if cond_den > 0:
                     cond_num = sum(int(
-                        getattr(r, 'was_correct_clean', 
+                        getattr(r, 'was_correct_clean',
                                getattr(r, 'clean_pred', None) == r.actual) and
                         (r.predicted != r.actual)
                     ) for r in attack_results)
@@ -338,17 +343,17 @@ class Metrics:
                     asr_conditional = float('nan')
             else:
                 asr_conditional = None
-            
-            accuracy_drop = max(0.0, clean_accuracy - (acc / 100.0))
-            relative_accuracy_drop = accuracy_drop / clean_accuracy if clean_accuracy > 0 else 0.0
-            
+
+            accuracy_drop = max(0.0, clean_ratio - robust_ratio)
+            relative_accuracy_drop = accuracy_drop / clean_ratio if clean_ratio > 0 else 0.0
+
             return AttackEvaluationScore(
                 acc, prec, rec, f1, conf_matrix, distances, attack_name, model_name,
                 asr_unconditional=asr_unconditional,
                 asr_conditional=asr_conditional,
                 accuracy_drop=accuracy_drop,
                 relative_accuracy_drop=relative_accuracy_drop,
-                clean_accuracy=clean_accuracy
+                clean_accuracy=clean_ratio
             )
         else:
             return AttackEvaluationScore(acc, prec, rec, f1, conf_matrix, distances, attack_name, model_name)
@@ -419,7 +424,9 @@ class Metrics:
                 lines.append(f"   Relative Drop: {score.relative_accuracy_drop:.{precision}f}")
             
             if score.clean_accuracy is not None:
-                lines.append(f"   Clean Accuracy: {score.clean_accuracy:.{precision}f}")
+                # clean_accuracy is stored as 0-1; display as percentage
+                ca_pct = score.clean_accuracy * 100 if score.clean_accuracy <= 1 else score.clean_accuracy
+                lines.append(f"   Clean Accuracy: {ca_pct:.{precision}f}%")
         else:
             lines.append(f"   Accuracy: {score.acc:.{precision}f}%")
             lines.append(f"   Precision: {score.prec:.{precision}f}%")
