@@ -4,7 +4,6 @@ import csv
 import datetime
 import traceback
 import torch
-import torch.nn.functional as F
 from typing import List, Dict, Tuple, Optional
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -16,8 +15,29 @@ from attacks.attack_names import AttackNames
 from data_eng.io import load_model_imagenette
 from data_eng.dataset_loader import load_imagenette
 from domain.model.model_names import ModelNames
-from config.imagenette_classes import ImageNetteClasses
 from shared.model_utils import ModelUtils
+
+
+def _resolve_saved_adv_images_dir(
+    attacked_images_folder: str, source_model_name: str, attack_name: str
+) -> Optional[str]:
+    """
+    Resolve directory with saved adversarial PNGs.
+
+    Supports layout from imagenette_adv_imgs_generator:
+        {root}/{train|test}/{model}/{attack}/{class}/*.png
+    and legacy flat layout:
+        {root}/{model}/{attack}/{class}/*.png
+    """
+    candidates = [
+        os.path.join(attacked_images_folder, "train", source_model_name, attack_name),
+        os.path.join(attacked_images_folder, "test", source_model_name, attack_name),
+        os.path.join(attacked_images_folder, source_model_name, attack_name),
+    ]
+    for path in candidates:
+        if os.path.isdir(path):
+            return path
+    return None
 
 
 class TransferabilityResult:
@@ -403,7 +423,8 @@ def imagenette_transferability_model2model_from_files(
     Args:
         model_names: List of model names to test
         attack_names: List of attack names to test
-        attacked_images_folder: Folder containing saved adversarial images
+        attacked_images_folder: Root folder; images may live under train/ or test/
+            subfolders (as from imagenette_adv_imgs_generator) or under model/attack/ (legacy).
         results_folder: Folder to save results
     
     Returns:
@@ -473,7 +494,12 @@ def imagenette_transferability_model2model_from_files(
                         # Load target model
                         target_model_path = f"./models/imagenette/{target_model_name}_advanced.pt"
                         target_result = load_model_imagenette(target_model_path, target_model_name, device=device)
-                        target_model = target_result['model']
+                        if not target_result["success"]:
+                            print(
+                                f"❌ Failed to load target {target_model_name}: {target_result.get('error', 'unknown')}"
+                            )
+                            continue
+                        target_model = target_result["model"]
                         target_model.eval()
                         
                         # Test transferability
@@ -537,7 +563,8 @@ def imagenette_transferability_attack2model_from_files(
     Args:
         model_names: List of model names to test
         attack_names: List of attack names to test
-        attacked_images_folder: Folder containing saved adversarial images
+        attacked_images_folder: Root folder; images may live under train/ or test/
+            subfolders (as from imagenette_adv_imgs_generator) or under model/attack/ (legacy).
         results_folder: Folder to save results
     
     Returns:
@@ -553,10 +580,14 @@ def imagenette_transferability_attack2model_from_files(
         try:
             # Use first model as source for adversarial examples
             source_model_name = model_names[0]
-            adv_images_path = os.path.join(attacked_images_folder, source_model_name, attack_name)
-            
-            if not os.path.exists(adv_images_path):
-                print(f"⚠️ No saved images found for {source_model_name}/{attack_name}")
+            adv_images_path = _resolve_saved_adv_images_dir(
+                attacked_images_folder, source_model_name, attack_name
+            )
+            if adv_images_path is None:
+                print(
+                    f"⚠️ No saved images found for {source_model_name}/{attack_name} "
+                    f"(tried train/, test/, and flat layout under {attacked_images_folder})"
+                )
                 continue
             
             # Load adversarial images from files
@@ -604,7 +635,12 @@ def imagenette_transferability_attack2model_from_files(
                     # Load target model
                     target_model_path = f"./models/imagenette/{target_model_name}_advanced.pt"
                     target_result = load_model_imagenette(target_model_path, target_model_name, device=device)
-                    target_model = target_result['model']
+                    if not target_result["success"]:
+                        print(
+                            f"❌ Failed to load target {target_model_name}: {target_result.get('error', 'unknown')}"
+                        )
+                        continue
+                    target_model = target_result["model"]
                     target_model.eval()
                     
                     # Test transferability
@@ -623,22 +659,21 @@ def imagenette_transferability_attack2model_from_files(
                             # Count successful transfers
                             transfer_mask = target_predictions != batch_labels
                             transfer_success_count += transfer_mask.sum().item()
-                        
-                        # Create result
-                        result = TransferabilityResult(
-                            source_model=source_model_name,
-                            target_model=target_model_name,
-                            attack_name=attack_name,
-                            transfer_success=transfer_success_count,
-                            total_successful_attacks=len(all_adv_images),
-                            total_images=successful_attacks_count  # For file-based, total = successful since files only contain successful attacks
-                        )
-                        
-                        results.append(result)
-                        
-                        print(f"✅ {attack_name} → {target_model_name}: "
-                              f"{transfer_success_count}/{len(all_adv_images)} "
-                              f"({result.transfer_rate:.2%})")
+                    
+                    result = TransferabilityResult(
+                        source_model=source_model_name,
+                        target_model=target_model_name,
+                        attack_name=attack_name,
+                        transfer_success=transfer_success_count,
+                        total_successful_attacks=len(all_adv_images),
+                        total_images=successful_attacks_count  # For file-based, total = successful since files only contain successful attacks
+                    )
+                    
+                    results.append(result)
+                    
+                    print(f"✅ {attack_name} → {target_model_name}: "
+                          f"{transfer_success_count}/{len(all_adv_images)} "
+                          f"({result.transfer_rate:.2%})")
                     
                 except Exception as e:
                     print(f"❌ Error testing {attack_name} → {target_model_name}: {e}")
