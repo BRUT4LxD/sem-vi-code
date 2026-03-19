@@ -40,6 +40,15 @@ def _resolve_saved_adv_images_dir(
     return None
 
 
+# Short CSV basename tags for save_results_to_csv (filename_key, method) -> prefix
+_TRANSFERABILITY_CSV_PREFIX: Dict[Tuple[str, str], str] = {
+    ("model2model_transferability", "in_memory"): "m2m_trans_mem",
+    ("attack2model_transferability", "in_memory"): "a2m_trans_mem",
+    ("model2model_transferability", "from_files"): "m2m_trans_files",
+    ("attack2model_transferability", "from_files"): "a2m_trans_files",
+}
+
+
 class TransferabilityResult:
     """Class to store transferability attack results"""
     
@@ -87,13 +96,17 @@ class TransferabilityLogger:
     
     def save_results_to_csv(self, results: List[TransferabilityResult], 
                            filename: str, method: str):
-        """Save transferability results to CSV"""
-        csv_path = os.path.join(self.results_folder, f"{filename}_{method}.csv")
+        """Save transferability results to CSV (timestamp only in filename, not in rows)."""
+        prefix = _TRANSFERABILITY_CSV_PREFIX.get((filename, method))
+        if prefix is None:
+            prefix = f"{filename}_{method}".replace(" ", "_")
+        stamp = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M")
+        csv_path = os.path.join(self.results_folder, f"{prefix}_{stamp}.csv")
         
         fieldnames = [
             'source_model', 'target_model', 'attack_name', 'total_images',
-            'total_successful_attacks', 'transfer_success', 'transfer_rate', 
-            'attack_success_rate', 'timestamp'
+            'total_successful_attacks', 'transfer_success', 'transfer_rate',
+            'attack_success_rate',
         ]
         
         with open(csv_path, 'w', newline='') as csvfile:
@@ -110,7 +123,6 @@ class TransferabilityLogger:
                     'transfer_success': result.transfer_success,
                     'transfer_rate': result.transfer_rate,
                     'attack_success_rate': result.attack_success_rate,
-                    'timestamp': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 })
         
         print(f"✅ Results saved to: {csv_path}")
