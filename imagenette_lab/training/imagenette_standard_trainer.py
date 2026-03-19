@@ -8,7 +8,7 @@ from data_eng.dataset_loader import load_imagenette
 from data_eng.io import load_model_imagenette
 from evaluation.metrics import Metrics
 from evaluation.visualization import simple_visualize
-from imagenette_lab.imagenette_base_trainer import BaseImageNetteTrainer
+from imagenette_lab.training.imagenette_base_trainer import BaseImageNetteTrainer
 from imagenette_training_configs import ImageNetteTrainingConfigs
 from training.train import Training
 

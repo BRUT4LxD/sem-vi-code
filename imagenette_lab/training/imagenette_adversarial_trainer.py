@@ -6,7 +6,7 @@ import torch
 
 from attacks.attack_names import AttackNames
 from data_eng.dataset_loader import load_attacked_imagenette_for_adversarial_training, load_imagenette
-from imagenette_lab.imagenette_base_trainer import BaseImageNetteTrainer
+from imagenette_lab.training.imagenette_base_trainer import BaseImageNetteTrainer
 from training.train import Training
 
 

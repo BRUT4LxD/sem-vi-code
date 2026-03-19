@@ -4,7 +4,7 @@ from typing import Dict, List
 
 from config.imagenet_models import ImageNetModels
 from data_eng.dataset_loader import load_attacked_imagenette
-from imagenette_lab.imagenette_base_trainer import BaseImageNetteTrainer
+from imagenette_lab.training.imagenette_base_trainer import BaseImageNetteTrainer
 from training.train import Training
 
 
