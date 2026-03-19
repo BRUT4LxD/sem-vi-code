@@ -1,14 +1,10 @@
 import os
-import sys
 from typing import Dict, List
 
 import torch
 
 from config.imagenette_classes import ImageNetteClasses
 from imagenette_training_configs import ImageNetteTrainingConfigs
-
-# Add project root to path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 class BaseImageNetteTrainer:
