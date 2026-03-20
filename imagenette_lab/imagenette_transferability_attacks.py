@@ -230,7 +230,6 @@ def imagenette_transferability_model2model_in_memory(
                                 target_model_path = f"./models/imagenette/{target_model_name}_advanced.pt"
                                 target_result = load_model_imagenette(target_model_path, target_model_name, device=device)
                                 target_model = target_result['model']
-                                target_model.eval()
                                 
                                 # Test transferability
                                 transfer_success_count = 0
