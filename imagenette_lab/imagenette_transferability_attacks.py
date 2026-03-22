@@ -4,7 +4,7 @@ import csv
 import datetime
 import traceback
 import torch
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple, Optional, Set
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from PIL import Image
@@ -40,13 +40,60 @@ def _resolve_saved_adv_images_dir(
     return None
 
 
-# Short CSV basename tags for save_results_to_csv (filename_key, method) -> prefix
+# Short CSV basename tags for incremental / bulk CSV (filename_key, method) -> prefix
 _TRANSFERABILITY_CSV_PREFIX: Dict[Tuple[str, str], str] = {
     ("model2model_transferability", "in_memory"): "m2m_trans_mem",
     ("attack2model_transferability", "in_memory"): "a2m_trans_mem",
     ("model2model_transferability", "from_files"): "m2m_trans_files",
     ("attack2model_transferability", "from_files"): "a2m_trans_files",
 }
+
+TRANSFERABILITY_CSV_FIELDNAMES: List[str] = [
+    "source_model",
+    "target_model",
+    "attack_name",
+    "total_images",
+    "total_successful_attacks",
+    "transfer_success",
+    "transfer_rate",
+    "attack_success_rate",
+    "timestamp",
+]
+
+
+def _transferability_csv_path(results_folder: str, filename: str, method: str) -> str:
+    prefix = _TRANSFERABILITY_CSV_PREFIX.get((filename, method))
+    if prefix is None:
+        prefix = f"{filename}_{method}".replace(" ", "_")
+    stamp = datetime.datetime.now().strftime("%Y_%m_%d")
+    return os.path.join(results_folder, f"{prefix}_{stamp}.csv")
+
+
+def _load_recorded_transfer_keys(csv_path: str) -> Set[Tuple[str, str, str]]:
+    """
+    Keys already present in today's incremental CSV: (source_model, target_model, attack_name).
+    The CSV basename includes the calendar day, so all rows in this file count as today's run.
+    """
+    recorded: Set[Tuple[str, str, str]] = set()
+    if not os.path.isfile(csv_path) or os.path.getsize(csv_path) == 0:
+        return recorded
+    try:
+        with open(csv_path, newline="", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            if reader.fieldnames is None:
+                return recorded
+            for row in reader:
+                try:
+                    s = row.get("source_model", "").strip()
+                    t = row.get("target_model", "").strip()
+                    a = row.get("attack_name", "").strip()
+                    if s and t and a:
+                        recorded.add((s, t, a))
+                except (TypeError, AttributeError):
+                    continue
+    except OSError:
+        pass
+    return recorded
 
 
 class TransferabilityResult:
@@ -72,6 +119,63 @@ class TransferabilityLogger:
         self.failure_logs_folder = os.path.join(results_folder, "failure_logs")
         os.makedirs(self.results_folder, exist_ok=True)
         os.makedirs(self.failure_logs_folder, exist_ok=True)
+        self._csv_path: Optional[str] = None
+        self._recorded_keys: Set[Tuple[str, str, str]] = set()
+    
+    def begin_incremental_csv(self, filename: str, method: str) -> str:
+        """
+        Set the CSV path for this run. Creates the file with a header if it
+        does not exist or is empty (same calendar day shares one file name).
+        """
+        self._csv_path = _transferability_csv_path(self.results_folder, filename, method)
+        if (not os.path.isfile(self._csv_path)) or os.path.getsize(self._csv_path) == 0:
+            with open(self._csv_path, "w", newline="", encoding="utf-8") as f:
+                w = csv.DictWriter(f, fieldnames=TRANSFERABILITY_CSV_FIELDNAMES)
+                w.writeheader()
+            self._recorded_keys = set()
+        else:
+            self._recorded_keys = _load_recorded_transfer_keys(self._csv_path)
+        print(f"📄 Results CSV: {self._csv_path}")
+        return self._csv_path
+    
+    def has_recorded(self, source_model: str, target_model: str, attack_name: str) -> bool:
+        """True if today's CSV already has a row for this source, target, and attack."""
+        return (source_model, target_model, attack_name) in self._recorded_keys
+    
+    def print_duplicate_row_skip(
+        self, source_model: str, target_model: str, attack_name: str
+    ) -> None:
+        """Console only: explain why a (source, target, attack) row is not written again."""
+        print(
+            f"⏭️ Skip (already in today's CSV): {source_model} → "
+            f"{target_model} ({attack_name})"
+        )
+    
+    def append_result(self, result: TransferabilityResult) -> None:
+        """Open CSV, append one row (with row timestamp), close."""
+        if not self._csv_path:
+            raise RuntimeError("append_result called before begin_incremental_csv")
+        key = (result.source_model, result.target_model, result.attack_name)
+        if key in self._recorded_keys:
+            self.print_duplicate_row_skip(
+                result.source_model, result.target_model, result.attack_name
+            )
+            return
+        row_ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        row = {
+            "source_model": result.source_model,
+            "target_model": result.target_model,
+            "attack_name": result.attack_name,
+            "total_images": result.total_images,
+            "total_successful_attacks": result.total_successful_attacks,
+            "transfer_success": result.transfer_success,
+            "transfer_rate": result.transfer_rate,
+            "attack_success_rate": result.attack_success_rate,
+            "timestamp": row_ts,
+        }
+        with open(self._csv_path, "a", newline="", encoding="utf-8") as f:
+            csv.DictWriter(f, fieldnames=TRANSFERABILITY_CSV_FIELDNAMES).writerow(row)
+        self._recorded_keys.add(key)
     
     def save_failure_log(self, source_model: str, target_model: str, attack_name: str, 
                         exception: Exception, method: str):
@@ -96,35 +200,26 @@ class TransferabilityLogger:
     
     def save_results_to_csv(self, results: List[TransferabilityResult], 
                            filename: str, method: str):
-        """Save transferability results to CSV (timestamp only in filename, not in rows)."""
-        prefix = _TRANSFERABILITY_CSV_PREFIX.get((filename, method))
-        if prefix is None:
-            prefix = f"{filename}_{method}".replace(" ", "_")
-        stamp = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M")
-        csv_path = os.path.join(self.results_folder, f"{prefix}_{stamp}.csv")
-        
-        fieldnames = [
-            'source_model', 'target_model', 'attack_name', 'total_images',
-            'total_successful_attacks', 'transfer_success', 'transfer_rate',
-            'attack_success_rate',
-        ]
-        
-        with open(csv_path, 'w', newline='') as csvfile:
-            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        """Write all results in one shot (each row includes its own timestamp)."""
+        csv_path = _transferability_csv_path(self.results_folder, filename, method)
+        with open(csv_path, "w", newline="", encoding="utf-8") as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=TRANSFERABILITY_CSV_FIELDNAMES)
             writer.writeheader()
-            
             for result in results:
-                writer.writerow({
-                    'source_model': result.source_model,
-                    'target_model': result.target_model,
-                    'attack_name': result.attack_name,
-                    'total_images': result.total_images,
-                    'total_successful_attacks': result.total_successful_attacks,
-                    'transfer_success': result.transfer_success,
-                    'transfer_rate': result.transfer_rate,
-                    'attack_success_rate': result.attack_success_rate,
-                })
-        
+                row_ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                writer.writerow(
+                    {
+                        "source_model": result.source_model,
+                        "target_model": result.target_model,
+                        "attack_name": result.attack_name,
+                        "total_images": result.total_images,
+                        "total_successful_attacks": result.total_successful_attacks,
+                        "transfer_success": result.transfer_success,
+                        "transfer_rate": result.transfer_rate,
+                        "attack_success_rate": result.attack_success_rate,
+                        "timestamp": row_ts,
+                    }
+                )
         print(f"✅ Results saved to: {csv_path}")
 
 
@@ -143,7 +238,7 @@ def imagenette_transferability_model2model_in_memory(
         attack_names: List of attack names to test
         images_per_attack: Number of images to attack per model-attack combination
         batch_size: Batch size for data loading
-        results_folder: Folder to save results
+        results_folder: Folder to save results (CSV path includes date only YYYY_MM_DD; each row open/append/close)
     
     Returns:
         List of TransferabilityResult objects
@@ -152,6 +247,7 @@ def imagenette_transferability_model2model_in_memory(
     
     logger = TransferabilityLogger(results_folder)
     results = []
+    logger.begin_incremental_csv("model2model_transferability", "in_memory")
     
     # Load test data
     _, test_loader = load_imagenette(batch_size=batch_size, test_subset_size=-1)
@@ -167,6 +263,18 @@ def imagenette_transferability_model2model_in_memory(
             
             for attack_name in tqdm(attack_names, desc=f"Attacks on {source_model_name}", leave=False):
                 try:
+                    pending_targets: List[str] = []
+                    for t in model_names:
+                        if t == source_model_name:
+                            continue
+                        if logger.has_recorded(source_model_name, t, attack_name):
+                            logger.print_duplicate_row_skip(
+                                source_model_name, t, attack_name
+                            )
+                        else:
+                            pending_targets.append(t)
+                    if not pending_targets:
+                        continue
                     # Create attack on source model
                     attack = AttackFactory.get_attack(attack_name, source_model)
                     
@@ -221,10 +329,7 @@ def imagenette_transferability_model2model_in_memory(
                         all_source_labels = torch.tensor(source_labels)
                         
                         # Test transferability to other models
-                        for target_model_name in model_names:
-                            if target_model_name == source_model_name:
-                                continue  # Skip same model
-                            
+                        for target_model_name in pending_targets:
                             try:
                                 # Load target model
                                 target_model_path = f"./models/imagenette/{target_model_name}_advanced.pt"
@@ -253,6 +358,7 @@ def imagenette_transferability_model2model_in_memory(
                                 )
                                 
                                 results.append(result)
+                                logger.append_result(result)
                                 
                                 print(f"✅ {source_model_name} → {target_model_name} ({attack_name}): "
                                       f"{transfer_success_count}/{len(all_adv_images)} "
@@ -273,9 +379,6 @@ def imagenette_transferability_model2model_in_memory(
             logger.save_failure_log(source_model_name, "N/A", "N/A", e, "model2model")
             continue
     
-    # Save results
-    logger.save_results_to_csv(results, "model2model_transferability", "in_memory")
-    
     return results
 
 
@@ -294,7 +397,7 @@ def imagenette_transferability_attack2model_in_memory(
         attack_names: List of attack names to test
         images_per_attack: Number of images to attack per model-attack combination
         batch_size: Batch size for data loading
-        results_folder: Folder to save results
+        results_folder: Folder to save results (CSV path includes date only YYYY_MM_DD; each row open/append/close)
     
     Returns:
         List of TransferabilityResult objects
@@ -303,8 +406,7 @@ def imagenette_transferability_attack2model_in_memory(
     
     logger = TransferabilityLogger(results_folder)
     results = []
-    
-    # Load test data
+    logger.begin_incremental_csv("attack2model_transferability", "in_memory")
     _, test_loader = load_imagenette(batch_size=batch_size, test_subset_size=-1)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
@@ -312,6 +414,14 @@ def imagenette_transferability_attack2model_in_memory(
         try:
             # Generate adversarial examples using the first model as source
             source_model_name = model_names[0]
+            pending_targets = []
+            for t in model_names:
+                if logger.has_recorded(source_model_name, t, attack_name):
+                    logger.print_duplicate_row_skip(source_model_name, t, attack_name)
+                else:
+                    pending_targets.append(t)
+            if not pending_targets:
+                continue
             source_model_path = f"./models/imagenette/{source_model_name}_advanced.pt"
             source_result = load_model_imagenette(source_model_path, source_model_name, device=device)
             source_model = source_result['model']
@@ -371,7 +481,7 @@ def imagenette_transferability_attack2model_in_memory(
                 all_source_labels = torch.tensor(source_labels)
                 
                 # Test transferability to all models
-                for target_model_name in tqdm(model_names, desc=f"Testing {attack_name}", leave=False):
+                for target_model_name in tqdm(pending_targets, desc=f"Testing {attack_name}", leave=False):
                     try:
                         # Load target model
                         target_model_path = f"./models/imagenette/{target_model_name}_advanced.pt"
@@ -401,6 +511,7 @@ def imagenette_transferability_attack2model_in_memory(
                         )
                         
                         results.append(result)
+                        logger.append_result(result)
                         
                         print(f"✅ {attack_name} → {target_model_name}: "
                               f"{transfer_success_count}/{len(all_adv_images)} "
@@ -415,9 +526,6 @@ def imagenette_transferability_attack2model_in_memory(
             print(f"❌ Error with attack {attack_name}: {e}")
             logger.save_failure_log("N/A", "N/A", attack_name, e, "attack2model")
             continue
-    
-    # Save results
-    logger.save_results_to_csv(results, "attack2model_transferability", "in_memory")
     
     return results
 
@@ -436,7 +544,7 @@ def imagenette_transferability_model2model_from_files(
         attack_names: List of attack names to test
         attacked_images_folder: Root folder; images may live under train/ or test/
             subfolders (as from imagenette_adv_imgs_generator) or under model/attack/ (legacy).
-        results_folder: Folder to save results
+        results_folder: Folder to save results (CSV path includes date only YYYY_MM_DD; each row open/append/close)
     
     Returns:
         List of TransferabilityResult objects
@@ -446,10 +554,23 @@ def imagenette_transferability_model2model_from_files(
     logger = TransferabilityLogger(results_folder)
     results = []
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    logger.begin_incremental_csv("model2model_transferability", "from_files")
     
     for source_model_name in tqdm(model_names, desc="Source Models"):
         for attack_name in tqdm(attack_names, desc=f"Attacks on {source_model_name}", leave=False):
             try:
+                pending_targets = []
+                for t in model_names:
+                    if t == source_model_name:
+                        continue
+                    if logger.has_recorded(source_model_name, t, attack_name):
+                        logger.print_duplicate_row_skip(
+                            source_model_name, t, attack_name
+                        )
+                    else:
+                        pending_targets.append(t)
+                if not pending_targets:
+                    continue
                 # Path to saved adversarial images
                 adv_images_path = os.path.join(attacked_images_folder, source_model_name, attack_name)
                 
@@ -497,10 +618,7 @@ def imagenette_transferability_model2model_from_files(
                 print(f"📁 Loaded {successful_attacks_count} adversarial images for {source_model_name}/{attack_name}")
                 
                 # Test transferability to other models
-                for target_model_name in model_names:
-                    if target_model_name == source_model_name:
-                        continue
-                    
+                for target_model_name in pending_targets:
                     try:
                         # Load target model
                         target_model_path = f"./models/imagenette/{target_model_name}_advanced.pt"
@@ -541,6 +659,7 @@ def imagenette_transferability_model2model_from_files(
                         )
                         
                         results.append(result)
+                        logger.append_result(result)
                         
                         print(f"✅ {source_model_name} → {target_model_name} ({attack_name}): "
                               f"{transfer_success_count}/{len(all_adv_images)} "
@@ -555,9 +674,6 @@ def imagenette_transferability_model2model_from_files(
                 print(f"❌ Error processing {source_model_name}/{attack_name}: {e}")
                 logger.save_failure_log(source_model_name, "N/A", attack_name, e, "model2model_files")
                 continue
-    
-    # Save results
-    logger.save_results_to_csv(results, "model2model_transferability", "from_files")
     
     return results
 
@@ -576,7 +692,7 @@ def imagenette_transferability_attack2model_from_files(
         attack_names: List of attack names to test
         attacked_images_folder: Root folder; images may live under train/ or test/
             subfolders (as from imagenette_adv_imgs_generator) or under model/attack/ (legacy).
-        results_folder: Folder to save results
+        results_folder: Folder to save results (CSV path includes date only YYYY_MM_DD; each row open/append/close)
     
     Returns:
         List of TransferabilityResult objects
@@ -586,11 +702,20 @@ def imagenette_transferability_attack2model_from_files(
     logger = TransferabilityLogger(results_folder)
     results = []
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    logger.begin_incremental_csv("attack2model_transferability", "from_files")
     
     for attack_name in tqdm(attack_names, desc="Attacks"):
         try:
             # Use first model as source for adversarial examples
             source_model_name = model_names[0]
+            pending_targets = []
+            for t in model_names:
+                if logger.has_recorded(source_model_name, t, attack_name):
+                    logger.print_duplicate_row_skip(source_model_name, t, attack_name)
+                else:
+                    pending_targets.append(t)
+            if not pending_targets:
+                continue
             adv_images_path = _resolve_saved_adv_images_dir(
                 attacked_images_folder, source_model_name, attack_name
             )
@@ -641,7 +766,7 @@ def imagenette_transferability_attack2model_from_files(
             print(f"📁 Loaded {successful_attacks_count} adversarial images for {attack_name}")
             
             # Test transferability to all models
-            for target_model_name in tqdm(model_names, desc=f"Testing {attack_name}", leave=False):
+            for target_model_name in tqdm(pending_targets, desc=f"Testing {attack_name}", leave=False):
                 try:
                     # Load target model
                     target_model_path = f"./models/imagenette/{target_model_name}_advanced.pt"
@@ -681,6 +806,7 @@ def imagenette_transferability_attack2model_from_files(
                     )
                     
                     results.append(result)
+                    logger.append_result(result)
                     
                     print(f"✅ {attack_name} → {target_model_name}: "
                           f"{transfer_success_count}/{len(all_adv_images)} "
@@ -695,9 +821,6 @@ def imagenette_transferability_attack2model_from_files(
             print(f"❌ Error with attack {attack_name}: {e}")
             logger.save_failure_log("N/A", "N/A", attack_name, e, "attack2model_files")
             continue
-    
-    # Save results
-    logger.save_results_to_csv(results, "attack2model_transferability", "from_files")
     
     return results
 
