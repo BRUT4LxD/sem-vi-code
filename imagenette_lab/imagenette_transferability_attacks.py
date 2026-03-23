@@ -65,14 +65,12 @@ def _transferability_csv_path(results_folder: str, filename: str, method: str) -
     prefix = _TRANSFERABILITY_CSV_PREFIX.get((filename, method))
     if prefix is None:
         prefix = f"{filename}_{method}".replace(" ", "_")
-    stamp = datetime.datetime.now().strftime("%Y_%m_%d")
-    return os.path.join(results_folder, f"{prefix}_{stamp}.csv")
+    return os.path.join(results_folder, f"{prefix}.csv")
 
 
 def _load_recorded_transfer_keys(csv_path: str) -> Set[Tuple[str, str, str]]:
     """
-    Keys already present in today's incremental CSV: (source_model, target_model, attack_name).
-    The CSV basename includes the calendar day, so all rows in this file count as today's run.
+    Keys already present in the incremental CSV: (source_model, target_model, attack_name).
     """
     recorded: Set[Tuple[str, str, str]] = set()
     if not os.path.isfile(csv_path) or os.path.getsize(csv_path) == 0:
@@ -125,7 +123,7 @@ class TransferabilityLogger:
     def begin_incremental_csv(self, filename: str, method: str) -> str:
         """
         Set the CSV path for this run. Creates the file with a header if it
-        does not exist or is empty (same calendar day shares one file name).
+        does not exist or is empty (fixed basename per experiment type).
         """
         self._csv_path = _transferability_csv_path(self.results_folder, filename, method)
         if (not os.path.isfile(self._csv_path)) or os.path.getsize(self._csv_path) == 0:
@@ -139,7 +137,7 @@ class TransferabilityLogger:
         return self._csv_path
     
     def has_recorded(self, source_model: str, target_model: str, attack_name: str) -> bool:
-        """True if today's CSV already has a row for this source, target, and attack."""
+        """True if the results CSV already has a row for this source, target, and attack."""
         return (source_model, target_model, attack_name) in self._recorded_keys
     
     def print_duplicate_row_skip(
@@ -147,7 +145,7 @@ class TransferabilityLogger:
     ) -> None:
         """Console only: explain why a (source, target, attack) row is not written again."""
         print(
-            f"⏭️ Skip (already in today's CSV): {source_model} → "
+            f"⏭️ Skip (already in results CSV): {source_model} → "
             f"{target_model} ({attack_name})"
         )
     
@@ -238,7 +236,7 @@ def imagenette_transferability_model2model_in_memory(
         attack_names: List of attack names to test
         images_per_attack: Number of images to attack per model-attack combination
         batch_size: Batch size for data loading
-        results_folder: Folder to save results (CSV path includes date only YYYY_MM_DD; each row open/append/close)
+        results_folder: Folder to save results (incremental CSV per experiment type; each row open/append/close)
     
     Returns:
         List of TransferabilityResult objects
@@ -397,7 +395,7 @@ def imagenette_transferability_attack2model_in_memory(
         attack_names: List of attack names to test
         images_per_attack: Number of images to attack per model-attack combination
         batch_size: Batch size for data loading
-        results_folder: Folder to save results (CSV path includes date only YYYY_MM_DD; each row open/append/close)
+        results_folder: Folder to save results (incremental CSV per experiment type; each row open/append/close)
     
     Returns:
         List of TransferabilityResult objects
@@ -544,7 +542,7 @@ def imagenette_transferability_model2model_from_files(
         attack_names: List of attack names to test
         attacked_images_folder: Root folder; images may live under train/ or test/
             subfolders (as from imagenette_adv_imgs_generator) or under model/attack/ (legacy).
-        results_folder: Folder to save results (CSV path includes date only YYYY_MM_DD; each row open/append/close)
+        results_folder: Folder to save results (incremental CSV per experiment type; each row open/append/close)
     
     Returns:
         List of TransferabilityResult objects
@@ -692,7 +690,7 @@ def imagenette_transferability_attack2model_from_files(
         attack_names: List of attack names to test
         attacked_images_folder: Root folder; images may live under train/ or test/
             subfolders (as from imagenette_adv_imgs_generator) or under model/attack/ (legacy).
-        results_folder: Folder to save results (CSV path includes date only YYYY_MM_DD; each row open/append/close)
+        results_folder: Folder to save results (incremental CSV per experiment type; each row open/append/close)
     
     Returns:
         List of TransferabilityResult objects
