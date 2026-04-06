@@ -5,9 +5,12 @@ from typing import Dict, List
 import torch
 
 from attacks.attack_names import AttackNames
+from config.imagenet_models import ImageNetModels
 from data_eng.dataset_loader import load_attacked_imagenette_for_adversarial_training, load_imagenette
+from domain.model.model_names import ModelNames
 from imagenette_lab.training.imagenette_base_trainer import BaseImageNetteTrainer
 from training.train import Training
+from training.transfer.setup_pretraining import SetupPretraining
 
 
 class ImageNetteAdversarialTrainer(BaseImageNetteTrainer):
@@ -115,7 +118,11 @@ class ImageNetteAdversarialTrainer(BaseImageNetteTrainer):
 
             # Setup save path (distinguish between pre-attacked and on-the-fly modes)
             mode_suffix = "preattacked" if use_preattacked_images else "onthefly"
-            save_path = os.path.join(self.adversarial_models_dir, f"{model_name}_adv_{mode_suffix}.pt")
+            training_day = datetime.now().strftime("%Y%m%d")
+            save_path = os.path.join(
+                self.adversarial_models_dir,
+                f"{model_name}_adv_{mode_suffix}_{training_day}.pt",
+            )
 
             # Train model using modern adversarial training
             print("\n🔥 Starting adversarial training...")
@@ -255,3 +262,48 @@ class ImageNetteAdversarialTrainer(BaseImageNetteTrainer):
                       f"Val Acc={result['best_val_accuracy']:.2f}%")
 
         return results
+if __name__ == "__main__":
+    model_names = [
+        ModelNames().resnet18,
+        ModelNames().vgg16,
+        ModelNames().densenet121,
+        ModelNames().mobilenet_v2,
+        ModelNames().efficientnet_b0,
+    ]
+
+    attack_names = AttackNames().all_attack_names
+
+    use_preattacked_images = True
+    attacked_images_folder = "data/attacks/imagenette_models"
+    learning_rate = 0.001
+    num_epochs = 20
+    batch_size = 32
+    adversarial_ratio = 0.5
+    device = "auto"
+
+    print("🚀 Starting ImageNette adversarial training experiment...")
+    print(f"📊 Models: {model_names}")
+    print(f"🛡️ Mode: {'Pre-attacked Images' if use_preattacked_images else 'On-the-fly Generation'}")
+    if not use_preattacked_images:
+        print(f"🎯 Attacks: {attack_names}")
+
+    trainer = ImageNetteAdversarialTrainer(device=device)
+    models = []
+
+    for model_name in model_names:
+        print(f"\n🔧 Preparing model: {model_name}")
+        model = ImageNetModels.get_model(model_name)
+        model.__class__.__name__ = model_name
+        model = SetupPretraining.setup_imagenette(model)
+        models.append(model)
+
+    trainer.train_multiple_adversarial_models(
+        models=models,
+        attack_names=attack_names,
+        learning_rate=learning_rate,
+        num_epochs=num_epochs,
+        batch_size=batch_size,
+        adversarial_ratio=adversarial_ratio,
+        use_preattacked_images=use_preattacked_images,
+        attacked_images_folder=attacked_images_folder,
+    )
