@@ -1423,6 +1423,17 @@ class Training:
                     },
                 )
 
+                Training._update_best_imagenette_adversarial_model(
+                    training_state=training_state,
+                    current_accuracy=clean_val_metrics['accuracy'],
+                    epoch=global_epoch,
+                    min_delta=min_delta,
+                    model=model,
+                    save_model_path=save_model_path,
+                    verbose=verbose,
+                    metric_type='Clean Val',
+                )
+
                 if verbose:
                     Training._print_imagenette_adversarial_epoch_summary(
                         epoch=local_epoch,

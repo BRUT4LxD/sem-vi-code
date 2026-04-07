@@ -12,7 +12,10 @@ from attacks.attack_factory import AttackFactory
 from attacks.attack_names import AttackNames
 from config.imagenet_models import ImageNetModels
 from data_eng.dataset_loader import load_imagenette
+from domain.attack.attack_distance_score import AttackDistanceScore
+from domain.attack.attack_result import AttackResult
 from domain.model.model_names import ModelNames
+from evaluation.metrics import Metrics
 from imagenette_lab.imagenette_direct_attacks import normalize_adversarial_image
 from imagenette_lab.training.imagenette_base_trainer import BaseImageNetteTrainer
 from training.train import Training
@@ -68,12 +71,13 @@ class ImageNetteAdversarialProgressiveTrainer(BaseImageNetteTrainer):
         attacked_images_folder: str,
         iteration: int,
         verbose: bool,
-    ) -> List[Tuple[torch.Tensor, int]]:
+    ) -> Tuple[List[Tuple[torch.Tensor, int]], AttackDistanceScore]:
         if images_per_attack <= 0:
-            return []
+            return [], AttackDistanceScore(0.0, 0.0, 0.0, 0.0, 0.0)
 
         model.eval()
         examples: List[Tuple[torch.Tensor, int]] = []
+        attack_results: List[AttackResult] = []
 
         for attack_name in attack_names:
             attack = AttackFactory.get_attack(attack_name, model)
@@ -118,8 +122,19 @@ class ImageNetteAdversarialProgressiveTrainer(BaseImageNetteTrainer):
                     if adv_predictions[i].item() == label:
                         continue
 
+                    src_image = images[i].detach().cpu()
                     adv_image = adv_images[i].detach().cpu()
                     examples.append((adv_image, label))
+                    attack_results.append(
+                        AttackResult(
+                            actual=label,
+                            predicted=adv_predictions[i].item(),
+                            adv_image=adv_image,
+                            src_image=src_image,
+                            model_name=model.__class__.__name__,
+                            attack_name=attack_name,
+                        )
+                    )
                     successful_examples += 1
 
                     if save_generated_images:
@@ -153,7 +168,7 @@ class ImageNetteAdversarialProgressiveTrainer(BaseImageNetteTrainer):
                     f"successful adversarial examples."
                 )
 
-        return examples
+        return examples, Metrics.attack_distance_score(attack_results)
 
     def train_progressive_adversarial_model(
         self,
@@ -165,7 +180,7 @@ class ImageNetteAdversarialProgressiveTrainer(BaseImageNetteTrainer):
         batch_size: int = 32,
         images_per_attack_per_iteration: int = 10,
         validation_images_per_attack_per_iteration: Optional[int] = None,
-        early_stopping_patience: int = 3,
+        early_stopping_patience: int = 7,
         scheduler_type: str = "step",
         scheduler_params: dict = None,
         weight_decay: float = 0.0001,
@@ -253,6 +268,7 @@ class ImageNetteAdversarialProgressiveTrainer(BaseImageNetteTrainer):
         print(f"   Learning rate: {learning_rate}")
         print(f"   Save generated images: {save_generated_images}")
 
+        # Keep attack generation anchored to the clean dataset on every iteration.
         generation_train_loader, generation_test_loader = load_imagenette(
             batch_size=1,
             shuffle=True,
@@ -272,7 +288,7 @@ class ImageNetteAdversarialProgressiveTrainer(BaseImageNetteTrainer):
             print(f"🔄 Iteration {iteration + 1}/{iterations}")
             print(f"{'=' * 60}")
 
-            new_train_examples = self._collect_successful_adversarial_examples(
+            new_train_examples, train_distance_score = self._collect_successful_adversarial_examples(
                 model=current_model,
                 attack_names=attack_names,
                 data_loader=generation_train_loader,
@@ -283,7 +299,7 @@ class ImageNetteAdversarialProgressiveTrainer(BaseImageNetteTrainer):
                 iteration=iteration,
                 verbose=verbose,
             )
-            new_test_examples = self._collect_successful_adversarial_examples(
+            new_test_examples, _ = self._collect_successful_adversarial_examples(
                 model=current_model,
                 attack_names=attack_names,
                 data_loader=generation_test_loader,
@@ -300,6 +316,32 @@ class ImageNetteAdversarialProgressiveTrainer(BaseImageNetteTrainer):
                     "No successful adversarial examples were generated for training."
                 )
 
+            writer.add_scalar(
+                "Distance/train_generated/l0_pixels",
+                train_distance_score.l0_pixels,
+                iteration + 1,
+            )
+            writer.add_scalar(
+                "Distance/train_generated/l1",
+                train_distance_score.l1,
+                iteration + 1,
+            )
+            writer.add_scalar(
+                "Distance/train_generated/l2",
+                train_distance_score.l2,
+                iteration + 1,
+            )
+            writer.add_scalar(
+                "Distance/train_generated/linf",
+                train_distance_score.linf,
+                iteration + 1,
+            )
+            writer.add_scalar(
+                "Distance/train_generated/power_mse",
+                train_distance_score.power_mse,
+                iteration + 1,
+            )
+
             progressive_train_dataset.extend(new_train_examples)
             progressive_test_dataset.extend(new_test_examples)
 
@@ -309,6 +351,12 @@ class ImageNetteAdversarialProgressiveTrainer(BaseImageNetteTrainer):
             )
             combined_val_dataset = ConcatDataset(
                 [clean_test_loader.dataset, progressive_test_dataset]
+            )
+
+            writer.add_scalar(
+                "Dataset/combined_train_size_iteration",
+                len(combined_train_dataset),
+                iteration + 1,
             )
 
             print(
