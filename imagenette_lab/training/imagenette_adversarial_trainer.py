@@ -265,10 +265,10 @@ class ImageNetteAdversarialTrainer(BaseImageNetteTrainer):
 if __name__ == "__main__":
     model_names = [
         ModelNames().resnet18,
-        ModelNames().vgg16,
         ModelNames().densenet121,
         ModelNames().mobilenet_v2,
         ModelNames().efficientnet_b0,
+        ModelNames().vgg16,
     ]
 
     attack_names = AttackNames().all_attack_names
@@ -277,7 +277,7 @@ if __name__ == "__main__":
     attacked_images_folder = "data/attacks/imagenette_models"
     learning_rate = 0.001
     num_epochs = 20
-    batch_size = 32
+    batch_size = 256
     adversarial_ratio = 0.5
     device = "auto"
 

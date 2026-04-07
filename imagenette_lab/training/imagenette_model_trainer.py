@@ -4,6 +4,9 @@ ImageNette Model Trainer - facade for standard, noise-detection, and adversarial
 """
 
 from imagenette_adversarial_trainer import ImageNetteAdversarialTrainer
+from imagenette_adversarial_progressive_trainer import (
+    ImageNetteAdversarialProgressiveTrainer,
+)
 from imagenette_noise_detection_trainer import ImageNetteNoiseDetectionTrainer
 from imagenette_standard_trainer import ImageNetteStandardTrainer
 
@@ -12,6 +15,7 @@ class ImageNetteModelTrainer(
     ImageNetteStandardTrainer,
     ImageNetteNoiseDetectionTrainer,
     ImageNetteAdversarialTrainer,
+    ImageNetteAdversarialProgressiveTrainer,
 ):
     """
     Convenience trainer that combines standard, noise detection,

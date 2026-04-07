@@ -14,7 +14,7 @@ from attacks.attack import Attack
 
 from torch.nn import Module, CrossEntropyLoss, BCELoss, BCEWithLogitsLoss
 from torch.optim import Adam
-from typing import List
+from typing import Callable, Dict, List, Optional
 
 class Training:
 
@@ -409,6 +409,283 @@ class Training:
             print(f"Model saved to: {save_model_path}")
         
         print(f"{'='*50}")
+
+    @staticmethod
+    def _create_or_get_writer(
+        writer: SummaryWriter,
+        log_dir: str,
+        verbose: bool,
+    ) -> SummaryWriter:
+        if writer is None:
+            writer = SummaryWriter(log_dir=log_dir)
+            if verbose:
+                print(f"📊 TensorBoard logging to: {log_dir}")
+        return writer
+
+    @staticmethod
+    def _build_imagenette_adversarial_training_state(
+        model: Module,
+        device,
+        use_preattacked_images: Optional[bool] = None,
+        attack_names: Optional[List[str]] = None,
+        adversarial_ratio: Optional[float] = None,
+        extra_state: Optional[Dict] = None,
+    ) -> dict:
+        training_state = {
+            'best_val_accuracy': 0.0,
+            'best_epoch': 0,
+            'train_losses': [],
+            'train_accuracies': [],
+            'val_losses': [],
+            'val_accuracies': [],
+            'learning_rates': [],
+            'epoch_times': [],
+            'early_stopping_counter': 0,
+            'model_name': model.__class__.__name__,
+            'device': str(device),
+            'total_params': sum(p.numel() for p in model.parameters()),
+            'trainable_params': sum(p.numel() for p in model.parameters() if p.requires_grad),
+        }
+        if use_preattacked_images is not None:
+            training_state['use_preattacked_images'] = use_preattacked_images
+        if attack_names is not None:
+            training_state['attack_names'] = attack_names
+        if adversarial_ratio is not None:
+            training_state['adversarial_ratio'] = adversarial_ratio
+        if extra_state:
+            training_state.update(extra_state)
+        return training_state
+
+    @staticmethod
+    def _print_imagenette_adversarial_training_configuration(
+        training_state: dict,
+        learning_rate: float,
+        num_epochs: int,
+        batch_size: int,
+        scheduler_type: str,
+        early_stopping_patience: int,
+        mode_label: str,
+        attack_names: Optional[List[str]] = None,
+        adversarial_ratio: Optional[float] = None,
+        extra_lines: Optional[List[str]] = None,
+    ) -> None:
+        print(f"📈 Adversarial Training Configuration:")
+        print(f"   Model: {training_state['model_name']}")
+        print(f"   Mode: {mode_label}")
+        print(
+            f"   Parameters: {training_state['trainable_params']:,} trainable / "
+            f"{training_state['total_params']:,} total"
+        )
+        print(f"   Learning Rate: {learning_rate}")
+        print(f"   Epochs: {num_epochs}")
+        print(f"   Batch Size: {batch_size}")
+        if attack_names:
+            print(f"   Attacks: {', '.join(attack_names)}")
+        if adversarial_ratio is not None:
+            print(f"   Adversarial Ratio: {adversarial_ratio:.1%}")
+        if extra_lines:
+            for line in extra_lines:
+                print(f"   {line}")
+        print(f"   Scheduler: {scheduler_type}")
+        print(f"   Early Stopping: {early_stopping_patience} epochs")
+
+    @staticmethod
+    def _step_scheduler(
+        scheduler,
+        scheduler_type: str,
+        val_metrics: Optional[dict] = None,
+    ) -> None:
+        if scheduler is None:
+            return
+        if scheduler_type == 'plateau' and val_metrics is not None:
+            scheduler.step(val_metrics['loss'])
+        else:
+            scheduler.step()
+
+    @staticmethod
+    def _record_imagenette_adversarial_epoch_metrics(
+        training_state: dict,
+        train_metrics: dict,
+        optimizer,
+        epoch_time: float,
+        val_metrics: Optional[dict] = None,
+        adv_val_metrics: Optional[dict] = None,
+    ) -> None:
+        training_state['train_losses'].append(train_metrics['loss'])
+        training_state['train_accuracies'].append(train_metrics['accuracy'])
+        training_state['learning_rates'].append(optimizer.param_groups[0]['lr'])
+        training_state['epoch_times'].append(epoch_time)
+        if val_metrics is not None:
+            training_state['val_losses'].append(val_metrics['loss'])
+            training_state['val_accuracies'].append(val_metrics['accuracy'])
+        if adv_val_metrics is not None:
+            training_state.setdefault('adv_val_losses', []).append(adv_val_metrics['loss'])
+            training_state.setdefault('adv_val_accuracies', []).append(
+                adv_val_metrics['accuracy']
+            )
+            training_state['best_adv_val_accuracy'] = max(
+                training_state.get('best_adv_val_accuracy', 0.0),
+                adv_val_metrics['accuracy']
+            )
+
+    @staticmethod
+    def _log_imagenette_adversarial_epoch_metrics(
+        writer: Optional[SummaryWriter],
+        epoch: int,
+        train_metrics: dict,
+        optimizer,
+        epoch_time: float,
+        val_metrics: Optional[dict] = None,
+        adv_val_metrics: Optional[dict] = None,
+        extra_scalars: Optional[Dict[str, float]] = None,
+    ) -> None:
+        if writer is None:
+            return
+        writer.add_scalar('Loss/train', train_metrics['loss'], epoch)
+        writer.add_scalar('Accuracy/train', train_metrics['accuracy'], epoch)
+        writer.add_scalar('LearningRate', optimizer.param_groups[0]['lr'], epoch)
+        writer.add_scalar('Epoch_Time', epoch_time, epoch)
+        if val_metrics is not None:
+            writer.add_scalar('Loss/val', val_metrics['loss'], epoch)
+            writer.add_scalar('Accuracy/val', val_metrics['accuracy'], epoch)
+        if adv_val_metrics is not None:
+            writer.add_scalar('Loss/val_adv', adv_val_metrics['loss'], epoch)
+            writer.add_scalar('Accuracy/val_adv', adv_val_metrics['accuracy'], epoch)
+        if extra_scalars:
+            for name, value in extra_scalars.items():
+                writer.add_scalar(name, value, epoch)
+
+    @staticmethod
+    def _update_best_imagenette_adversarial_model(
+        training_state: dict,
+        current_accuracy: float,
+        epoch: int,
+        min_delta: float,
+        model: Module,
+        save_model_path: Optional[str],
+        verbose: bool,
+        metric_type: str,
+    ) -> None:
+        if current_accuracy > training_state['best_val_accuracy'] + min_delta:
+            training_state['best_val_accuracy'] = current_accuracy
+            training_state['best_epoch'] = epoch
+            training_state['early_stopping_counter'] = 0
+            if save_model_path:
+                save_model_dir = os.path.dirname(save_model_path)
+                if save_model_dir:
+                    os.makedirs(save_model_dir, exist_ok=True)
+                save_model(model, save_model_path)
+                if verbose:
+                    print(
+                        f"💾 Best model saved ({metric_type} Acc: "
+                        f"{current_accuracy:.2f}%)"
+                    )
+        else:
+            training_state['early_stopping_counter'] += 1
+
+    @staticmethod
+    def _print_imagenette_adversarial_epoch_summary(
+        epoch: int,
+        num_epochs: int,
+        train_metrics: dict,
+        training_state: dict,
+        optimizer,
+        epoch_time: float,
+        early_stopping_patience: int,
+        val_metrics: Optional[dict] = None,
+        adv_val_metrics: Optional[dict] = None,
+        best_label: str = 'Val',
+    ) -> None:
+        print(f"\n📊 Epoch {epoch+1}/{num_epochs} Summary:")
+        print(
+            f"   Train Loss: {train_metrics['loss']:.4f} | "
+            f"Train Acc: {train_metrics['accuracy']:.2f}%"
+        )
+        if val_metrics is not None:
+            print(
+                f"   {best_label} Loss: {val_metrics['loss']:.4f} | "
+                f"{best_label} Acc: {val_metrics['accuracy']:.2f}%"
+            )
+            print(
+                f"   Best {best_label} Acc: {training_state['best_val_accuracy']:.2f}% "
+                f"(Epoch {training_state['best_epoch']+1})"
+            )
+        else:
+            print(
+                f"   Best Train Acc: {training_state['best_val_accuracy']:.2f}% "
+                f"(Epoch {training_state['best_epoch']+1})"
+            )
+        if adv_val_metrics is not None:
+            print(
+                f"   Adv Val Loss: {adv_val_metrics['loss']:.4f} | "
+                f"Adv Val Acc: {adv_val_metrics['accuracy']:.2f}%"
+            )
+        print(
+            f"   LR: {optimizer.param_groups[0]['lr']:.6f} | Time: {epoch_time:.2f}s"
+        )
+        print(
+            f"   Early Stop Counter: {training_state['early_stopping_counter']}/"
+            f"{early_stopping_patience}"
+        )
+
+    @staticmethod
+    def _finalize_imagenette_adversarial_training(
+        training_state: dict,
+        start_time: datetime,
+        save_model_path: Optional[str],
+        writer: Optional[SummaryWriter],
+        verbose: bool,
+        use_preattacked_images: bool,
+        training_mode: Optional[str] = None,
+        best_label: str = 'Validation',
+        include_adv_summary: bool = False,
+    ) -> dict:
+        total_time = (datetime.now() - start_time).total_seconds()
+        training_state['total_training_time'] = total_time
+
+        if save_model_path:
+            Training._save_adversarial_training_results_csv(
+                training_state,
+                save_model_path,
+                use_preattacked_images,
+                training_mode=training_mode,
+            )
+
+        if verbose:
+            print(f"\n✅ Adversarial Training Complete!")
+            print(f"{'='*70}")
+            print(f"Training Time: {total_time:.2f}s ({total_time/60:.2f} minutes)")
+            print(f"\n📊 Best Performance:")
+            if training_state['val_accuracies']:
+                print(
+                    f"   Best {best_label} Accuracy: "
+                    f"{training_state['best_val_accuracy']:.2f}% "
+                    f"(Epoch {training_state['best_epoch']+1})"
+                )
+                print(
+                    f"   Final {best_label} Accuracy: "
+                    f"{training_state['val_accuracies'][-1]:.2f}%"
+                )
+            else:
+                print(
+                    f"   Best Training Accuracy: "
+                    f"{training_state['best_val_accuracy']:.2f}% "
+                    f"(Epoch {training_state['best_epoch']+1})"
+                )
+            if include_adv_summary and training_state.get('adv_val_accuracies'):
+                print(
+                    f"   Best Adversarial Validation Accuracy: "
+                    f"{training_state['best_adv_val_accuracy']:.2f}%"
+                )
+            print(f"   Final Training Loss: {training_state['train_losses'][-1]:.4f}")
+            if save_model_path:
+                print(f"\n💾 Model saved to: {save_model_path}")
+            print(f"{'='*70}")
+
+        if writer is not None:
+            writer.close()
+
+        return training_state
 
     @staticmethod
     def train_binary(
@@ -873,13 +1150,9 @@ class Training:
             print(f"Device: {device}")
         
         model_name = model.__class__.__name__
-        # Setup TensorBoard logging
-        if writer is None:
-            date = datetime.now().strftime("%d-%m-%Y_%H-%M")
-            log_dir = f'runs/adversarial_training/{model_name}/{date}_lr={learning_rate}'
-            writer = SummaryWriter(log_dir=log_dir)
-            if verbose:
-                print(f"📊 TensorBoard logging to: {log_dir}")
+        date = datetime.now().strftime("%d-%m-%Y_%H-%M")
+        log_dir = f'runs/adversarial_training/{model_name}/{date}_lr={learning_rate}'
+        writer = Training._create_or_get_writer(writer, log_dir, verbose)
         
         # Move model to device
         model = model.to(device)
@@ -893,39 +1166,26 @@ class Training:
             optimizer, scheduler_type, scheduler_params, num_epochs
         )
         
-        # Training state tracking
-        training_state = {
-            'best_val_accuracy': 0.0,
-            'best_epoch': 0,
-            'train_losses': [],
-            'train_accuracies': [],
-            'val_losses': [],
-            'val_accuracies': [],
-            'learning_rates': [],
-            'epoch_times': [],
-            'early_stopping_counter': 0,
-            'model_name': model_name,
-            'device': str(device),
-            'total_params': sum(p.numel() for p in model.parameters()),
-            'trainable_params': sum(p.numel() for p in model.parameters() if p.requires_grad),
-            'use_preattacked_images': use_preattacked_images,
-            'attack_names': attack_names if not use_preattacked_images else None,
-            'adversarial_ratio': adversarial_ratio if not use_preattacked_images else None
-        }
+        training_state = Training._build_imagenette_adversarial_training_state(
+            model=model,
+            device=device,
+            use_preattacked_images=use_preattacked_images,
+            attack_names=attack_names if not use_preattacked_images else None,
+            adversarial_ratio=adversarial_ratio if not use_preattacked_images else None,
+        )
         
         if verbose:
-            print(f"📈 Adversarial Training Configuration:")
-            print(f"   Model: {model_name}")
-            print(f"   Mode: {'Pre-attacked Images' if use_preattacked_images else 'On-the-fly Generation'}")
-            print(f"   Parameters: {training_state['trainable_params']:,} trainable / {training_state['total_params']:,} total")
-            print(f"   Learning Rate: {learning_rate}")
-            print(f"   Epochs: {num_epochs}")
-            print(f"   Batch Size: {train_loader.batch_size}")
-            if not use_preattacked_images:
-                print(f"   Attacks: {', '.join(attack_names)}")
-                print(f"   Adversarial Ratio: {adversarial_ratio:.1%}")
-            print(f"   Scheduler: {scheduler_type}")
-            print(f"   Early Stopping: {early_stopping_patience} epochs")
+            Training._print_imagenette_adversarial_training_configuration(
+                training_state=training_state,
+                learning_rate=learning_rate,
+                num_epochs=num_epochs,
+                batch_size=train_loader.batch_size,
+                scheduler_type=scheduler_type,
+                early_stopping_patience=early_stopping_patience,
+                mode_label='Pre-attacked Images' if use_preattacked_images else 'On-the-fly Generation',
+                attack_names=attack_names if not use_preattacked_images else None,
+                adversarial_ratio=adversarial_ratio if not use_preattacked_images else None,
+            )
         
         # Training loop
         start_time = datetime.now()
@@ -960,33 +1220,23 @@ class Training:
                         model, test_loader, criterion, device, verbose, epoch, num_epochs
                     )
             
-            # Update learning rate
-            if scheduler is not None:
-                if scheduler_type == 'plateau' and val_metrics is not None:
-                    scheduler.step(val_metrics['loss'])
-                else:
-                    scheduler.step()
-            
-            # Record metrics
-            training_state['train_losses'].append(train_metrics['loss'])
-            training_state['train_accuracies'].append(train_metrics['accuracy'])
-            training_state['learning_rates'].append(optimizer.param_groups[0]['lr'])
             epoch_time = (datetime.now() - epoch_start_time).total_seconds()
-            training_state['epoch_times'].append(epoch_time)
-            
-            if val_metrics is not None:
-                training_state['val_losses'].append(val_metrics['loss'])
-                training_state['val_accuracies'].append(val_metrics['accuracy'])
-            
-            # TensorBoard logging
-            if writer is not None:
-                writer.add_scalar('Loss/train', train_metrics['loss'], epoch)
-                writer.add_scalar('Accuracy/train', train_metrics['accuracy'], epoch)
-                writer.add_scalar('LearningRate', optimizer.param_groups[0]['lr'], epoch)
-                writer.add_scalar('Epoch_Time', epoch_time, epoch)
-                if val_metrics is not None:
-                    writer.add_scalar('Loss/val', val_metrics['loss'], epoch)
-                    writer.add_scalar('Accuracy/val', val_metrics['accuracy'], epoch)
+            Training._step_scheduler(scheduler, scheduler_type, val_metrics)
+            Training._record_imagenette_adversarial_epoch_metrics(
+                training_state=training_state,
+                train_metrics=train_metrics,
+                optimizer=optimizer,
+                epoch_time=epoch_time,
+                val_metrics=val_metrics,
+            )
+            Training._log_imagenette_adversarial_epoch_metrics(
+                writer=writer,
+                epoch=epoch,
+                train_metrics=train_metrics,
+                optimizer=optimizer,
+                epoch_time=epoch_time,
+                val_metrics=val_metrics,
+            )
             
             # Check for improvement (based on validation accuracy if available, else training accuracy)
             if val_metrics is not None:
@@ -994,31 +1244,30 @@ class Training:
             else:
                 current_accuracy = train_metrics['accuracy']
             
-            if current_accuracy > training_state['best_val_accuracy'] + min_delta:
-                training_state['best_val_accuracy'] = current_accuracy
-                training_state['best_epoch'] = epoch
-                training_state['early_stopping_counter'] = 0
-                
-                # Save best model
-                if save_model_path:
-                    save_model(model, save_model_path)
-                    if verbose:
-                        metric_type = "Val" if val_metrics is not None else "Train"
-                        print(f"💾 Best model saved ({metric_type} Acc: {current_accuracy:.2f}%)")
-            else:
-                training_state['early_stopping_counter'] += 1
+            # Training._update_best_imagenette_adversarial_model(
+            #     training_state=training_state,
+            #     current_accuracy=current_accuracy,
+            #     epoch=epoch,
+            #     min_delta=min_delta,
+            #     model=model,
+            #     save_model_path=save_model_path,
+            #     verbose=verbose,
+            #     metric_type="Val" if val_metrics is not None else "Train",
+            # )
             
             # Print epoch summary
             if verbose:
-                print(f"\n📊 Epoch {epoch+1}/{num_epochs} Summary:")
-                print(f"   Train Loss: {train_metrics['loss']:.4f} | Train Acc: {train_metrics['accuracy']:.2f}%")
-                if val_metrics is not None:
-                    print(f"   Val Loss: {val_metrics['loss']:.4f} | Val Acc: {val_metrics['accuracy']:.2f}%")
-                    print(f"   Best Val Acc: {training_state['best_val_accuracy']:.2f}% (Epoch {training_state['best_epoch']+1})")
-                else:
-                    print(f"   Best Train Acc: {training_state['best_val_accuracy']:.2f}% (Epoch {training_state['best_epoch']+1})")
-                print(f"   LR: {optimizer.param_groups[0]['lr']:.6f} | Time: {epoch_time:.2f}s")
-                print(f"   Early Stop Counter: {training_state['early_stopping_counter']}/{early_stopping_patience}")
+                Training._print_imagenette_adversarial_epoch_summary(
+                    epoch=epoch,
+                    num_epochs=num_epochs,
+                    train_metrics=train_metrics,
+                    training_state=training_state,
+                    optimizer=optimizer,
+                    epoch_time=epoch_time,
+                    early_stopping_patience=early_stopping_patience,
+                    val_metrics=val_metrics,
+                    best_label='Val',
+                )
             
             # Early stopping check
             if training_state['early_stopping_counter'] >= early_stopping_patience:
@@ -1027,40 +1276,201 @@ class Training:
                     print(f"   No improvement for {early_stopping_patience} consecutive epochs")
                 break
         
-        # Training complete
-        total_time = (datetime.now() - start_time).total_seconds()
-        training_state['total_training_time'] = total_time
-        
-        # Save validation results to CSV
-        if save_model_path:
-            Training._save_adversarial_training_results_csv(
-                training_state, save_model_path, use_preattacked_images
+        return Training._finalize_imagenette_adversarial_training(
+            training_state=training_state,
+            start_time=start_time,
+            save_model_path=save_model_path,
+            writer=writer,
+            verbose=verbose,
+            use_preattacked_images=use_preattacked_images,
+        )
+
+    @staticmethod
+    def train_imagenette_adversarial_progressive(
+        model: Module,
+        iteration_data_generator: Callable[[Module, int], Dict],
+        clean_test_loader: DataLoader,
+        learning_rate: float = 0.001,
+        iterations: int = 5,
+        epochs_per_iteration: int = 2,
+        device: str = 'cuda',
+        save_model_path: str = None,
+        writer: SummaryWriter = None,
+        early_stopping_patience: int = 7,
+        min_delta: float = 0.001,
+        scheduler_type: str = 'step',
+        scheduler_params: dict = None,
+        gradient_clip_norm: float = None,
+        weight_decay: float = 0.0,
+        verbose: bool = True,
+    ) -> dict:
+        """
+        Train ImageNette model with progressive adversarial dataset growth.
+
+        The unique progressive part is delegated to `iteration_data_generator`,
+        which should return a dictionary with:
+        - train_loader: DataLoader for the cumulative attacked train dataset
+        - adv_test_loader: optional DataLoader for cumulative attacked validation set
+        - train_dataset_size: optional cumulative train dataset size
+        - adv_test_dataset_size: optional cumulative attacked validation size
+        """
+        if not isinstance(model, Module):
+            raise TypeError(f"Model must be a PyTorch Module, got {type(model)}")
+        if iteration_data_generator is None:
+            raise ValueError("iteration_data_generator cannot be None")
+        if clean_test_loader is None:
+            raise ValueError("clean_test_loader cannot be None")
+        if iterations <= 0:
+            raise ValueError(f"iterations must be positive, got {iterations}")
+        if epochs_per_iteration <= 0:
+            raise ValueError(
+                f"epochs_per_iteration must be positive, got {epochs_per_iteration}"
             )
-        
+
+        device = torch.device(device if torch.cuda.is_available() else 'cpu')
         if verbose:
-            print(f"\n✅ Adversarial Training Complete!")
+            print(f"🛡️ Progressive Adversarial Training for ImageNette")
             print(f"{'='*70}")
-            print(f"Training Time: {total_time:.2f}s ({total_time/60:.2f} minutes)")
-            print(f"\n📊 Best Performance:")
-            if training_state['val_accuracies']:
-                print(f"   Best Validation Accuracy: {training_state['best_val_accuracy']:.2f}% (Epoch {training_state['best_epoch']+1})")
-                print(f"   Final Validation Accuracy: {training_state['val_accuracies'][-1]:.2f}%")
-            else:
-                print(f"   Best Training Accuracy: {training_state['best_val_accuracy']:.2f}% (Epoch {training_state['best_epoch']+1})")
-            print(f"   Final Training Loss: {training_state['train_losses'][-1]:.4f}")
-            
-            if save_model_path:
-                print(f"\n💾 Model saved to: {save_model_path}")
-            print(f"{'='*70}")
-        
-        # Close writer
-        if writer is not None:
-            writer.close()
-        
-        return training_state
+            print(f"Device: {device}")
+
+        model_name = model.__class__.__name__
+        date = datetime.now().strftime("%d-%m-%Y_%H-%M")
+        log_dir = f'runs/adversarial_training_progressive/{model_name}/{date}'
+        writer = Training._create_or_get_writer(writer, log_dir, verbose)
+
+        model = model.to(device)
+        criterion = CrossEntropyLoss()
+
+        training_state = Training._build_imagenette_adversarial_training_state(
+            model=model,
+            device=device,
+            extra_state={
+                'best_adv_val_accuracy': 0.0,
+                'adv_val_losses': [],
+                'adv_val_accuracies': [],
+                'train_dataset_sizes': [],
+                'test_dataset_sizes': [],
+                'iterations_completed': 0,
+                'training_mode': 'progressive',
+            },
+        )
+
+        global_epoch = 0
+        start_time = datetime.now()
+        for iteration in range(iterations):
+            iteration_data = iteration_data_generator(model, iteration)
+            train_loader = iteration_data['train_loader']
+            val_loader = iteration_data.get('val_loader', clean_test_loader)
+            adv_test_loader = iteration_data.get('adv_test_loader')
+            optimizer = Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
+            scheduler = Training._setup_scheduler(
+                optimizer, scheduler_type, scheduler_params, epochs_per_iteration
+            )
+            training_state['early_stopping_counter'] = 0
+            training_state['iterations_completed'] = iteration + 1
+            training_state['train_dataset_sizes'].append(
+                iteration_data.get('train_dataset_size', len(train_loader.dataset))
+            )
+            training_state['test_dataset_sizes'].append(
+                iteration_data.get(
+                    'val_dataset_size',
+                    len(val_loader.dataset)
+                )
+            )
+
+            for local_epoch in range(epochs_per_iteration):
+                epoch_start_time = datetime.now()
+
+                train_metrics = Training._train_preattacked_epoch(
+                    model, train_loader, criterion, optimizer, device, verbose,
+                    local_epoch, epochs_per_iteration
+                )
+                clean_val_metrics = Validation.validate_imagenette_epoch(
+                    model, val_loader, criterion, device, verbose,
+                    local_epoch, epochs_per_iteration
+                )
+                adv_val_metrics = None
+                if adv_test_loader is not None:
+                    adv_val_metrics = Training._validate_preattacked_epoch(
+                        model, adv_test_loader, criterion, device, verbose,
+                        local_epoch, epochs_per_iteration
+                    )
+
+                epoch_time = (datetime.now() - epoch_start_time).total_seconds()
+                Training._step_scheduler(scheduler, scheduler_type, clean_val_metrics)
+                Training._record_imagenette_adversarial_epoch_metrics(
+                    training_state=training_state,
+                    train_metrics=train_metrics,
+                    optimizer=optimizer,
+                    epoch_time=epoch_time,
+                    val_metrics=clean_val_metrics,
+                    adv_val_metrics=adv_val_metrics,
+                )
+                Training._log_imagenette_adversarial_epoch_metrics(
+                    writer=writer,
+                    epoch=global_epoch,
+                    train_metrics=train_metrics,
+                    optimizer=optimizer,
+                    epoch_time=epoch_time,
+                    val_metrics={
+                        'loss': clean_val_metrics['loss'],
+                        'accuracy': clean_val_metrics['accuracy'],
+                    },
+                    adv_val_metrics=adv_val_metrics,
+                    extra_scalars={
+                        'Dataset/train_size': training_state['train_dataset_sizes'][-1],
+                        'Dataset/test_size': training_state['test_dataset_sizes'][-1],
+                    },
+                )
+
+                if verbose:
+                    Training._print_imagenette_adversarial_epoch_summary(
+                        epoch=local_epoch,
+                        num_epochs=epochs_per_iteration,
+                        train_metrics=train_metrics,
+                        training_state=training_state,
+                        optimizer=optimizer,
+                        epoch_time=epoch_time,
+                        early_stopping_patience=early_stopping_patience,
+                        val_metrics=clean_val_metrics,
+                        adv_val_metrics=adv_val_metrics,
+                        best_label='Clean Val',
+                    )
+
+                global_epoch += 1
+
+                if training_state['early_stopping_counter'] >= early_stopping_patience:
+                    if verbose:
+                        print(
+                            f"\n⚠️ Early stopping triggered inside iteration "
+                            f"{iteration + 1} after {training_state['early_stopping_counter']} "
+                            f"consecutive non-improving epochs"
+                        )
+                        print(
+                            f"   Moving to the next iteration with a newly expanded "
+                            f"adversarial dataset"
+                        )
+                    break
+
+        return Training._finalize_imagenette_adversarial_training(
+            training_state=training_state,
+            start_time=start_time,
+            save_model_path=save_model_path,
+            writer=writer,
+            verbose=verbose,
+            use_preattacked_images=True,
+            training_mode='progressive',
+            best_label='Combined Validation',
+            include_adv_summary=True,
+        )
     
     @staticmethod
-    def _save_adversarial_training_results_csv(training_state, model_path, use_preattacked_images):
+    def _save_adversarial_training_results_csv(
+        training_state,
+        model_path,
+        use_preattacked_images,
+        training_mode: Optional[str] = None,
+    ):
         """Save adversarial training summary to CSV file."""
         import csv
         
@@ -1075,16 +1485,15 @@ class Training:
         
         # Generate filename
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        mode = "preattacked" if use_preattacked_images else "onthefly"
+        mode = training_mode if training_mode is not None else (
+            "preattacked" if use_preattacked_images else "onthefly"
+        )
         summary_filename = f"summary_{mode}_{timestamp}.csv"
         summary_path = os.path.join(model_results_dir, summary_filename)
         
-        # Save summary file
-        num_epochs = len(training_state['train_losses'])
-        
         with open(summary_path, 'w', newline='') as f:
             writer = csv.DictWriter(f, fieldnames=[
-                'model_name', 'training_mode', 'total_epochs', 'best_val_accuracy', 'best_epoch',
+                'model_name', 'training_mode', 'it', 'best_val_accuracy', 'best_epoch',
                 'final_train_loss', 'final_train_accuracy', 'final_val_accuracy', 
                 'total_training_time', 'total_params', 'trainable_params', 'device'
             ])
@@ -1093,7 +1502,7 @@ class Training:
             writer.writerow({
                 'model_name': model_name,
                 'training_mode': mode,
-                'total_epochs': num_epochs,
+                'it': training_state.get('iterations_completed', ''),
                 'best_val_accuracy': training_state['best_val_accuracy'],
                 'best_epoch': training_state['best_epoch'] + 1,
                 'final_train_loss': training_state['train_losses'][-1],
@@ -1115,7 +1524,7 @@ class Training:
         correct_predictions = 0
         total_samples = 0
         
-        progress_bar = tqdm(train_loader, desc=f"Epoch {epoch+1}/{num_epochs} [Adv Train]",
+        progress_bar = tqdm(train_loader, desc=f"Epoch {epoch+1}/{num_epochs} [Adv Train] [{model.__class__.__name__}]",
                           disable=not verbose)
         
         for batch_idx, (data, target) in enumerate(progress_bar):

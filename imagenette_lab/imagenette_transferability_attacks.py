@@ -892,10 +892,10 @@ if __name__ == "__main__":
     # Example usage
     model_names = [
         ModelNames().resnet18,
-        ModelNames().vgg16,
         ModelNames().densenet121,
         ModelNames().mobilenet_v2,
-        ModelNames().efficientnet_b0
+        ModelNames().efficientnet_b0,
+        ModelNames().vgg16,
     ]
     
     attack_names = AttackNames().all_attack_names
