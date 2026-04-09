@@ -154,7 +154,7 @@ class Training:
             print(f"🚀 Training on device: {device}")
         
         # Setup model name
-        model_name = model.__class__.__name__
+        model_name = model_name or model.__class__.__name__
         
         # Setup TensorBoard logging
         if writer is None and verbose:
@@ -324,7 +324,7 @@ class Training:
                          gamma=scheduler_params.get('gamma', 0.8))
         elif scheduler_type == 'plateau':
             return ReduceLROnPlateau(optimizer, mode='max', factor=scheduler_params.get('factor', 0.5),
-                                   patience=scheduler_params.get('patience', 3), verbose=True)
+                                   patience=scheduler_params.get('patience', 3))
         elif scheduler_type == 'cosine':
             from torch.optim.lr_scheduler import CosineAnnealingLR
             return CosineAnnealingLR(optimizer, T_max=num_epochs, 
@@ -569,7 +569,6 @@ class Training:
         if current_accuracy > training_state['best_val_accuracy'] + min_delta:
             training_state['best_val_accuracy'] = current_accuracy
             training_state['best_epoch'] = epoch
-            training_state['early_stopping_counter'] = 0
             if save_model_path:
                 save_model_dir = os.path.dirname(save_model_path)
                 if save_model_dir:
@@ -580,8 +579,6 @@ class Training:
                         f"💾 Best model saved ({metric_type} Acc: "
                         f"{current_accuracy:.2f}%)"
                     )
-        else:
-            training_state['early_stopping_counter'] += 1
 
     @staticmethod
     def _print_imagenette_adversarial_epoch_summary(
@@ -798,7 +795,7 @@ class Training:
             print(f"Device: {device}")
         
         # Setup model name
-        model_name = model.__class__.__name__
+        model_name = model_name or model.__class__.__name__
         
         # Setup TensorBoard logging
         if writer is None:
@@ -1362,11 +1359,19 @@ class Training:
             train_loader = iteration_data['train_loader']
             val_loader = iteration_data.get('val_loader', clean_test_loader)
             adv_test_loader = iteration_data.get('adv_test_loader')
+            iteration_save_model_path = None
+            if save_model_path:
+                path_root, path_ext = os.path.splitext(save_model_path)
+                iteration_save_model_path = (
+                    f"{path_root}_it{iteration + 1}{path_ext or '.pt'}"
+                )
+            iteration_current_accuracy = None
             optimizer = Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
             scheduler = Training._setup_scheduler(
                 optimizer, scheduler_type, scheduler_params, epochs_per_iteration
             )
             training_state['early_stopping_counter'] = 0
+            iteration_best_val_accuracy = float('-inf')
             training_state['iterations_completed'] = iteration + 1
             training_state['train_dataset_sizes'].append(
                 iteration_data.get('train_dataset_size', len(train_loader.dataset))
@@ -1423,16 +1428,25 @@ class Training:
                     },
                 )
 
+                current_accuracy = clean_val_metrics['accuracy']
+                if current_accuracy > iteration_best_val_accuracy + min_delta:
+                    iteration_best_val_accuracy = current_accuracy
+                    training_state['early_stopping_counter'] = 0
+                else:
+                    training_state['early_stopping_counter'] += 1
+
                 Training._update_best_imagenette_adversarial_model(
                     training_state=training_state,
-                    current_accuracy=clean_val_metrics['accuracy'],
+                    current_accuracy=current_accuracy,
                     epoch=global_epoch,
                     min_delta=min_delta,
                     model=model,
-                    save_model_path=save_model_path,
+                    save_model_path=None,
                     verbose=verbose,
                     metric_type='Clean Val',
                 )
+
+                iteration_current_accuracy = current_accuracy
 
                 if verbose:
                     Training._print_imagenette_adversarial_epoch_summary(
@@ -1462,6 +1476,23 @@ class Training:
                             f"adversarial dataset"
                         )
                     break
+
+            if iteration_save_model_path and iteration_current_accuracy is not None:
+                iteration_path_root, iteration_path_ext = os.path.splitext(iteration_save_model_path)
+                accuracy_tag = f"{iteration_current_accuracy:.2f}".replace(".", "_")
+                iteration_checkpoint_path = (
+                    f"{iteration_path_root}_acc{accuracy_tag}{iteration_path_ext or '.pt'}"
+                )
+                save_model_dir = os.path.dirname(iteration_checkpoint_path)
+                if save_model_dir:
+                    os.makedirs(save_model_dir, exist_ok=True)
+                save_model(model, iteration_checkpoint_path)
+                if verbose:
+                    print(
+                        f"💾 Iteration {iteration + 1} model saved "
+                        f"(Clean Val Acc: {iteration_current_accuracy:.2f}%) -> "
+                        f"{iteration_checkpoint_path}"
+                    )
 
         return Training._finalize_imagenette_adversarial_training(
             training_state=training_state,

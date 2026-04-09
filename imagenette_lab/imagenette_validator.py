@@ -15,13 +15,16 @@ Usage:
 
 import torch
 import os
+import random
 import sys
 import pandas as pd
 from datetime import datetime
 from typing import List, Dict, Optional
 import numpy as np
+import torchvision.datasets as datasets
+from torch.utils.data import DataLoader
 
-from imagenette_lab.imagenette_training_configs import ImageNetteTrainingConfigs
+from imagenette_lab.training.imagenette_training_configs import ImageNetteTrainingConfigs
 
 # Add project root to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -31,6 +34,7 @@ from domain.model.model_names import ModelNames
 from data_eng.dataset_loader import load_imagenette
 from data_eng.io import load_model_imagenette, load_model_binary
 from data_eng.dataset_loader import load_attacked_imagenette
+from data_eng.transforms import imagenette_transformer
 from evaluation.metrics import Metrics
 
 class ImageNetteValidator:
@@ -432,6 +436,57 @@ class ImageNetteValidator:
         }
     
     # ===== NOISE DETECTION VALIDATION METHODS =====
+
+    @staticmethod
+    def _build_balanced_binary_loader(
+        clean_dataset,
+        attacked_dataset,
+        batch_size: int,
+        shuffle: bool,
+        split_name: str,
+        clean_to_attacked_ratio: float = 1.0,
+        random_seed: int = 42,
+    ) -> DataLoader:
+        if len(clean_dataset) == 0 or len(attacked_dataset) == 0:
+            raise FileNotFoundError(
+                f"Unable to build {split_name} split: missing clean or attacked images"
+            )
+
+        if clean_to_attacked_ratio == -1:
+            clean_count = len(clean_dataset)
+            attacked_count = len(attacked_dataset)
+        else:
+            if clean_to_attacked_ratio <= 0:
+                raise ValueError(
+                    "clean_to_attacked_ratio must be positive or -1 to disable balancing"
+                )
+            attacked_count = min(
+                len(attacked_dataset),
+                max(1, int(len(clean_dataset) / clean_to_attacked_ratio)),
+            )
+            clean_count = min(
+                len(clean_dataset),
+                max(1, int(attacked_count * clean_to_attacked_ratio)),
+            )
+
+        random.seed(random_seed)
+        clean_indices = random.sample(range(len(clean_dataset)), clean_count)
+        attacked_indices = random.sample(range(len(attacked_dataset)), attacked_count)
+
+        mixed_dataset = []
+
+        for idx in attacked_indices:
+            image, _ = attacked_dataset[idx]
+            mixed_dataset.append((image, 1))
+
+        for idx in clean_indices:
+            image, _ = clean_dataset[idx]
+            mixed_dataset.append((image, 0))
+
+        if shuffle:
+            random.shuffle(mixed_dataset)
+
+        return DataLoader(mixed_dataset, batch_size=batch_size, shuffle=shuffle)
     
     def _get_noise_detection_model_path(self, model_name: str) -> str:
         """
@@ -443,7 +498,21 @@ class ImageNetteValidator:
         Returns:
             str: Path to the noise detection model file
         """
-        return os.path.join(self.noise_detection_models_dir, f"{model_name}_noise_detector.pt")
+        exact_path = os.path.join(self.noise_detection_models_dir, f"{model_name}_noise_detector.pt")
+        if os.path.exists(exact_path):
+            return exact_path
+
+        prefix = f"{model_name}_noise_detector_"
+        candidates = [
+            filename
+            for filename in os.listdir(self.noise_detection_models_dir)
+            if filename.startswith(prefix) and filename.endswith(".pt")
+        ]
+        if not candidates:
+            return exact_path
+
+        candidates.sort(reverse=True)
+        return os.path.join(self.noise_detection_models_dir, candidates[0])
     
     def _noise_detection_model_exists(self, model_name: str) -> bool:
         """
@@ -470,7 +539,7 @@ class ImageNetteValidator:
             if self._noise_detection_model_exists(model_name):
                 available_models.append(model_name)
             else:
-                print(f"⚠️ Noise detection model not found: {model_name}_noise_detector.pt")
+                print(f"⚠️ Noise detection model not found for prefix: {model_name}_noise_detector")
         
         return available_models
     
@@ -495,7 +564,7 @@ class ImageNetteValidator:
         try:
             # Check if model exists
             if not self._noise_detection_model_exists(model_name):
-                raise FileNotFoundError(f"Noise detection model {model_name}_noise_detector.pt not found")
+                raise FileNotFoundError(f"Noise detection model for prefix {model_name}_noise_detector not found")
             
             # Load model
             model_path = self._get_noise_detection_model_path(model_name)
@@ -508,12 +577,21 @@ class ImageNetteValidator:
             
             # Load test dataset
             print(f"   Loading test dataset...")
-            _, test_loader = load_attacked_imagenette(
-                attacked_images_folder=attacked_images_folder,
-                clean_train_folder="./data/imagenette/train",  # Not used for test
-                clean_test_folder=clean_test_folder,
+            _, attacked_test_loader = load_attacked_imagenette(
+                path_to_data=attacked_images_folder,
                 batch_size=batch_size,
-                shuffle=False
+                shuffle=False,
+            )
+            clean_test_dataset = datasets.ImageFolder(
+                root=clean_test_folder,
+                transform=imagenette_transformer(),
+            )
+            test_loader = self._build_balanced_binary_loader(
+                clean_dataset=clean_test_dataset,
+                attacked_dataset=attacked_test_loader.dataset,
+                batch_size=batch_size,
+                shuffle=False,
+                split_name="test",
             )
             
             # Evaluate model

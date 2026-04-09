@@ -192,169 +192,71 @@ def _load_adversarial_images_from_folder(folder_path: str):
     return adversarial_images
 
 
-def load_attacked_imagenette(
-    attacked_images_folder: str = "data/attacks/imagenette_models",
-    clean_train_folder: str = "./data/imagenette/train",
-    clean_test_folder: str = "./data/imagenette/val",
-    batch_size: int = 32,
-    shuffle: bool = True,
-    transform=None
-):
+def load_attacked_imagenette(transform=None, path_to_data='data/attacks/imagenette_models', batch_size=1, train_subset_size=-1, test_subset_size=-1, shuffle=True):
     """
-    Load attacked ImageNette images from all models and attacks for binary classification.
-    
-    Creates balanced datasets:
-    - Train: adversarial images (label=1) from train folder + 2x clean images (label=0) from train folder
-    - Test: adversarial images (label=1) from test folder + equal clean images (label=0) from val folder
-    
+    Load only attacked ImageNette images from disk.
+
     Folder structure expected:
-        attacked_images_folder/
+        path_to_data/
             train/
                 model_name/
                     attack_name/
                         class_label/
-                            timestamp.png (adversarial)
+                            timestamp.png
             test/
                 model_name/
                     attack_name/
                         class_label/
-                            timestamp.png (adversarial)
-    
-    Args:
-        attacked_images_folder: Root folder containing attacked images with train/test subfolders
-        clean_train_folder: Folder containing clean ImageNette training images
-        clean_test_folder: Folder containing clean ImageNette validation images
-        batch_size: Batch size for dataloaders
-        shuffle: Whether to shuffle the data
-        transform: Image transformation to apply (default: imagenette_transformer)
-    
-    Returns:
-        Tuple of (train_loader, test_loader)
-        - Labels: 0 = clean, 1 = adversarial
+                            timestamp.png
+
+    Returns attacked train/test loaders where every sample is labeled as 1
+    (attacked). Callers are responsible for combining with clean data and for
+    any balancing or slicing policy they want to apply.
     """
-    from PIL import Image
-    import numpy as np
-    
-    print("📁 Loading attacked ImageNette dataset for binary classification...")
-    print(f"   Attacked images folder: {attacked_images_folder}")
-    print(f"   Clean train images folder: {clean_train_folder}")
-    print(f"   Clean test images folder: {clean_test_folder}")
-    
     trans = transform if transform is not None else imagenette_transformer()
-    
-    # Storage for train and test data
+
+    print("📁 Loading attacked ImageNette images...")
+    print(f"   Attacked images folder: {path_to_data}")
+
+    if not os.path.exists(path_to_data):
+        raise FileNotFoundError(f"Attacked images folder not found: {path_to_data}")
+
+    train_folder = os.path.join(path_to_data, 'train')
+    test_folder = os.path.join(path_to_data, 'test')
+
     train_adversarial = []
     test_adversarial = []
-    
-    # Collect adversarial images from train and test folders
-    if not os.path.exists(attacked_images_folder):
-        raise FileNotFoundError(f"Attacked images folder not found: {attacked_images_folder}")
-    
-    # Load adversarial images from train folder
-    train_folder = os.path.join(attacked_images_folder, "train")
+
     if os.path.exists(train_folder):
-        print(f"🔍 Loading adversarial images from train folder...")
+        print("🔍 Loading attacked images from train folder...")
         train_adversarial = _load_adversarial_images_from_folder(train_folder)
-        print(f"✅ Loaded {len(train_adversarial)} training adversarial images")
+        print(f"✅ Loaded {len(train_adversarial)} training attacked images")
     else:
         print(f"⚠️ Train folder not found: {train_folder}")
-    
-    # Load adversarial images from test folder
-    test_folder = os.path.join(attacked_images_folder, "test")
+
     if os.path.exists(test_folder):
-        print(f"🔍 Loading adversarial images from test folder...")
+        print("🔍 Loading attacked images from test folder...")
         test_adversarial = _load_adversarial_images_from_folder(test_folder)
-        print(f"✅ Loaded {len(test_adversarial)} test adversarial images")
+        print(f"✅ Loaded {len(test_adversarial)} test attacked images")
     else:
         print(f"⚠️ Test folder not found: {test_folder}")
-    
+
     if len(train_adversarial) == 0 and len(test_adversarial) == 0:
-        raise FileNotFoundError(f"No adversarial images found in {attacked_images_folder}/train or {attacked_images_folder}/test")
-    
-    # Load clean images from separate train and test folders
-    print("📁 Loading clean ImageNette images...")
-    
-    # Load clean training images
-    clean_train_dataset = datasets.ImageFolder(root=clean_train_folder, transform=None)
-    # Load clean test images  
-    clean_test_dataset = datasets.ImageFolder(root=clean_test_folder, transform=None)
-    
-    print(f"📊 Available clean images: {len(clean_train_dataset)} train, {len(clean_test_dataset)} test")
-    
-    # IMPORTANT: For test set, match adversarial images to available clean validation images for 50:50 split
-    # Limit test adversarial images to the number of available clean validation images
-    if len(test_adversarial) > len(clean_test_dataset):
-        print(f"⚠️ Limiting test adversarial images from {len(test_adversarial)} to {len(clean_test_dataset)} to match clean validation images")
-        # Randomly sample to match clean validation set size
-        import random
-        random.seed(42)
-        sampled_indices = random.sample(range(len(test_adversarial)), len(clean_test_dataset))
-        test_adversarial = [test_adversarial[i] for i in sampled_indices]
-    
-    # Calculate how many clean images we need
-    num_clean_train = len(train_adversarial) * 2  # 2x adversarial for balance
-    num_clean_test = len(test_adversarial)  # Equal to adversarial for test (guaranteed to be <= clean_test_dataset size)
-    
-    if len(clean_train_dataset) < num_clean_train:
-        print(f"⚠️ Warning: Not enough clean training images. Need {num_clean_train}, have {len(clean_train_dataset)}")
-        num_clean_train = len(clean_train_dataset)
-    
-    # Sample clean images
-    import random
-    random.seed(42)
-    clean_train_indices = random.sample(range(len(clean_train_dataset)), num_clean_train)
-    clean_test_indices = random.sample(range(len(clean_test_dataset)), num_clean_test)
-    
-    train_clean = [clean_train_dataset[i][0] for i in clean_train_indices]
-    test_clean = [clean_test_dataset[i][0] for i in clean_test_indices]
-    
-    print(f"✅ Loaded {len(train_clean)} clean training images")
-    print(f"✅ Loaded {len(test_clean)} clean test images")
-    
-    # Create datasets with labels
-    # Label: 0 = clean, 1 = adversarial
-    print("🔨 Creating binary classification datasets...")
-    
-    train_dataset = []
-    for img in train_adversarial:
-        if trans:
-            img = trans(img)
-        train_dataset.append((img, 1))  # Adversarial = 1
-    
-    for img in train_clean:
-        if trans:
-            img = trans(img)
-        train_dataset.append((img, 0))  # Clean = 0
-    
-    test_dataset = []
-    for img in test_adversarial:
-        if trans:
-            img = trans(img)
-        test_dataset.append((img, 1))  # Adversarial = 1
-    
-    for img in test_clean:
-        if trans:
-            img = trans(img)
-        test_dataset.append((img, 0))  # Clean = 0
-    
-    # Shuffle the datasets
-    if shuffle:
-        random.shuffle(train_dataset)
-        random.shuffle(test_dataset)
-    
-    print(f"📊 Dataset Summary:")
-    print(f"   Train: {len(train_dataset)} total ({len(train_adversarial)} adv + {len(train_clean)} clean)")
-    print(f"   Test: {len(test_dataset)} total ({len(test_adversarial)} adv + {len(test_clean)} clean)")
-    print(f"   Train ratio (clean:adv): {len(train_clean)}:{len(train_adversarial)} = {len(train_clean)/len(train_adversarial):.2f}x")
-    print(f"   Test ratio (clean:adv): {len(test_clean)}:{len(test_adversarial)} = {len(test_clean)/len(test_adversarial) if len(test_adversarial) > 0 else 0:.2f}x (should be 1.0 for 50:50)")
-    
-    # Create dataloaders
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=shuffle)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)  # Don't shuffle test
-    
-    print("✅ Binary classification dataloaders created successfully!")
-    
-    return train_loader, test_loader
+        raise FileNotFoundError(
+            f"No attacked images found in {path_to_data}/train or {path_to_data}/test"
+        )
+
+    train_dataset = [(trans(img), 1) for img in train_adversarial]
+    test_dataset = [(trans(img), 1) for img in test_adversarial]
+
+    return _get_data_loaders(
+        train_dataset,
+        test_dataset,
+        batch_size=batch_size,
+        train_subset_size=train_subset_size,
+        test_subset_size=test_subset_size,
+        shuffle=shuffle,
+    )
 
 
 def load_attacked_imagenette_for_adversarial_training(
