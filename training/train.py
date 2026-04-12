@@ -1536,7 +1536,8 @@ class Training:
         with open(summary_path, 'w', newline='') as f:
             writer = csv.DictWriter(f, fieldnames=[
                 'model_name', 'training_mode', 'it', 'best_val_accuracy', 'best_epoch',
-                'final_train_loss', 'final_train_accuracy', 'final_val_accuracy', 
+                'final_train_loss', 'final_train_accuracy', 'final_val_accuracy',
+                'final_adv_val_accuracy', 'train_dataset_size', 'val_dataset_size',
                 'total_training_time', 'total_params', 'trainable_params', 'device'
             ])
             writer.writeheader()

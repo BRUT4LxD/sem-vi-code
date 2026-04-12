@@ -15,7 +15,6 @@ Usage:
 
 import torch
 import os
-import random
 import sys
 import pandas as pd
 from datetime import datetime
@@ -32,6 +31,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config.imagenette_classes import ImageNetteClasses
 from domain.model.model_names import ModelNames
 from data_eng.dataset_loader import load_imagenette
+from data_eng.noise_detection_dataset_builder import build_binary_noise_loader
 from data_eng.io import load_model_imagenette, load_model_binary
 from data_eng.dataset_loader import load_attacked_imagenette
 from data_eng.transforms import imagenette_transformer
@@ -437,57 +437,6 @@ class ImageNetteValidator:
     
     # ===== NOISE DETECTION VALIDATION METHODS =====
 
-    @staticmethod
-    def _build_balanced_binary_loader(
-        clean_dataset,
-        attacked_dataset,
-        batch_size: int,
-        shuffle: bool,
-        split_name: str,
-        clean_to_attacked_ratio: float = 1.0,
-        random_seed: int = 42,
-    ) -> DataLoader:
-        if len(clean_dataset) == 0 or len(attacked_dataset) == 0:
-            raise FileNotFoundError(
-                f"Unable to build {split_name} split: missing clean or attacked images"
-            )
-
-        if clean_to_attacked_ratio == -1:
-            clean_count = len(clean_dataset)
-            attacked_count = len(attacked_dataset)
-        else:
-            if clean_to_attacked_ratio <= 0:
-                raise ValueError(
-                    "clean_to_attacked_ratio must be positive or -1 to disable balancing"
-                )
-            attacked_count = min(
-                len(attacked_dataset),
-                max(1, int(len(clean_dataset) / clean_to_attacked_ratio)),
-            )
-            clean_count = min(
-                len(clean_dataset),
-                max(1, int(attacked_count * clean_to_attacked_ratio)),
-            )
-
-        random.seed(random_seed)
-        clean_indices = random.sample(range(len(clean_dataset)), clean_count)
-        attacked_indices = random.sample(range(len(attacked_dataset)), attacked_count)
-
-        mixed_dataset = []
-
-        for idx in attacked_indices:
-            image, _ = attacked_dataset[idx]
-            mixed_dataset.append((image, 1))
-
-        for idx in clean_indices:
-            image, _ = clean_dataset[idx]
-            mixed_dataset.append((image, 0))
-
-        if shuffle:
-            random.shuffle(mixed_dataset)
-
-        return DataLoader(mixed_dataset, batch_size=batch_size, shuffle=shuffle)
-    
     def _get_noise_detection_model_path(self, model_name: str) -> str:
         """
         Get the path to a trained noise detection model.
@@ -586,7 +535,7 @@ class ImageNetteValidator:
                 root=clean_test_folder,
                 transform=imagenette_transformer(),
             )
-            test_loader = self._build_balanced_binary_loader(
+            test_loader = build_binary_noise_loader(
                 clean_dataset=clean_test_dataset,
                 attacked_dataset=attacked_test_loader.dataset,
                 batch_size=batch_size,

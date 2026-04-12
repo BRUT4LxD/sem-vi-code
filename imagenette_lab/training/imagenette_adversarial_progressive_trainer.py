@@ -500,12 +500,14 @@ class ImageNetteAdversarialProgressiveTrainer(BaseImageNetteTrainer):
 
 if __name__ == "__main__":
     model_names = [
-        ModelNames().resnet18,
-        ModelNames().densenet121,
-        ModelNames().mobilenet_v2,
-        ModelNames().efficientnet_b0,
+        # ModelNames().resnet18,
+        # ModelNames().densenet121,
+        # ModelNames().mobilenet_v2,
+        # ModelNames().efficientnet_b0,
         ModelNames().vgg16,
     ]
+
+    print(f"Model names: {model_names}")
     attack_names = AttackNames().all_attack_names
 
     trainer = ImageNetteAdversarialProgressiveTrainer(device="auto")
@@ -522,11 +524,11 @@ if __name__ == "__main__":
         models=models,
         attack_names=attack_names,
         learning_rate=0.001,
-        iterations=50,
+        iterations=30,
         epochs_per_iteration=50,
         batch_size=32,
-        images_per_attack_per_iteration=10,
-        validation_images_per_attack_per_iteration=2,
+        images_per_attack_per_iteration=5,
+        validation_images_per_attack_per_iteration=1,
         save_generated_images=True,
         attacked_images_folder="data/attacks/imagenette_models",
     )

@@ -1,15 +1,14 @@
 import os
-import random
 from datetime import datetime
 from typing import Dict, List
 
 import torchvision.datasets as datasets
 from config.imagenet_models import ImageNetModels
 from domain.model.model_names import ModelNames
-from torch.utils.data import DataLoader
 
 from data_eng.dataset_loader import load_attacked_imagenette
-from data_eng.transforms import imagenette_transformer
+from data_eng.noise_detection_dataset_builder import build_binary_noise_loader
+from data_eng.transforms import imagenette_augmentation_transformer, imagenette_transformer
 from imagenette_lab.training.imagenette_base_trainer import BaseImageNetteTrainer
 from training.train import Training
 
@@ -19,62 +18,6 @@ class ImageNetteNoiseDetectionTrainer(BaseImageNetteTrainer):
     Noise detection training for ImageNette adversarial vs clean classification.
     """
 
-    @staticmethod
-    def _build_balanced_binary_loader(
-        clean_dataset,
-        attacked_dataset,
-        batch_size: int,
-        shuffle: bool,
-        split_name: str,
-        clean_to_attacked_ratio: float = 1.0,
-        random_seed: int = 42,
-    ) -> DataLoader:
-        if len(clean_dataset) == 0 or len(attacked_dataset) == 0:
-            raise FileNotFoundError(
-                f"Unable to build {split_name} split: missing clean or attacked images"
-            )
-
-        if clean_to_attacked_ratio == -1:
-            clean_count = len(clean_dataset)
-            attacked_count = len(attacked_dataset)
-        else:
-            if clean_to_attacked_ratio <= 0:
-                raise ValueError(
-                    "clean_to_attacked_ratio must be positive or -1 to disable balancing"
-                )
-            attacked_count = min(
-                len(attacked_dataset),
-                max(1, int(len(clean_dataset) / clean_to_attacked_ratio)),
-            )
-            clean_count = min(
-                len(clean_dataset),
-                max(1, int(attacked_count * clean_to_attacked_ratio)),
-            )
-
-        random.seed(random_seed)
-        clean_indices = random.sample(range(len(clean_dataset)), clean_count)
-        attacked_indices = random.sample(range(len(attacked_dataset)), attacked_count)
-
-        mixed_dataset = []
-
-        for idx in attacked_indices:
-            image, _ = attacked_dataset[idx]
-            mixed_dataset.append((image, 1))
-
-        for idx in clean_indices:
-            image, _ = clean_dataset[idx]
-            mixed_dataset.append((image, 0))
-
-        if shuffle:
-            random.shuffle(mixed_dataset)
-
-        print(
-            f"📊 {split_name.capitalize()} split: {len(mixed_dataset)} total "
-            f"({attacked_count} attacked + {clean_count} clean)"
-        )
-
-        return DataLoader(mixed_dataset, batch_size=batch_size, shuffle=shuffle)
-
     def train_noise_detection_model(
         self,
         model_name: str,
@@ -83,6 +26,7 @@ class ImageNetteNoiseDetectionTrainer(BaseImageNetteTrainer):
         clean_test_folder: str = "./data/imagenette/val",
         attacked_subset_size: int = 10000,
         clean_to_attacked_ratio: float = 1.0,
+        augment_clean_to_match_attacked: bool = True,
         batch_size: int = 32,
         learning_rate: float = 0.001,
         num_epochs: int = 20,
@@ -106,6 +50,7 @@ class ImageNetteNoiseDetectionTrainer(BaseImageNetteTrainer):
             clean_test_folder: Folder containing clean ImageNette validation images
             attacked_subset_size: Number of attacked images to load per split after shuffling
             clean_to_attacked_ratio: Desired clean-to-attacked ratio; use -1 to disable balancing
+            augment_clean_to_match_attacked: Augment and resample clean training images to match attacked count
             batch_size: Batch size for training
             learning_rate: Initial learning rate
             num_epochs: Maximum number of training epochs
@@ -137,7 +82,11 @@ class ImageNetteNoiseDetectionTrainer(BaseImageNetteTrainer):
                 test_subset_size=attacked_subset_size,
                 shuffle=True,
             )
-            clean_transform = imagenette_transformer()
+            clean_transform = (
+                imagenette_augmentation_transformer()
+                if augment_clean_to_match_attacked
+                else imagenette_transformer()
+            )
             clean_train_dataset = datasets.ImageFolder(
                 root=clean_train_folder,
                 transform=clean_transform,
@@ -147,21 +96,23 @@ class ImageNetteNoiseDetectionTrainer(BaseImageNetteTrainer):
                 transform=clean_transform,
             )
 
-            train_loader = self._build_balanced_binary_loader(
+            train_loader = build_binary_noise_loader(
                 clean_dataset=clean_train_dataset,
                 attacked_dataset=attacked_train_loader.dataset,
                 batch_size=batch_size,
                 shuffle=True,
                 split_name="train",
                 clean_to_attacked_ratio=clean_to_attacked_ratio,
+                augment_clean_to_match_attacked=augment_clean_to_match_attacked,
             )
-            test_loader = self._build_balanced_binary_loader(
+            test_loader = build_binary_noise_loader(
                 clean_dataset=clean_test_dataset,
                 attacked_dataset=attacked_test_loader.dataset,
                 batch_size=batch_size,
                 shuffle=False,
                 split_name="test",
                 clean_to_attacked_ratio=clean_to_attacked_ratio,
+                augment_clean_to_match_attacked=False,
             )
 
             # Create fresh model instance
@@ -222,6 +173,7 @@ class ImageNetteNoiseDetectionTrainer(BaseImageNetteTrainer):
                 'clean_test_folder': clean_test_folder,
                 'attacked_subset_size': attacked_subset_size,
                 'clean_to_attacked_ratio': clean_to_attacked_ratio,
+                'augment_clean_to_match_attacked': augment_clean_to_match_attacked,
                 'batch_size': batch_size,
                 'learning_rate': learning_rate,
                 'num_epochs': num_epochs,
@@ -252,6 +204,7 @@ class ImageNetteNoiseDetectionTrainer(BaseImageNetteTrainer):
         clean_test_folder: str = "./data/imagenette/val",
         attacked_subset_size: int = 10000,
         clean_to_attacked_ratio: float = 1.0,
+        augment_clean_to_match_attacked: bool = True,
         batch_size: int = 32,
         learning_rate: float = 0.001,
         num_epochs: int = 20
@@ -266,6 +219,7 @@ class ImageNetteNoiseDetectionTrainer(BaseImageNetteTrainer):
             clean_test_folder: Folder containing clean validation images
             attacked_subset_size: Number of attacked images to load per split after shuffling
             clean_to_attacked_ratio: Desired clean-to-attacked ratio; use -1 to disable balancing
+            augment_clean_to_match_attacked: Augment and resample clean training images to match attacked count
             batch_size: Batch size for training
             learning_rate: Learning rate for all models
             num_epochs: Number of epochs for all models
@@ -291,6 +245,7 @@ class ImageNetteNoiseDetectionTrainer(BaseImageNetteTrainer):
                 clean_test_folder=clean_test_folder,
                 attacked_subset_size=attacked_subset_size,
                 clean_to_attacked_ratio=clean_to_attacked_ratio,
+                augment_clean_to_match_attacked=augment_clean_to_match_attacked,
                 batch_size=batch_size,
                 learning_rate=learning_rate,
                 num_epochs=num_epochs,
@@ -337,8 +292,9 @@ if __name__ == "__main__":
     attacked_images_folder = "data/attacks/imagenette_models"
     clean_train_folder = "./data/imagenette/train"
     clean_test_folder = "./data/imagenette/val"
-    attacked_subset_size = 100000
-    clean_to_attacked_ratio = -1
+    attacked_subset_size = -1
+    clean_to_attacked_ratio = 1
+    augment_clean_to_match_attacked = True
     learning_rate = 0.001
     num_epochs = 2000
     batch_size = 128
@@ -351,6 +307,7 @@ if __name__ == "__main__":
         clean_test_folder=clean_test_folder,
         attacked_subset_size=attacked_subset_size,
         clean_to_attacked_ratio=clean_to_attacked_ratio,
+        augment_clean_to_match_attacked=augment_clean_to_match_attacked,
         batch_size=batch_size,
         learning_rate=learning_rate,
         num_epochs=num_epochs,
