@@ -292,7 +292,7 @@ if __name__ == "__main__":
     attacked_images_folder = "data/attacks/imagenette_models"
     clean_train_folder = "./data/imagenette/train"
     clean_test_folder = "./data/imagenette/val"
-    attacked_subset_size = -1
+    attacked_subset_size = 20000
     clean_to_attacked_ratio = 1
     augment_clean_to_match_attacked = True
     learning_rate = 0.001
