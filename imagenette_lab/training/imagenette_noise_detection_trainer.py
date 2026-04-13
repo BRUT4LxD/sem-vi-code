@@ -30,7 +30,7 @@ class ImageNetteNoiseDetectionTrainer(BaseImageNetteTrainer):
         batch_size: int = 32,
         learning_rate: float = 0.001,
         num_epochs: int = 20,
-        early_stopping_patience: int = 20,
+        early_stopping_patience: int = 10,
         scheduler_type: str = 'plateau',
         weight_decay: float = 0.0001,
         gradient_clip_norm: float = 1.0,
@@ -282,10 +282,10 @@ class ImageNetteNoiseDetectionTrainer(BaseImageNetteTrainer):
 
 if __name__ == "__main__":
     model_names = [
-        ModelNames().resnet18,
-        ModelNames().densenet121,
-        ModelNames().mobilenet_v2,
-        ModelNames().efficientnet_b0,
+        # ModelNames().resnet18,
+        # ModelNames().densenet121,
+        # ModelNames().mobilenet_v2,
+        # ModelNames().efficientnet_b0,
         ModelNames().vgg16,
     ]
 

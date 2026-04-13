@@ -131,7 +131,6 @@ dmypy.json
 # Project-specific exclusions
 data/
 models/
-runs/
 # Exclude visualization folder from results
 results/visualization/
 *.pt
