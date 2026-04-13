@@ -256,9 +256,9 @@ def imagenette_transferability_model2model_in_memory(
             # Load source model
             source_model_path = f"./models/imagenette/{source_model_name}_advanced.pt"
             source_result = load_model_imagenette(source_model_path, source_model_name, device=device)
-            source_model = source_result['model']
+            source_model = source_result.model
             source_model.eval()
-            
+
             for attack_name in tqdm(attack_names, desc=f"Attacks on {source_model_name}", leave=False):
                 try:
                     pending_targets: List[str] = []
@@ -332,7 +332,7 @@ def imagenette_transferability_model2model_in_memory(
                                 # Load target model
                                 target_model_path = f"./models/imagenette/{target_model_name}_advanced.pt"
                                 target_result = load_model_imagenette(target_model_path, target_model_name, device=device)
-                                target_model = target_result['model']
+                                target_model = target_result.model
                                 
                                 # Test transferability
                                 transfer_success_count = 0
@@ -422,9 +422,9 @@ def imagenette_transferability_attack2model_in_memory(
                 continue
             source_model_path = f"./models/imagenette/{source_model_name}_advanced.pt"
             source_result = load_model_imagenette(source_model_path, source_model_name, device=device)
-            source_model = source_result['model']
+            source_model = source_result.model
             source_model.eval()
-            
+
             # Create attack
             attack = AttackFactory.get_attack(attack_name, source_model)
             
@@ -484,7 +484,7 @@ def imagenette_transferability_attack2model_in_memory(
                         # Load target model
                         target_model_path = f"./models/imagenette/{target_model_name}_advanced.pt"
                         target_result = load_model_imagenette(target_model_path, target_model_name, device=device)
-                        target_model = target_result['model']
+                        target_model = target_result.model
                         target_model.eval()
                         
                         # Test transferability
@@ -621,12 +621,12 @@ def imagenette_transferability_model2model_from_files(
                         # Load target model
                         target_model_path = f"./models/imagenette/{target_model_name}_advanced.pt"
                         target_result = load_model_imagenette(target_model_path, target_model_name, device=device)
-                        if not target_result["success"]:
+                        if not target_result.success:
                             print(
-                                f"❌ Failed to load target {target_model_name}: {target_result.get('error', 'unknown')}"
+                                f"❌ Failed to load target {target_model_name}: {(target_result.error or 'unknown')}"
                             )
                             continue
-                        target_model = target_result["model"]
+                        target_model = target_result.model
                         target_model.eval()
                         
                         # Test transferability
@@ -769,12 +769,12 @@ def imagenette_transferability_attack2model_from_files(
                     # Load target model
                     target_model_path = f"./models/imagenette/{target_model_name}_advanced.pt"
                     target_result = load_model_imagenette(target_model_path, target_model_name, device=device)
-                    if not target_result["success"]:
+                    if not target_result.success:
                         print(
-                            f"❌ Failed to load target {target_model_name}: {target_result.get('error', 'unknown')}"
+                            f"❌ Failed to load target {target_model_name}: {(target_result.error or 'unknown')}"
                         )
                         continue
-                    target_model = target_result["model"]
+                    target_model = target_result.model
                     target_model.eval()
                     
                     # Test transferability

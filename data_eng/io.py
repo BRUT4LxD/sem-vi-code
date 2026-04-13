@@ -1,6 +1,9 @@
 import torch
 import os
 
+from domain.model.loaded_model import LoadedModel
+
+
 def save_model(model: torch.nn.Module, model_save_path: str):
     torch.save(model.state_dict(), model_save_path)
 
@@ -11,7 +14,7 @@ def load_model(model_instance: torch.nn.Module, model_load_path: str) -> torch.n
     return model_instance
 
 
-def load_model_imagenette(model_path: str, model_name: str = None, device: str = 'cuda', verbose: bool = True) -> dict:
+def load_model_imagenette(model_path: str, model_name: str = None, device: str = 'cuda', verbose: bool = True) -> LoadedModel:
     """
     Properly load an ImageNette-trained model with full checkpoint information.
     
@@ -29,14 +32,14 @@ def load_model_imagenette(model_path: str, model_name: str = None, device: str =
         verbose (bool): Whether to print loading information
         
     Returns:
-        dict: Dictionary containing:
-            - 'model': The loaded PyTorch model
-            - 'model_name': Name of the model
-            - 'checkpoint': Full checkpoint data
-            - 'training_state': Training metadata (if available)
-            - 'device': Device the model is on
-            - 'success': Boolean indicating if loading was successful
-            - 'error': Error message (if loading failed)
+        LoadedModel: Typed result with attributes:
+            - model: The loaded PyTorch model (None on failure)
+            - model_name: Name of the model
+            - checkpoint: Full checkpoint data
+            - training_state: Training metadata (if available)
+            - device: Device the model is on
+            - success: Boolean indicating if loading was successful
+            - error: Error message (if loading failed)
     
     Raises:
         FileNotFoundError: If the model file doesn't exist
@@ -44,10 +47,10 @@ def load_model_imagenette(model_path: str, model_name: str = None, device: str =
         
     Example:
         >>> result = load_model_imagenette("./models/imagenette/resnet18_advanced.pt")
-        >>> if result['success']:
-        ...     model = result['model']
-        ...     print(f"Model loaded: {result['model_name']}")
-        ...     print(f"Best validation accuracy: {result['checkpoint']['val_accuracy']:.2f}%")
+        >>> if result.success:
+        ...     model = result.model
+        ...     print(f"Model loaded: {result.model_name}")
+        ...     print(f"Best validation accuracy: {result.checkpoint['val_accuracy']:.2f}%")
     """
     
     # Import here to avoid circular imports
@@ -150,39 +153,29 @@ def load_model_imagenette(model_path: str, model_name: str = None, device: str =
             else:
                 print(f"   Training Time: Unknown")
         
-        return {
-            'model': model,
-            'model_name': model_name,
-            'checkpoint': checkpoint,
-            'training_state': training_state,
-            'device': device,
-            'success': True
-        }
+        return LoadedModel(
+            model=model,
+            model_name=model_name,
+            checkpoint=checkpoint,
+            training_state=training_state,
+            device=device,
+            success=True,
+        )
         
     except FileNotFoundError as e:
         error_msg = f"Model file not found: {str(e)}"
         if verbose:
             print(f"❌ {error_msg}")
-        return {
-            'model': None,
-            'model_name': model_name,
-            'error': error_msg,
-            'success': False
-        }
+        return LoadedModel(model_name=model_name, error=error_msg)
         
     except Exception as e:
         error_msg = f"Model loading failed: {str(e)}"
         if verbose:
             print(f"❌ {error_msg}")
-        return {
-            'model': None,
-            'model_name': model_name,
-            'error': error_msg,
-            'success': False
-        }
+        return LoadedModel(model_name=model_name, error=error_msg)
 
 
-def load_model_binary(model_path: str, model_name: str = None, device: str = 'cuda', verbose: bool = True) -> dict:
+def load_model_binary(model_path: str, model_name: str = None, device: str = 'cuda', verbose: bool = True) -> LoadedModel:
     """
     Properly load a binary classification-trained model with full checkpoint information.
     
@@ -193,7 +186,7 @@ def load_model_binary(model_path: str, model_name: str = None, device: str = 'cu
         verbose (bool): Whether to print loading information
         
     Returns:
-        dict: Dictionary containing model, metadata, and success status
+        LoadedModel: Typed result with model, metadata, and success status
     """
     
     # Import here to avoid circular imports
@@ -257,21 +250,16 @@ def load_model_binary(model_path: str, model_name: str = None, device: str = 'cu
         if verbose:
             print(f"✅ Model loaded successfully!")
         
-        return {
-            'model': model,
-            'model_name': model_name,
-            'checkpoint': checkpoint,
-            'device': device,
-            'success': True
-        }
+        return LoadedModel(
+            model=model,
+            model_name=model_name,
+            checkpoint=checkpoint,
+            device=device,
+            success=True,
+        )
         
     except Exception as e:
         error_msg = f"Error loading binary model: {str(e)}"
         if verbose:
             print(f"❌ {error_msg}")
-        return {
-            'model': None,
-            'model_name': model_name,
-            'error': error_msg,
-            'success': False
-        }
+        return LoadedModel(model_name=model_name, error=error_msg)

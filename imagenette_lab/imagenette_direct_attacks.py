@@ -4,7 +4,7 @@ import time
 import traceback
 import torch
 import csv
-from typing import List
+from typing import List, Optional
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from attacks.attack import Attack
@@ -13,6 +13,7 @@ from attacks.attack_factory import AttackFactory
 from config.imagenette_classes import ImageNetteClasses
 from data_eng.io import load_model_imagenette
 from domain.attack.attack_result import AttackResult
+from domain.model.loaded_model import LoadedModel
 from evaluation.metrics import Metrics
 
 
@@ -110,42 +111,57 @@ class ImageNetteDirectAttacks:
 
     def run_attacks_on_models(
         self,
-        model_names: List[str],
         attack_names: List[str],
         data_loader: DataLoader,
+        model_names: Optional[List[str]] = None,
+        loaded_models: Optional[List[LoadedModel]] = None,
         results_folder: str = "",
     ):
         """
         Run attacks on multiple models and save results to CSV files.
+
+        Provide either ``loaded_models`` (pre-loaded :class:`LoadedModel` instances)
+        or ``model_names`` (names resolved to ``./models/imagenette/{name}_advanced.pt``).
+        If both are given, ``loaded_models`` takes precedence.
+
+        Args:
+            attack_names: List of attack algorithm names to run.
+            data_loader: DataLoader with test images.
+            model_names: Model name strings (used for auto-loading from default path).
+            loaded_models: Pre-loaded LoadedModel instances (skips loading step).
+            results_folder: Folder to save CSV results (empty string to skip saving).
         """
+        if loaded_models is not None:
+            models_to_run: List[LoadedModel] = loaded_models
+        elif model_names is not None:
+            models_to_run = []
+            for name in model_names:
+                model_path = f"./models/imagenette/{name}_advanced.pt"
+                lm = load_model_imagenette(model_path, name, device=self.device_name)
+                if not lm.success:
+                    print(f"❌ Failed to load model {name}: {lm.error}")
+                    continue
+                models_to_run.append(lm)
+        else:
+            raise ValueError("Either model_names or loaded_models must be provided")
+
         save_results = results_folder != ""
 
-        # Create results directory if it doesn't exist
         if save_results:
             os.makedirs(results_folder, exist_ok=True)
 
         print("🚀 Starting comprehensive attack evaluation...")
-        print(f"📊 Models: {len(model_names)}")
+        print(f"📊 Models: {len(models_to_run)}")
         print(f"⚔️  Attacks: {len(attack_names)}")
         print(f"📁 Results will be saved to: {results_folder}")
         print("=" * 80)
 
-        # Initialize results storage
         all_results = {}
 
-        for model_name in model_names:
-            print(f"\n🔍 Loading model: {model_name}")
-
-            # Load model
-            model_path = f"./models/imagenette/{model_name}_advanced.pt"
-            result = load_model_imagenette(model_path, model_name, device=self.device_name)
-
-            if not result['success']:
-                print(f"❌ Failed to load model {model_name}: {result['error']}")
-                continue
-
-            model = result['model']
-            print(f"✅ Model {model_name} loaded successfully")
+        for loaded in models_to_run:
+            model_name = loaded.model_name
+            model = loaded.model
+            print(f"\n🔍 Model: {model_name}")
 
             # Store results for this model
             model_results = []
@@ -229,17 +245,19 @@ def attack_images_imagenette(attack: Attack, data_loader: DataLoader, successful
 
 
 def run_attacks_on_models(
-    model_names: List[str],
     attack_names: List[str],
     data_loader: DataLoader,
+    model_names: Optional[List[str]] = None,
+    loaded_models: Optional[List[LoadedModel]] = None,
     device: str = 'cuda',
     results_folder: str = "",
 ):
     direct_attacks = ImageNetteDirectAttacks(device=device)
     return direct_attacks.run_attacks_on_models(
-        model_names=model_names,
         attack_names=attack_names,
         data_loader=data_loader,
+        model_names=model_names,
+        loaded_models=loaded_models,
         results_folder=results_folder,
     )
 
@@ -315,4 +333,38 @@ def save_model_results_to_csv(model_name: str, results: List[dict], results_fold
             writer.writerow(filtered_result)
     
     print(f"    💾 Saved results to: {csv_path}")
+
+
+if __name__ == "__main__":
+    import glob
+    from attacks.attack_names import AttackNames
+    from data_eng.dataset_loader import load_imagenette
+    from domain.model.model_names import ModelNames
+
+    progressive_dir = "./models/imagenette_adversarial_progressive"
+    model_files = sorted(glob.glob(os.path.join(progressive_dir, "*.pt")))
+
+    if not model_files:
+        print(f"❌ No .pt files found in {progressive_dir}")
+        exit(1)
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    loaded_models: List[LoadedModel] = []
+    for path in model_files:
+        lm = load_model_imagenette(path, device=device)
+        if lm.success:
+            loaded_models.append(lm)
+
+    attack_names = AttackNames().all_attack_names
+
+    _, test_loader = load_imagenette(batch_size=4, test_subset_size=500)
+
+    runner = ImageNetteDirectAttacks(device=device)
+    runner.run_attacks_on_models(
+        attack_names=attack_names,
+        data_loader=test_loader,
+        loaded_models=loaded_models,
+        results_folder="./results/imagenette/progressive_attacks",
+    )
 

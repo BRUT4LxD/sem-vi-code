@@ -165,4 +165,4 @@ _, test_loader = load_imagenette(
 
 for model_name in model_names:
   result = load_model_imagenette(f"./models/imagenette/{model_name}_advanced.pt", model_name)
-  Metrics.evaluate_model_torchmetrics(result['model'], test_loader, 10, verbose=True)
+  Metrics.evaluate_model_torchmetrics(result.model, test_loader, 10, verbose=True)

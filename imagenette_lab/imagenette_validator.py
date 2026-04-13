@@ -225,10 +225,10 @@ class ImageNetteValidator:
             model_path = self._get_model_path(model_name)
             model_info = load_model_imagenette(model_path, device=str(self.device), verbose=False)
             
-            if not model_info['success']:
-                raise RuntimeError(f"Failed to load model: {model_info['error']}")
+            if not model_info.success:
+                raise RuntimeError(f"Failed to load model: {model_info.error}")
             
-            model = model_info['model']
+            model = model_info.model
             
             # Create test dataset (full dataset)
             _, test_loader = load_imagenette(batch_size=32, test_subset_size=-1)
@@ -244,7 +244,7 @@ class ImageNetteValidator:
             per_class_metrics = self._calculate_per_class_metrics(model, test_loader)
             
             # Get checkpoint info
-            checkpoint = model_info['checkpoint']
+            checkpoint = model_info.checkpoint
             
             result = {
                 'model_name': model_name,
@@ -519,10 +519,10 @@ class ImageNetteValidator:
             model_path = self._get_noise_detection_model_path(model_name)
             model_info = load_model_binary(model_path, device=str(self.device), verbose=False)
             
-            if not model_info['success']:
-                raise RuntimeError(f"Failed to load noise detection model: {model_info['error']}")
+            if not model_info.success:
+                raise RuntimeError(f"Failed to load noise detection model: {model_info.error}")
             
-            model = model_info['model']
+            model = model_info.model
             
             # Load test dataset
             print(f"   Loading test dataset...")
@@ -577,7 +577,7 @@ class ImageNetteValidator:
             f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0.0
             
             # Get checkpoint info
-            checkpoint = model_info['checkpoint']
+            checkpoint = model_info.checkpoint
             
             result = {
                 'model_name': model_name,
@@ -770,10 +770,10 @@ class ImageNetteValidator:
             print(f"   Loading model from: {model_path}")
             model_info = load_model_imagenette(model_path, device=str(self.device), verbose=False)
             
-            if not model_info['success']:
-                raise RuntimeError(f"Failed to load adversarial model: {model_info['error']}")
+            if not model_info.success:
+                raise RuntimeError(f"Failed to load adversarial model: {model_info.error}")
             
-            model = model_info['model']
+            model = model_info.model
             model.eval()
             
             # Load clean test dataset

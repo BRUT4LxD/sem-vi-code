@@ -200,8 +200,8 @@ class ImageNetteStandardTrainer(BaseImageNetteTrainer):
             # Load model
             model_info = load_model_imagenette(model_path, device=str(self.device), verbose=verbose)
 
-            if not model_info['success']:
-                raise RuntimeError(model_info['error'])
+            if not model_info.success:
+                raise RuntimeError(model_info.error)
 
             # Create ImageNette test dataset
             _, test_loader = load_imagenette(batch_size=batch_size)
@@ -209,7 +209,7 @@ class ImageNetteStandardTrainer(BaseImageNetteTrainer):
             # Evaluate model on ImageNette
             print("\n🔍 Running ImageNette evaluation...")
             acc, prec, rec, f1 = Metrics.evaluate_model_torchmetrics(
-                model_info['model'], test_loader, 10, verbose=verbose  # 10 classes for ImageNette
+                model_info.model, test_loader, 10, verbose=verbose  # 10 classes for ImageNette
             )
 
             # Visual verification with ImageNette classes
@@ -219,7 +219,7 @@ class ImageNetteStandardTrainer(BaseImageNetteTrainer):
                 _, viz_test_loader = load_imagenette(batch_size=8, test_subset_size=50)
 
                 simple_visualize(
-                    test_model=model_info['model'],
+                    test_model=model_info.model,
                     test_loader=viz_test_loader,
                     batch_size=8,
                     classes=imagenette_classes,
@@ -228,7 +228,7 @@ class ImageNetteStandardTrainer(BaseImageNetteTrainer):
 
             # Summary
             print("\n🎯 ImageNette Validation Summary:")
-            print(f"   Model: {model_info['model_name']}")
+            print(f"   Model: {model_info.model_name}")
             print("   Dataset: ImageNette (10 classes)")
             print(f"   Test Accuracy: {acc:.4f}")
             print(f"   Precision: {prec:.4f}")

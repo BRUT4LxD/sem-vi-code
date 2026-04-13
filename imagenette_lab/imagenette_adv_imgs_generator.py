@@ -110,7 +110,7 @@ def attack_and_save_images_multiple(
     for model_name in model_names:
         model_path = f"./models/imagenette/{model_name}_advanced.pt"
         result = load_model_imagenette(model_path, model_name, device='cuda')
-        model = result['model']
+        model = result.model
         for attack_name in attack_names:
             print(f"🔍 Running {attack_name} attack on {model_name}...")
             if attack_test_dataset:
