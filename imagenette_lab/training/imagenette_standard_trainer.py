@@ -236,7 +236,10 @@ class ImageNetteStandardTrainer(BaseImageNetteTrainer):
             print(f"   F1-Score: {f1:.4f}")
 
             return {
-                **model_info,
+                'model': model_info.model,
+                'model_name': model_info.model_name,
+                'checkpoint': model_info.checkpoint,
+                'device': model_info.device,
                 'evaluation_metrics': {'accuracy': acc, 'precision': prec, 'recall': rec, 'f1': f1},
                 'test_loader': test_loader,
                 'dataset': 'ImageNette',

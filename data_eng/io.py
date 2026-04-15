@@ -4,6 +4,24 @@ import os
 from domain.model.loaded_model import LoadedModel
 
 
+def _extract_model_state_dict(checkpoint):
+    """
+    Supports:
+    - Full training checkpoints: ``{'model_state_dict': ..., 'epoch': ...}``
+    - Some checkpoints use ``state_dict`` instead of ``model_state_dict``
+    - Plain ``torch.save(model.state_dict(), path)`` (e.g. progressive per-iteration saves)
+    """
+    if not isinstance(checkpoint, dict):
+        raise TypeError(
+            f"Checkpoint must be a dict-like object with weights or metadata, got {type(checkpoint)}"
+        )
+    if "model_state_dict" in checkpoint:
+        return checkpoint["model_state_dict"]
+    if "state_dict" in checkpoint:
+        return checkpoint["state_dict"]
+    return checkpoint
+
+
 def save_model(model: torch.nn.Module, model_save_path: str):
     torch.save(model.state_dict(), model_save_path)
 
@@ -119,7 +137,8 @@ def load_model_imagenette(model_path: str, model_name: str = None, device: str =
         if verbose:
             print(f"📥 Loading trained weights...")
         
-        model.load_state_dict(checkpoint['model_state_dict'])
+        state_dict = _extract_model_state_dict(checkpoint)
+        model.load_state_dict(state_dict)
         model.eval()
         
         if verbose:
@@ -244,7 +263,8 @@ def load_model_binary(model_path: str, model_name: str = None, device: str = 'cu
         if verbose:
             print(f"📥 Loading trained weights...")
         
-        model.load_state_dict(checkpoint['model_state_dict'])
+        state_dict = _extract_model_state_dict(checkpoint)
+        model.load_state_dict(state_dict)
         model.eval()
         
         if verbose:

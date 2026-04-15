@@ -344,6 +344,14 @@ if __name__ == "__main__":
     progressive_dir = "./models/imagenette_adversarial_progressive"
     model_files = sorted(glob.glob(os.path.join(progressive_dir, "*.pt")))
 
+    model_files = [
+        # './models/imagenette_adversarial_progressive/efficientnet_b0_adv_progressive_20260410_it30_acc84_36.pt',
+        # './models/imagenette_adversarial_progressive/mobilenet_v2_adv_progressive_20260410_it30_acc83_57.pt',
+        # './models/imagenette_adversarial_progressive/resnet18_adv_progressive_20260410_it30_acc84_07.pt',
+        './models/imagenette_adversarial_progressive/vgg16_adv_progressive_20260411_it30_acc78_04.pt'
+        ]
+    print(f"Model files: {model_files}")
+
     if not model_files:
         print(f"❌ No .pt files found in {progressive_dir}")
         exit(1)
