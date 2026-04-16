@@ -629,6 +629,7 @@ class Training:
     def _finalize_imagenette_adversarial_training(
         training_state: dict,
         start_time: datetime,
+        model: Module,
         save_model_path: Optional[str],
         writer: Optional[SummaryWriter],
         verbose: bool,
@@ -641,6 +642,10 @@ class Training:
         training_state['total_training_time'] = total_time
 
         if save_model_path:
+            save_model_dir = os.path.dirname(save_model_path)
+            if save_model_dir:
+                os.makedirs(save_model_dir, exist_ok=True)
+            save_model(model, save_model_path)
             Training._save_adversarial_training_results_csv(
                 training_state,
                 save_model_path,
@@ -1240,17 +1245,22 @@ class Training:
                 current_accuracy = val_metrics['accuracy']
             else:
                 current_accuracy = train_metrics['accuracy']
+
+            if current_accuracy > training_state['best_val_accuracy'] + min_delta:
+                training_state['early_stopping_counter'] = 0
+            else:
+                training_state['early_stopping_counter'] += 1
             
-            # Training._update_best_imagenette_adversarial_model(
-            #     training_state=training_state,
-            #     current_accuracy=current_accuracy,
-            #     epoch=epoch,
-            #     min_delta=min_delta,
-            #     model=model,
-            #     save_model_path=save_model_path,
-            #     verbose=verbose,
-            #     metric_type="Val" if val_metrics is not None else "Train",
-            # )
+            Training._update_best_imagenette_adversarial_model(
+                training_state=training_state,
+                current_accuracy=current_accuracy,
+                epoch=epoch,
+                min_delta=min_delta,
+                model=model,
+                save_model_path=save_model_path,
+                verbose=verbose,
+                metric_type="Val" if val_metrics is not None else "Train",
+            )
             
             # Print epoch summary
             if verbose:
@@ -1276,6 +1286,7 @@ class Training:
         return Training._finalize_imagenette_adversarial_training(
             training_state=training_state,
             start_time=start_time,
+            model=model,
             save_model_path=save_model_path,
             writer=writer,
             verbose=verbose,
@@ -1497,6 +1508,7 @@ class Training:
         return Training._finalize_imagenette_adversarial_training(
             training_state=training_state,
             start_time=start_time,
+            model=model,
             save_model_path=save_model_path,
             writer=writer,
             verbose=verbose,

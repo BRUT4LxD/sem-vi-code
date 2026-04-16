@@ -1,12 +1,15 @@
 import os
 from datetime import datetime
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import torch
 
 from attacks.attack_names import AttackNames
+from data_eng.adversarial_training_dataset_builder import (
+    build_imagenette_adversarial_training_loaders,
+)
 from config.imagenet_models import ImageNetModels
-from data_eng.dataset_loader import load_attacked_imagenette_for_adversarial_training, load_imagenette
+from data_eng.dataset_loader import load_imagenette
 from domain.model.model_names import ModelNames
 from imagenette_lab.training.imagenette_base_trainer import BaseImageNetteTrainer
 from training.train import Training
@@ -31,8 +34,9 @@ class ImageNetteAdversarialTrainer(BaseImageNetteTrainer):
         weight_decay: float = 0.0001,
         gradient_clip_norm: float = 1.0,
         use_preattacked_images: bool = False,
-        attacked_images_folder: str = "data/attacks/imagenette_models",
-        clean_images_folder: str = "./data/imagenette/train",
+        attacked_subset_size: int = -1,
+        augment_clean_to_match_attacked: bool = True,
+        train_test_split: Optional[float] = None,
         verbose: bool = True
     ) -> Dict:
         """
@@ -54,8 +58,9 @@ class ImageNetteAdversarialTrainer(BaseImageNetteTrainer):
             weight_decay: L2 regularization weight
             gradient_clip_norm: Gradient clipping threshold
             use_preattacked_images: If True, use pre-attacked images from disk
-            attacked_images_folder: Folder with pre-attacked images (used if use_preattacked_images=True)
-            clean_images_folder: Folder with clean images
+            attacked_subset_size: Optional cap for attacked train/test images (-1 uses all)
+            augment_clean_to_match_attacked: If True, oversample clean images to match attacked count
+            train_test_split: Optional ratio to resplit attacked+clean data (e.g., 0.8)
             verbose: Whether to print detailed progress
 
         Returns:
@@ -93,21 +98,12 @@ class ImageNetteAdversarialTrainer(BaseImageNetteTrainer):
             # Load dataset based on mode
             print("\n📁 Loading dataset...")
             if use_preattacked_images:
-                # Load pre-attacked images mixed with clean images
-                train_loader = load_attacked_imagenette_for_adversarial_training(
-                    attacked_images_folder=attacked_images_folder,
-                    clean_images_folder=clean_images_folder,
+                train_loader, test_loader = build_imagenette_adversarial_training_loaders(
                     batch_size=batch_size,
-                    shuffle=True,
-                    train_dataset=True
-                )
-                # Load test dataset with pre-attacked images
-                test_loader = load_attacked_imagenette_for_adversarial_training(
-                    attacked_images_folder=attacked_images_folder,
-                    clean_images_folder="./data/imagenette/val",
-                    batch_size=batch_size,
-                    shuffle=False,
-                    train_dataset=False
+                    attacked_subset_size=attacked_subset_size,
+                    clean_to_attacked_ratio=1.0,
+                    augment_clean_to_match_attacked=augment_clean_to_match_attacked,
+                    train_test_split=train_test_split,
                 )
             else:
                 # Load clean ImageNette for on-the-fly generation
@@ -193,7 +189,9 @@ class ImageNetteAdversarialTrainer(BaseImageNetteTrainer):
         batch_size: int = 32,
         adversarial_ratio: float = 0.5,
         use_preattacked_images: bool = False,
-        attacked_images_folder: str = "data/attacks/imagenette_models"
+        attacked_subset_size: int = -1,
+        augment_clean_to_match_attacked: bool = True,
+        train_test_split: Optional[float] = None,
     ) -> List[Dict]:
         """
         Train multiple models using adversarial training.
@@ -206,7 +204,9 @@ class ImageNetteAdversarialTrainer(BaseImageNetteTrainer):
             batch_size: Batch size for training
             adversarial_ratio: Ratio of adversarial to clean examples for on-the-fly mode
             use_preattacked_images: If True, use pre-attacked images from disk
-            attacked_images_folder: Folder with pre-attacked images
+            attacked_subset_size: Optional cap for attacked train/test images (-1 uses all)
+            augment_clean_to_match_attacked: If True, oversample clean images to match attacked count
+            train_test_split: Optional ratio to resplit attacked+clean data (e.g., 0.8)
 
         Returns:
             List of training results for each model
@@ -235,7 +235,9 @@ class ImageNetteAdversarialTrainer(BaseImageNetteTrainer):
                 batch_size=batch_size,
                 adversarial_ratio=adversarial_ratio,
                 use_preattacked_images=use_preattacked_images,
-                attacked_images_folder=attacked_images_folder,
+                attacked_subset_size=attacked_subset_size,
+                augment_clean_to_match_attacked=augment_clean_to_match_attacked,
+                train_test_split=train_test_split,
                 verbose=True
             )
 
@@ -274,10 +276,12 @@ if __name__ == "__main__":
     attack_names = AttackNames().all_attack_names
 
     use_preattacked_images = True
-    attacked_images_folder = "data/attacks/imagenette_models"
+    attacked_subset_size = 20000
+    augment_clean_to_match_attacked = True
+    train_test_split = 0.2
     learning_rate = 0.001
-    num_epochs = 20
-    batch_size = 256
+    num_epochs = 1000
+    batch_size = 128
     adversarial_ratio = 0.5
     device = "auto"
 
@@ -305,5 +309,7 @@ if __name__ == "__main__":
         batch_size=batch_size,
         adversarial_ratio=adversarial_ratio,
         use_preattacked_images=use_preattacked_images,
-        attacked_images_folder=attacked_images_folder,
+        attacked_subset_size=attacked_subset_size,
+        augment_clean_to_match_attacked=augment_clean_to_match_attacked,
+        train_test_split=train_test_split,
     )
