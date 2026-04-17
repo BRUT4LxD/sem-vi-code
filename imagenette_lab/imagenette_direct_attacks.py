@@ -4,7 +4,7 @@ import time
 import traceback
 import torch
 import csv
-from typing import List, Optional
+from typing import Dict, List, Optional, Set
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from attacks.attack import Attack
@@ -15,6 +15,90 @@ from data_eng.io import load_model_imagenette
 from domain.attack.attack_result import AttackResult
 from domain.model.loaded_model import LoadedModel
 from evaluation.metrics import Metrics
+
+
+DIRECT_ATTACK_CSV_FIELDNAMES: List[str] = [
+    'model_name',
+    'attack_name',
+    'acc',
+    'prec',
+    'rec',
+    'f1',
+    'l0_pixels',
+    'l1',
+    'l2',
+    'linf',
+    'power_mse',
+    'clean_accuracy',
+    'accuracy_drop',
+    'relative_accuracy_drop',
+    'asr_unconditional',
+    'asr_conditional',
+    'time',
+    'n_samples',
+]
+
+
+class DirectAttackLogger:
+    """Handles incremental CSV writes for direct attack experiments."""
+
+    def __init__(self, results_folder: str):
+        self.results_folder = results_folder
+        self._csv_paths: Dict[str, str] = {}
+        self._recorded_attacks: Dict[str, Set[str]] = {}
+        os.makedirs(results_folder, exist_ok=True)
+
+    def begin_incremental_csv(self, model_name: str) -> str:
+        csv_path = os.path.join(self.results_folder, f"{model_name}.csv")
+        self._csv_paths[model_name] = csv_path
+
+        if (not os.path.isfile(csv_path)) or os.path.getsize(csv_path) == 0:
+            with open(csv_path, 'w', newline='', encoding='utf-8') as f:
+                writer = csv.DictWriter(f, fieldnames=DIRECT_ATTACK_CSV_FIELDNAMES)
+                writer.writeheader()
+            self._recorded_attacks[model_name] = set()
+        else:
+            self._recorded_attacks[model_name] = self._load_recorded_attack_names(csv_path)
+
+        print(f"📄 Results CSV for {model_name}: {csv_path}")
+        return csv_path
+
+    def has_recorded(self, model_name: str, attack_name: str) -> bool:
+        return attack_name in self._recorded_attacks.get(model_name, set())
+
+    def append_result(self, result: dict) -> None:
+        model_name = result['model_name']
+        attack_name = result['attack_name']
+        csv_path = self._csv_paths.get(model_name)
+        if csv_path is None:
+            raise RuntimeError(f"append_result called before begin_incremental_csv for {model_name}")
+
+        if self.has_recorded(model_name, attack_name):
+            print(f"    ⏭️  Skipping duplicate row for {model_name}/{attack_name}")
+            return
+
+        filtered_result = {key: value for key, value in result.items() if key != 'conf_matrix'}
+        with open(csv_path, 'a', newline='', encoding='utf-8') as f:
+            writer = csv.DictWriter(f, fieldnames=DIRECT_ATTACK_CSV_FIELDNAMES)
+            writer.writerow(filtered_result)
+        self._recorded_attacks[model_name].add(attack_name)
+        print(f"    💾 Appended result to: {csv_path}")
+
+    @staticmethod
+    def _load_recorded_attack_names(csv_path: str) -> Set[str]:
+        recorded: Set[str] = set()
+        try:
+            with open(csv_path, newline='', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                if reader.fieldnames is None:
+                    return recorded
+                for row in reader:
+                    attack_name = row.get('attack_name', '').strip()
+                    if attack_name:
+                        recorded.add(attack_name)
+        except OSError:
+            pass
+        return recorded
 
 
 def normalize_adversarial_image(adv_image: torch.Tensor) -> torch.Tensor:
@@ -147,8 +231,7 @@ class ImageNetteDirectAttacks:
 
         save_results = results_folder != ""
 
-        if save_results:
-            os.makedirs(results_folder, exist_ok=True)
+        logger = DirectAttackLogger(results_folder) if save_results else None
 
         print("🚀 Starting comprehensive attack evaluation...")
         print(f"📊 Models: {len(models_to_run)}")
@@ -162,12 +245,17 @@ class ImageNetteDirectAttacks:
             model_name = loaded.model_name
             model = loaded.model
             print(f"\n🔍 Model: {model_name}")
+            if logger is not None:
+                logger.begin_incremental_csv(model_name)
 
             # Store results for this model
             model_results = []
 
             # Run each attack on this model
             for attack_name in attack_names:
+                if logger is not None and logger.has_recorded(model_name, attack_name):
+                    print(f"  ⏭️  Skipping {attack_name} (already in CSV)")
+                    continue
                 print(f"  ⚔️  Running {attack_name} attack...")
 
                 try:
@@ -204,6 +292,8 @@ class ImageNetteDirectAttacks:
                         result_dict['n_samples'] = ev.n_samples
 
                         model_results.append(result_dict)
+                        if logger is not None:
+                            logger.append_result(result_dict)
                         print(f"    ✅ {attack_name}: {ev.acc:.2f}% accuracy")
                     else:
                         print(f"    ⚠️  {attack_name}: No results generated")
@@ -216,10 +306,6 @@ class ImageNetteDirectAttacks:
 
             # Store results for this model
             all_results[model_name] = model_results
-
-            # Save individual model results to CSV
-            if save_results and model_results:
-                save_model_results_to_csv(model_name, model_results, results_folder)
 
         # Print summary
         print("\n" + "=" * 80)
@@ -298,43 +384,6 @@ def save_failure_log(model_name: str, attack_name: str, exception: Exception, re
     print(f"    📝 Failure log saved to: {filepath}")
 
 
-def save_model_results_to_csv(model_name: str, results: List[dict], results_folder: str):
-    """
-    Save results for a single model to CSV file.
-    
-    Args:
-        model_name: Name of the model
-        results: List of result dictionaries
-        results_folder: Folder to save the CSV file
-    """
-    
-    if not results:
-        return
-    
-    # Create CSV filename
-    csv_filename = f"{model_name}.csv"
-    csv_path = os.path.join(results_folder, csv_filename)
-    
-    # Get fieldnames from first result (excluding model_name and conf_matrix)
-    fieldnames = [key for key in results[0].keys() if key not in ['model_name', 'conf_matrix']]
-    # Put model_name first
-    fieldnames = ['model_name'] + fieldnames
-    
-    # Write CSV file
-    with open(csv_path, 'w', newline='', encoding='utf-8') as csvfile:
-        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-        
-        # Write header
-        writer.writeheader()
-        
-        # Write data rows (excluding conf_matrix)
-        for result in results:
-            filtered_result = {key: value for key, value in result.items() if key != 'conf_matrix'}
-            writer.writerow(filtered_result)
-    
-    print(f"    💾 Saved results to: {csv_path}")
-
-
 if __name__ == "__main__":
     import glob
     from attacks.attack_names import AttackNames
@@ -345,11 +394,11 @@ if __name__ == "__main__":
     model_files = sorted(glob.glob(os.path.join(progressive_dir, "*.pt")))
 
     model_files = [
-        './models/imagenette_adversarial/densenet121_adv_preattacked_20260415.pt',
-        './models/imagenette_adversarial/efficientnet_b0_adv_preattacked_20260415.pt',
+        # './models/imagenette_adversarial/densenet121_adv_preattacked_20260415.pt',
+        # './models/imagenette_adversarial/efficientnet_b0_adv_preattacked_20260415.pt',
         './models/imagenette_adversarial/mobilenet_v2_adv_preattacked_20260415.pt',
         './models/imagenette_adversarial/resnet18_adv_preattacked_20260415.pt',
-        './models/imagenette_adversarial/vgg16_adv_preattacked_20260415.pt',
+        # './models/imagenette_adversarial/vgg16_adv_preattacked_20260415.pt',
         ]
     print(f"Model files: {model_files}")
 
