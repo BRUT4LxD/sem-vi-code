@@ -396,9 +396,9 @@ if __name__ == "__main__":
     model_files = [
         # './models/imagenette_adversarial/densenet121_adv_preattacked_20260415.pt',
         # './models/imagenette_adversarial/efficientnet_b0_adv_preattacked_20260415.pt',
-        './models/imagenette_adversarial/mobilenet_v2_adv_preattacked_20260415.pt',
-        './models/imagenette_adversarial/resnet18_adv_preattacked_20260415.pt',
-        # './models/imagenette_adversarial/vgg16_adv_preattacked_20260415.pt',
+        # './models/imagenette_adversarial/mobilenet_v2_adv_preattacked_20260415.pt',
+        # './models/imagenette_adversarial/resnet18_adv_preattacked_20260415.pt',
+        './models/imagenette_adversarial/vgg16_adv_preattacked_20260415.pt',
         ]
     print(f"Model files: {model_files}")
 
