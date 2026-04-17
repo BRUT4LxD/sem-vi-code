@@ -1,0 +1,8 @@
+[]  
+[*] Attacks on active progressively trained models
+[-] Attacks on passive progressively trained models
+[] Validation on clean data for progressively trained models
+[] Validation on clean data for noise detection models
+[] Transferability of passive progressively trained models
+[] Fuze detectors validation with different variations
+[] 

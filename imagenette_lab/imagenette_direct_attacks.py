@@ -345,10 +345,11 @@ if __name__ == "__main__":
     model_files = sorted(glob.glob(os.path.join(progressive_dir, "*.pt")))
 
     model_files = [
-        # './models/imagenette_adversarial_progressive/efficientnet_b0_adv_progressive_20260410_it30_acc84_36.pt',
-        # './models/imagenette_adversarial_progressive/mobilenet_v2_adv_progressive_20260410_it30_acc83_57.pt',
-        # './models/imagenette_adversarial_progressive/resnet18_adv_progressive_20260410_it30_acc84_07.pt',
-        './models/imagenette_adversarial_progressive/vgg16_adv_progressive_20260411_it30_acc78_04.pt'
+        './models/imagenette_adversarial/densenet121_adv_preattacked_20260415.pt',
+        './models/imagenette_adversarial/efficientnet_b0_adv_preattacked_20260415.pt',
+        './models/imagenette_adversarial/mobilenet_v2_adv_preattacked_20260415.pt',
+        './models/imagenette_adversarial/resnet18_adv_preattacked_20260415.pt',
+        './models/imagenette_adversarial/vgg16_adv_preattacked_20260415.pt',
         ]
     print(f"Model files: {model_files}")
 
@@ -364,16 +365,7 @@ if __name__ == "__main__":
         if lm.success:
             loaded_models.append(lm)
 
-    attack_names = [
-        AttackNames().Pixle,
-        AttackNames().Square,
-        AttackNames().SPSA,
-        AttackNames().TIFGSM,
-        AttackNames().TPGD,
-        AttackNames().UPGD,
-        AttackNames().VMIFGSM,
-        AttackNames().VNIFGSM,
-    ]
+    attack_names = AttackNames().all_attack_names
 
     _, test_loader = load_imagenette(batch_size=4, test_subset_size=500)
 
