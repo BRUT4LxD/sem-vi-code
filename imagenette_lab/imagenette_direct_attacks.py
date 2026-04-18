@@ -414,7 +414,16 @@ if __name__ == "__main__":
         if lm.success:
             loaded_models.append(lm)
 
-    attack_names = AttackNames().all_attack_names
+    attack_names = [
+        AttackNames().Pixle,
+        AttackNames().SPSA,
+        AttackNames().Square,
+        AttackNames().TIFGSM,
+        AttackNames().TPGD,
+        AttackNames().UPGD,
+        AttackNames().VNIFGSM,
+        AttackNames().VNIFGSM,
+    ]
 
     _, test_loader = load_imagenette(batch_size=4, test_subset_size=500)
 
