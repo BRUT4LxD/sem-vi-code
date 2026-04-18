@@ -904,5 +904,5 @@ if __name__ == "__main__":
     save_path = "results/imagenette/transferability/model2model"
     imagenette_transferability_model2model_in_memory(model_names, attack_names, images_per_attack=500, results_folder=save_path)
 
-    save_path = "results/imagenette/transferability/attack2model"
-    imagenette_transferability_attack2model_in_memory(model_names, attack_names, images_per_attack=500, results_folder=save_path)
+    # save_path = "results/imagenette/transferability/attack2model"
+    # imagenette_transferability_attack2model_in_memory(model_names, attack_names, images_per_attack=500, results_folder=save_path)
