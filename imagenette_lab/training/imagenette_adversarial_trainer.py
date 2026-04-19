@@ -298,7 +298,7 @@ if __name__ == "__main__":
         print(f"\n🔧 Preparing model: {model_name}")
         model = ImageNetModels.get_model(model_name)
         model.__class__.__name__ = model_name
-        model = SetupPretraining.setup_imagenette(model)
+        model = SetupPretraining.setup_imagenette(model, full_finetune=True)
         models.append(model)
 
     trainer.train_multiple_adversarial_models(

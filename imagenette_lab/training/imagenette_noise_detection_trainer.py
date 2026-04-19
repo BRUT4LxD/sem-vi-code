@@ -141,6 +141,7 @@ class ImageNetteNoiseDetectionTrainer(BaseImageNetteTrainer):
                 model_name=model_name,
                 writer=None,  # TensorBoard writer will be created automatically
                 setup_model=True,  # Automatically setup for binary classification
+                full_finetune=True,
                 validation_frequency=1,
                 early_stopping_patience=early_stopping_patience,
                 min_delta=0.001,

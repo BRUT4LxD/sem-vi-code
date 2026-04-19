@@ -8,6 +8,7 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 from evaluation.validation import Validation, ValidationAccuracyResult
+from training.architecture_freeze_policy import ArchitectureFreezePolicy
 from training.transfer.setup_pretraining import SetupPretraining
 from attacks.attack_factory import AttackFactory
 from attacks.attack import Attack
@@ -745,7 +746,9 @@ class Training:
         scheduler_params: dict = None,
         gradient_clip_norm: float = None,
         weight_decay: float = 0.0001,
-        verbose: bool = True) -> dict:
+        verbose: bool = True,
+        full_finetune: bool = True,
+    ) -> dict:
         """
         Train a binary classifier to detect adversarial noise in ImageNette images.
         
@@ -763,6 +766,8 @@ class Training:
             model_name: Name of the model for logging
             writer: TensorBoard writer for logging
             setup_model: Whether to setup model for binary classification (default: True)
+            full_finetune: If True (default), unfreeze all parameters after binary head setup;
+                if False, use partial transfer-learning freezing like standard ImageNette setup.
             validation_frequency: How often to run validation (every N epochs)
             early_stopping_patience: Number of epochs to wait before early stopping
             min_delta: Minimum change to qualify as improvement
@@ -815,7 +820,9 @@ class Training:
             if verbose:
                 print(f"⚙️ Setting up {model_name} for binary classification...")
             try:
-                model = SetupPretraining.setup_binary(model)
+                model = SetupPretraining.setup_binary(
+                    model, full_finetune=full_finetune
+                )
                 if verbose:
                     print(f"✅ Model setup complete - ready for binary classification (1 output)")
             except Exception as e:
@@ -1158,6 +1165,11 @@ class Training:
         
         # Move model to device
         model = model.to(device)
+        ArchitectureFreezePolicy.unfreeze_all(model)
+        if verbose:
+            print(
+                "🔓 Adversarial training: all parameters trainable (full fine-tuning policy)."
+            )
         
         # Setup loss function and optimizer
         criterion = CrossEntropyLoss()
@@ -1347,6 +1359,11 @@ class Training:
         writer = Training._create_or_get_writer(writer, log_dir, verbose)
 
         model = model.to(device)
+        ArchitectureFreezePolicy.unfreeze_all(model)
+        if verbose:
+            print(
+                "🔓 Progressive adversarial: all parameters trainable (full fine-tuning policy)."
+            )
         criterion = CrossEntropyLoss()
 
         training_state = Training._build_imagenette_adversarial_training_state(

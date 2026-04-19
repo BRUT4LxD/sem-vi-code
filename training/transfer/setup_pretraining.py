@@ -1,33 +1,41 @@
 import torch
 import torch.nn as nn
 
+from training.architecture_freeze_policy import ArchitectureFreezePolicy
+
+
 class SetupPretraining:
   @staticmethod
-  def setup_imagenette(model: torch.nn.Module, num_last_layers_to_unfreeze: int = 2):
+  def setup_imagenette(
+      model: torch.nn.Module,
+      num_last_layers_to_unfreeze: int = 2,
+      full_finetune: bool = False,
+  ):
     """
-    Setup model for ImageNette transfer learning with proper layer freezing and classifier replacement.
-    
+    Setup model for ImageNette transfer learning with classifier replacement.
+
     Args:
         model: Pretrained ImageNet model
-        num_last_layers_to_unfreeze: Number of last layers to unfreeze (default: 2)
-    
-    Returns:
-        Model configured for ImageNette (10 classes)
+        num_last_layers_to_unfreeze: Passed to partial-unfreeze policy (reserved / future use)
+        full_finetune: If True, replace classifier then unfreeze **all** parameters (full
+            fine-tuning). If False, freeze all, partially unfreeze tail, then replace head.
     """
     
     # Store original classifier info for debugging
     original_classifier_info = SetupPretraining._get_classifier_info(model)
     print(f"Original classifier: {original_classifier_info}")
     
-    # Freeze all parameters first
-    for param in model.parameters():
-        param.requires_grad = False
-    
-    # Unfreeze specific layers based on model architecture
-    SetupPretraining._unfreeze_layers(model, num_last_layers_to_unfreeze)
-    
-    # Replace classifier with ImageNette-specific one (10 classes)
-    SetupPretraining._replace_classifier(model)
+    ArchitectureFreezePolicy.freeze_all(model)
+
+    if full_finetune:
+      print("⚙️ Full fine-tuning: classifier will be adapted, then all layers unfrozen.")
+      SetupPretraining._replace_classifier(model)
+      ArchitectureFreezePolicy.unfreeze_all(model)
+    else:
+      ArchitectureFreezePolicy.apply_partial_transfer_unfreeze(
+          model, num_last_layers_to_unfreeze
+      )
+      SetupPretraining._replace_classifier(model)
     
     # Verify the setup
     new_classifier_info = SetupPretraining._get_classifier_info(model)
@@ -41,31 +49,35 @@ class SetupPretraining:
     return model
   
   @staticmethod
-  def setup_binary(model: torch.nn.Module, num_last_layers_to_unfreeze: int = 2):
+  def setup_binary(
+      model: torch.nn.Module,
+      num_last_layers_to_unfreeze: int = 2,
+      full_finetune: bool = False,
+  ):
     """
-    Setup model for binary classification with proper layer freezing and classifier replacement.
-    
+    Setup model for binary classification with classifier replacement.
+
     Args:
         model: Pretrained ImageNet model
-        num_last_layers_to_unfreeze: Number of last layers to unfreeze (default: 2)
-    
-    Returns:
-        Model configured for binary classification (2 classes or 1 output with sigmoid)
+        num_last_layers_to_unfreeze: Passed to partial-unfreeze policy (reserved / future use)
+        full_finetune: If True, replace binary head then unfreeze all parameters.
     """
     
     # Store original classifier info for debugging
     original_classifier_info = SetupPretraining._get_classifier_info(model)
     print(f"Original classifier: {original_classifier_info}")
     
-    # Freeze all parameters first
-    for param in model.parameters():
-        param.requires_grad = False
-    
-    # Unfreeze specific layers based on model architecture
-    SetupPretraining._unfreeze_layers(model, num_last_layers_to_unfreeze)
-    
-    # Replace classifier with binary-specific one (1 output for sigmoid)
-    SetupPretraining._replace_classifier_binary(model)
+    ArchitectureFreezePolicy.freeze_all(model)
+
+    if full_finetune:
+      print("⚙️ Full fine-tuning (binary): head replaced, then all layers unfrozen.")
+      SetupPretraining._replace_classifier_binary(model)
+      ArchitectureFreezePolicy.unfreeze_all(model)
+    else:
+      ArchitectureFreezePolicy.apply_partial_transfer_unfreeze(
+          model, num_last_layers_to_unfreeze
+      )
+      SetupPretraining._replace_classifier_binary(model)
     
     # Verify the setup
     new_classifier_info = SetupPretraining._get_classifier_info(model)
@@ -89,48 +101,6 @@ class SetupPretraining:
         return f"_fc: {model._fc}"
     else:
         return "No classifier found"
-  
-  @staticmethod
-  def _unfreeze_layers(model, num_layers):
-    """Unfreeze the last N layers based on model architecture."""
-    model_name = model.__class__.__name__.lower()
-    
-    if 'resnet' in model_name:
-        # For ResNet: unfreeze last few layers
-        layers_to_unfreeze = ['layer4', 'fc']
-        for name, module in model.named_modules():
-            if any(layer in name for layer in layers_to_unfreeze):
-                for param in module.parameters():
-                    param.requires_grad = True
-                    
-    elif 'densenet' in model_name:
-        # For DenseNet: unfreeze classifier and last dense block
-        layers_to_unfreeze = ['classifier', 'features.denseblock4']
-        for name, module in model.named_modules():
-            if any(layer in name for layer in layers_to_unfreeze):
-                for param in module.parameters():
-                    param.requires_grad = True
-                    
-    elif 'vgg' in model_name:
-        # For VGG: unfreeze classifier
-        for name, module in model.named_modules():
-            if 'classifier' in name:
-                for param in module.parameters():
-                    param.requires_grad = True
-                    
-    elif 'mobilenet' in model_name:
-        # For MobileNet: unfreeze classifier
-        for name, module in model.named_modules():
-            if 'classifier' in name:
-                for param in module.parameters():
-                    param.requires_grad = True
-                    
-    elif 'efficientnet' in model_name:
-        # For EfficientNet: unfreeze classifier
-        for name, module in model.named_modules():
-            if 'classifier' in name:
-                for param in module.parameters():
-                    param.requires_grad = True
   
   @staticmethod
   def _replace_classifier(model):
@@ -244,4 +214,3 @@ class SetupPretraining:
     except Exception as e:
         print(f"❌ Model verification failed with error: {e}")
         return False
-
