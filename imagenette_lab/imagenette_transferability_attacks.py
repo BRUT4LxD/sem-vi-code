@@ -426,7 +426,7 @@ def imagenette_transferability_model2model_in_memory(
     _, test_loader = load_imagenette(batch_size=batch_size, test_subset_size=-1)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    for source in tqdm(refs, desc="Source Models"):
+    for source in tqdm(refs, desc="M2M[in-mem] source models", unit="model"):
         source_label = source.label
         try:
             source_result = load_model_imagenette(
@@ -443,7 +443,10 @@ def imagenette_transferability_model2model_in_memory(
             source_model.eval()
 
             for attack_name in tqdm(
-                attack_names, desc=f"Attacks on {source_label}", leave=False
+                attack_names,
+                desc=f"M2M[in-mem] {source_label} | attacks",
+                leave=False,
+                unit="attack",
             ):
                 try:
                     pending_targets: List[ModelCheckpoint] = []
@@ -470,7 +473,12 @@ def imagenette_transferability_model2model_in_memory(
                     source_labels = []
                     successful_attacks_count = 0
 
-                    for images, labels in test_loader:
+                    for images, labels in tqdm(
+                        test_loader,
+                        desc=f"M2M craft | src={source_label} atk={attack_name}",
+                        leave=False,
+                        unit="batch",
+                    ):
                         if successful_attacks_count >= images_per_attack:
                             break
 
@@ -514,7 +522,12 @@ def imagenette_transferability_model2model_in_memory(
                         labels_gpu = all_source_labels.to(device)
                         tb = _TARGET_TRANSFER_MICRO_BATCH
 
-                        for target in pending_targets:
+                        for target in tqdm(
+                            pending_targets,
+                            desc=f"M2M transfer | src={source_label} atk={attack_name}",
+                            leave=False,
+                            unit="target",
+                        ):
                             target_model = None
                             target_result = None
                             try:
@@ -637,7 +650,11 @@ def imagenette_transferability_attack2model_in_memory(
     _, test_loader = load_imagenette(batch_size=batch_size, test_subset_size=-1)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    for attack_name in tqdm(attack_names, desc="Attacks"):
+    for attack_name in tqdm(
+        attack_names,
+        desc=f"A2M[in-mem] src={source.label} | attacks",
+        unit="attack",
+    ):
         try:
             pending_targets: List[ModelCheckpoint] = []
             for t in refs:
@@ -677,7 +694,12 @@ def imagenette_transferability_attack2model_in_memory(
             source_labels = []
             successful_attacks_count = 0
 
-            for images, labels in test_loader:
+            for images, labels in tqdm(
+                test_loader,
+                desc=f"A2M craft | src={source.label} atk={attack_name}",
+                leave=False,
+                unit="batch",
+            ):
                 if successful_attacks_count >= images_per_attack:
                     break
 
@@ -720,7 +742,10 @@ def imagenette_transferability_attack2model_in_memory(
                 tb = _TARGET_TRANSFER_MICRO_BATCH
 
                 for target in tqdm(
-                    pending_targets, desc=f"Testing {attack_name}", leave=False
+                    pending_targets,
+                    desc=f"A2M transfer | src={source.label} atk={attack_name}",
+                    leave=False,
+                    unit="target",
                 ):
                     target_model = None
                     target_result = None
@@ -824,10 +849,13 @@ def imagenette_transferability_model2model_from_files(
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     logger.begin_incremental_csv("model2model_transferability", "from_files")
 
-    for source in tqdm(refs, desc="Source Models"):
+    for source in tqdm(refs, desc="M2M[files] source models", unit="model"):
         source_label = source.label
         for attack_name in tqdm(
-            attack_names, desc=f"Attacks on {source_label}", leave=False
+            attack_names,
+            desc=f"M2M[files] {source_label} | attacks",
+            leave=False,
+            unit="attack",
         ):
             try:
                 pending_targets: List[ModelCheckpoint] = []
@@ -1003,7 +1031,11 @@ def imagenette_transferability_attack2model_from_files(
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     logger.begin_incremental_csv("attack2model_transferability", "from_files")
 
-    for attack_name in tqdm(attack_names, desc="Attacks"):
+    for attack_name in tqdm(
+        attack_names,
+        desc=f"A2M[files] src={source.label} | attacks",
+        unit="attack",
+    ):
         try:
             pending_targets: List[ModelCheckpoint] = []
             for t in refs:
@@ -1083,7 +1115,10 @@ def imagenette_transferability_attack2model_from_files(
             )
 
             for target in tqdm(
-                pending_targets, desc=f"Testing {attack_name}", leave=False
+                pending_targets,
+                desc=f"A2M[files] transfer | src={source.label} atk={attack_name}",
+                leave=False,
+                unit="target",
             ):
                 try:
                     target_result = load_model_imagenette(

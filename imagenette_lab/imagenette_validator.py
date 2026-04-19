@@ -18,7 +18,7 @@ import os
 import sys
 import pandas as pd
 from datetime import datetime
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple
 import numpy as np
 import torchvision.datasets as datasets
 from torch.utils.data import DataLoader
@@ -103,6 +103,13 @@ class ImageNetteValidator:
             str: Path to the model file
         """
         return os.path.join(self.models_dir, f"{model_name}_advanced.pt")
+
+    @staticmethod
+    def _checkpoint_stem(model_path: str) -> str:
+        """CSV-friendly checkpoint name: filename without `.pt`."""
+        base = os.path.basename(model_path)
+        stem, ext = os.path.splitext(base)
+        return stem if ext.lower() == ".pt" else base
     
     def _model_exists(self, model_name: str) -> bool:
         """
@@ -313,6 +320,151 @@ class ImageNetteValidator:
                 print(f"   {i}. {result['model_name']}: {result['accuracy']:.4f}")
         
         return results
+
+    def validate_model_from_path(
+        self,
+        model_tuple: Tuple[str, str],
+        batch_size: int = 32,
+    ) -> Dict:
+        """
+        Validate one ImageNette model from explicit tuple ``(model_name, model_path)``.
+
+        ``model_name`` is used as architecture hint for loading.
+        Reported ``model_name`` in result uses checkpoint filename stem (without ``.pt``).
+        """
+        architecture_hint, model_path = model_tuple
+        model_label = self._checkpoint_stem(model_path)
+        print(f"\n🔍 Validating {model_label} from path...")
+
+        try:
+            if not os.path.exists(model_path):
+                raise FileNotFoundError(f"Model file not found: {model_path}")
+
+            model_info = load_model_imagenette(
+                model_path=model_path,
+                model_name=architecture_hint,
+                device=str(self.device),
+                verbose=False,
+            )
+            if not model_info.success or model_info.model is None:
+                raise RuntimeError(f"Failed to load model: {model_info.error}")
+
+            model = model_info.model
+            _, test_loader = load_imagenette(batch_size=batch_size, test_subset_size=-1)
+
+            print("   Calculating overall metrics...")
+            acc, prec, rec, f1 = Metrics.evaluate_model_torchmetrics(
+                model, test_loader, 10, verbose=False
+            )
+
+            print("   Calculating per-class metrics...")
+            per_class_metrics = self._calculate_per_class_metrics(model, test_loader)
+            checkpoint = model_info.checkpoint or {}
+
+            result = {
+                "model_name": model_label,
+                "source_model_path": model_path,
+                "source_architecture": architecture_hint,
+                "accuracy": acc,
+                "precision": prec,
+                "recall": rec,
+                "f1": f1,
+                "per_class_metrics": per_class_metrics,
+                "training_epoch": checkpoint.get("epoch", "Unknown"),
+                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "success": True,
+            }
+            print(f"   ✅ {model_label}: Overall Accuracy = {acc:.4f}")
+            return result
+
+        except Exception as e:
+            error_msg = f"Validation failed for {model_label}: {str(e)}"
+            print(f"   ❌ {error_msg}")
+            return {
+                "model_name": model_label,
+                "source_model_path": model_path,
+                "source_architecture": architecture_hint,
+                "error": error_msg,
+                "success": False,
+            }
+
+    def validate_models_from_tuples(
+        self,
+        models: List[Tuple[str, str]],
+        batch_size: int = 32,
+    ) -> List[Dict]:
+        """
+        Validate clean accuracy for a list of tuples in transferability format:
+        ``[(model_name, model_path), ...]``.
+        """
+        print(f"\n{'='*70}")
+        print("🚀 Validating Models From Explicit Paths (clean dataset)")
+        print(f"{'='*70}")
+        print(f"📊 Models provided: {len(models)}")
+
+        results: List[Dict] = []
+        for i, model_tuple in enumerate(models, 1):
+            _, model_path = model_tuple
+            model_label = self._checkpoint_stem(model_path)
+            print(f"\n📊 Model {i}/{len(models)}: {model_label}")
+            results.append(
+                self.validate_model_from_path(model_tuple=model_tuple, batch_size=batch_size)
+            )
+
+        successful = [r for r in results if r.get("success")]
+        failed = [r for r in results if not r.get("success")]
+        print(f"\n📈 Validation Summary:")
+        print(f"   Successful: {len(successful)}/{len(results)}")
+        print(f"   Failed: {len(failed)}/{len(results)}")
+
+        if successful:
+            print("\n🏆 Ranking:")
+            successful.sort(key=lambda x: x["accuracy"], reverse=True)
+            for i, result in enumerate(successful, 1):
+                print(f"   {i}. {result['model_name']}: {result['accuracy']:.4f}")
+
+        return results
+
+    def save_models_from_tuples_summary(
+        self,
+        results: List[Dict],
+        output_filename: Optional[str] = None,
+    ) -> str:
+        """
+        Save summary CSV for results from :func:`validate_models_from_tuples`.
+
+        ``model_name`` in CSV is checkpoint filename without ``.pt``.
+        """
+        successful_results = [r for r in results if r.get("success")]
+        if not successful_results:
+            print("❌ No successful results to save")
+            return ""
+
+        summary_data = []
+        for result in successful_results:
+            summary_data.append(
+                {
+                    "model_name": result["model_name"],
+                    "model_path": result.get("source_model_path", ""),
+                    "architecture_hint": result.get("source_architecture", ""),
+                    "accuracy": result["accuracy"],
+                    "precision": result["precision"],
+                    "recall": result["recall"],
+                    "f1": result["f1"],
+                    "training_epoch": result["training_epoch"],
+                    "timestamp": result["timestamp"],
+                }
+            )
+
+        df = pd.DataFrame(summary_data).sort_values("accuracy", ascending=False)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = output_filename or f"imagenette_models_from_paths_summary_{timestamp}.csv"
+        if not filename.lower().endswith(".csv"):
+            filename = f"{filename}.csv"
+        filepath = os.path.join(self.results_dir, filename)
+        df.to_csv(filepath, index=False)
+        print(f"📊 Summary for provided model paths saved to: {filepath}")
+        return filepath
     
     def save_all_models_summary(self, results: List[Dict]) -> str:
         """
@@ -1057,55 +1209,36 @@ class ImageNetteValidator:
 
 
 if __name__ == "__main__":
-    # Example usage
-    validator = ImageNetteValidator()
-    
-    # ===== ImageNette Classification Validation =====
-    # Run full ImageNette validation pipeline
-    # files = validator.run_full_validation()
-    
-    # ===== Noise Detection Validation =====
-    # Run noise detection validation pipeline
-    noise_files = validator.run_noise_detection_validation()
-    
-    print(f"\n✅ Noise Detection Validation complete! Generated files:")
-    
-    # Display noise detection summary file
-    if noise_files.get('noise_detection_summary_csv'):
-        print(f"\n📊 Noise Detection Summary file:")
-        print(f"   📄 {noise_files['noise_detection_summary_csv']}")
-    
-    # ===== Adversarial Models Validation =====
-    # Example: Validate adversarial models
-    # from attacks.attack_names import AttackNames
-    # attack_names = ['FGSM', 'PGD', 'BIM', 'DeepFool']
-    # adv_files = validator.run_adversarial_validation(
-    #     attack_names=attack_names,
-    #     batch_size=32
-    # )
-    
-    # ===== Complete Validation (All Types) =====
-    # Run complete validation for ImageNette, noise detection, and adversarial models
-    # all_files = validator.run_complete_validation()
-    
-    # ===== Individual Model Validation Examples =====
-    # Example: Validate specific ImageNette model
-    # result = validator.validate_model('resnet18')
-    # print(f"ResNet18 accuracy: {result['accuracy']:.4f}")
-    
-    # Example: Validate specific noise detection model
-    # result = validator.validate_noise_detection_model('resnet18')
-    # print(f"ResNet18 noise detector F1: {result['f1']:.2f}%")
-    
-    # Example: Validate specific adversarial model
-    # result = validator.validate_adversarial_model('resnet18', ['FGSM', 'PGD'])
-    # print(f"ResNet18 adversarial: Clean={result['clean_accuracy']:.2f}%, Adv={result['adversarial_accuracy']:.2f}%")
-    
-    # ===== Check Available Models =====
-    # Example: Get available trained ImageNette models
-    # available_models = validator._get_available_trained_models()
-    # print(f"Available ImageNette models: {available_models}")
-    
-    # Example: Get available noise detection models
-    # available_noise_models = validator._get_available_noise_detection_models()
-    # print(f"Available noise detection models: {available_noise_models}")
+    # Example execution: validate explicit model tuples (same format as transferability)
+    # tuple format: (model_name_architecture_hint, model_checkpoint_path)
+    models: List[Tuple[str, str]] = [
+        (ModelNames().densenet121, "./models/imagenette_adversarial/densenet121_adv_preattacked_20260415.pt"),
+        (ModelNames().efficientnet_b0, "./models/imagenette_adversarial/efficientnet_b0_adv_preattacked_20260415.pt"),
+        (ModelNames().mobilenet_v2, "./models/imagenette_adversarial/mobilenet_v2_adv_preattacked_20260415.pt"),
+        (ModelNames().resnet18, "./models/imagenette_adversarial/resnet18_adv_preattacked_20260415.pt"),
+        (ModelNames().vgg16, "./models/imagenette_adversarial/vgg16_adv_preattacked_20260415.pt"),
+        (ModelNames().resnet18, "./models/imagenette/resnet18_advanced.pt"),
+        (ModelNames().densenet121, "./models/imagenette/densenet121_advanced.pt"),
+        (ModelNames().mobilenet_v2, "./models/imagenette/mobilenet_v2_advanced.pt"),
+        (ModelNames().efficientnet_b0, "./models/imagenette/efficientnet_b0_advanced.pt"),
+        (ModelNames().vgg16, "./models/imagenette/vgg16_advanced.pt"),
+    ]
+
+    validator = ImageNetteValidator(
+        results_dir="./results/imagenette_trained_models"
+    )
+
+    results = validator.validate_models_from_tuples(
+        models=models,
+        batch_size=32,
+    )
+
+    output_filename = "validation_clean_dataset_transfer_models";
+    summary_csv = validator.save_models_from_tuples_summary(
+        results,
+        output_filename=output_filename,
+    )
+
+    print("\n✅ Validation-from-paths completed.")
+    if summary_csv:
+        print(f"📄 Summary CSV: {summary_csv}")
