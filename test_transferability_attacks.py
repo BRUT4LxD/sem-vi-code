@@ -22,6 +22,14 @@ from domain.model.model_names import ModelNames
 from attacks.attack_names import AttackNames
 
 
+def models_from_names(architecture_names, models_root: str = "./models/imagenette"):
+    """Build ``List[Tuple[str, str]]`` as (name, path) for transferability APIs."""
+    return [
+        (n, os.path.normpath(os.path.join(models_root, f"{n}_advanced.pt")))
+        for n in architecture_names
+    ]
+
+
 def test_model2model_transferability():
     """
     Test in-memory model-to-model transferability analysis.
@@ -31,6 +39,7 @@ def test_model2model_transferability():
     
     # Define test parameters
     model_names = [ModelNames().resnet18, ModelNames().densenet121]
+    models = models_from_names(model_names)
     attack_names = [AttackNames().FGSM, AttackNames().PGD]
     images_per_attack = 10  # Small number for testing
     results_folder = "test_results/transferability"
@@ -43,7 +52,7 @@ def test_model2model_transferability():
     try:
         # Run model-to-model transferability analysis
         results = imagenette_transferability_model2model_in_memory(
-            model_names=model_names,
+            models=models,
             attack_names=attack_names,
             images_per_attack=images_per_attack,
             batch_size=1,
@@ -56,7 +65,7 @@ def test_model2model_transferability():
         # Print summary of results
         for result in results:
             print(f"  {result.source_model} → {result.target_model} ({result.attack_name}): "
-                  f"{result.transfer_success}/{result.source_success} "
+                  f"{result.transfer_success}/{result.total_successful_attacks} "
                   f"({result.transfer_rate:.2%})")
         
         return results
@@ -75,6 +84,7 @@ def test_attack2model_transferability():
     
     # Define test parameters
     model_names = [ModelNames().resnet18, ModelNames().densenet121]
+    models = models_from_names(model_names)
     attack_names = [AttackNames().FGSM, AttackNames().PGD]
     images_per_attack = 10  # Small number for testing
     results_folder = "test_results/transferability"
@@ -87,7 +97,7 @@ def test_attack2model_transferability():
     try:
         # Run attack-to-model transferability analysis
         results = imagenette_transferability_attack2model_in_memory(
-            model_names=model_names,
+            models=models,
             attack_names=attack_names,
             images_per_attack=images_per_attack,
             batch_size=1,
@@ -100,7 +110,7 @@ def test_attack2model_transferability():
         # Print summary of results
         for result in results:
             print(f"  {result.attack_name} → {result.target_model}: "
-                  f"{result.transfer_success}/{result.source_success} "
+                  f"{result.transfer_success}/{result.total_successful_attacks} "
                   f"({result.transfer_rate:.2%})")
         
         return results
@@ -119,6 +129,7 @@ def test_comprehensive_experiment():
     
     # Define test parameters
     model_names = [ModelNames().resnet18, ModelNames().densenet121]
+    models = models_from_names(model_names)
     attack_names = [AttackNames().FGSM, AttackNames().PGD]
     images_per_attack = 5  # Very small number for quick testing
     results_folder = "test_results/transferability"
@@ -135,7 +146,7 @@ def test_comprehensive_experiment():
         # Test model-to-model transferability
         print("\n🔄 Running Model-to-Model Transferability...")
         model2model_results = imagenette_transferability_model2model_in_memory(
-            model_names=model_names,
+            models=models,
             attack_names=attack_names,
             images_per_attack=images_per_attack,
             batch_size=1,
@@ -146,7 +157,7 @@ def test_comprehensive_experiment():
         # Test attack-to-model transferability
         print("\n🔄 Running Attack-to-Model Transferability...")
         attack2model_results = imagenette_transferability_attack2model_in_memory(
-            model_names=model_names,
+            models=models,
             attack_names=attack_names,
             images_per_attack=images_per_attack,
             batch_size=1,
@@ -162,11 +173,11 @@ def test_comprehensive_experiment():
             for result in results:
                 if "Model-to-Model" in exp_name:
                     print(f"  {result.source_model} → {result.target_model} ({result.attack_name}): "
-                          f"{result.transfer_success}/{result.source_success} "
+                          f"{result.transfer_success}/{result.total_successful_attacks} "
                           f"({result.transfer_rate:.2%})")
                 else:
                     print(f"  {result.attack_name} → {result.target_model}: "
-                          f"{result.transfer_success}/{result.source_success} "
+                          f"{result.transfer_success}/{result.total_successful_attacks} "
                           f"({result.transfer_rate:.2%})")
         
         return all_results
@@ -184,12 +195,15 @@ def test_single_model_single_attack():
     print("=" * 50)
     
     # Define minimal test parameters
-    model_names = [ModelNames().resnet18]
+    model_names_one = [ModelNames().resnet18]
+    models_one = models_from_names(model_names_one)
+    model_names_two = [ModelNames().resnet18, ModelNames().densenet121]
+    models_two = models_from_names(model_names_two)
     attack_names = [AttackNames().FGSM]
     images_per_attack = 3  # Very small for debugging
     results_folder = "test_results/transferability_debug"
     
-    print(f"📊 Models: {model_names}")
+    print(f"📊 Models (m2m): {model_names_one} | (a2m): {model_names_two}")
     print(f"🎯 Attacks: {attack_names}")
     print(f"🖼️ Images per attack: {images_per_attack}")
     print(f"📁 Results folder: {results_folder}")
@@ -198,7 +212,7 @@ def test_single_model_single_attack():
         # Test model-to-model (should have no results since only one model)
         print("\n🔄 Testing Model-to-Model (should be empty)...")
         model2model_results = imagenette_transferability_model2model_in_memory(
-            model_names=model_names,
+            models=models_one,
             attack_names=attack_names,
             images_per_attack=images_per_attack,
             batch_size=1,
@@ -207,22 +221,22 @@ def test_single_model_single_attack():
         
         print(f"Model-to-Model results: {len(model2model_results)} (expected: 0)")
         
-        # Test attack-to-model (should work with single model)
+        # Attack-to-model requires at least two checkpoints
         print("\n🔄 Testing Attack-to-Model...")
         attack2model_results = imagenette_transferability_attack2model_in_memory(
-            model_names=model_names,
+            models=models_two,
             attack_names=attack_names,
             images_per_attack=images_per_attack,
             batch_size=1,
             results_folder=results_folder
         )
         
-        print(f"Attack-to-Model results: {len(attack2model_results)} (expected: 1)")
+        print(f"Attack-to-Model results: {len(attack2model_results)} (expected: >=1)")
         
         # Print results
         for result in attack2model_results:
             print(f"  {result.attack_name} → {result.target_model}: "
-                  f"{result.transfer_success}/{result.source_success} "
+                  f"{result.transfer_success}/{result.total_successful_attacks} "
                   f"({result.transfer_rate:.2%})")
         
         print(f"\n✅ Single Model Single Attack Test Completed!")
@@ -241,23 +255,25 @@ def test_error_handling():
     print("=" * 50)
     
     try:
-        # Test with invalid model names
-        print("🔄 Testing with invalid model names...")
-        invalid_results = imagenette_transferability_model2model_in_memory(
-            model_names=["invalid_model"],
-            attack_names=[AttackNames().FGSM],
-            images_per_attack=5,
-            results_folder="test_results/error_test"
-        )
-        print(f"Results with invalid models: {len(invalid_results)} (expected: 0)")
-        
+        # Missing checkpoint file
+        print("🔄 Testing with missing .pt file...")
+        try:
+            imagenette_transferability_model2model_in_memory(
+                models=[("resnet18", "./this_checkpoint_does_not_exist_xxx.pt")],
+                attack_names=[AttackNames().FGSM],
+                images_per_attack=5,
+                results_folder="test_results/error_test",
+            )
+        except FileNotFoundError:
+            print("  Caught FileNotFoundError as expected")
+
         # Test with invalid attack names
         print("🔄 Testing with invalid attack names...")
         invalid_results2 = imagenette_transferability_model2model_in_memory(
-            model_names=[ModelNames().resnet18],
+            models=models_from_names([ModelNames().resnet18, ModelNames().densenet121]),
             attack_names=["invalid_attack"],
             images_per_attack=5,
-            results_folder="test_results/error_test"
+            results_folder="test_results/error_test",
         )
         print(f"Results with invalid attacks: {len(invalid_results2)} (expected: 0)")
         
@@ -275,6 +291,7 @@ def run_performance_test():
     print("=" * 50)
     
     model_names = [ModelNames().resnet18, ModelNames().densenet121]
+    models = models_from_names(model_names)
     attack_names = [AttackNames().FGSM]
     images_per_attack = 10
     results_folder = "test_results/performance_test"
@@ -289,7 +306,7 @@ def run_performance_test():
             start_time = time.time()
             
             results = imagenette_transferability_model2model_in_memory(
-                model_names=model_names,
+                models=models,
                 attack_names=attack_names,
                 images_per_attack=images_per_attack,
                 batch_size=batch_size,

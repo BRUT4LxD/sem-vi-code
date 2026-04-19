@@ -4,6 +4,14 @@ import os
 from domain.model.loaded_model import LoadedModel
 
 
+def _coerce_torch_device(device) -> torch.device:
+    if isinstance(device, torch.device):
+        return device
+    if isinstance(device, str):
+        return torch.device(device)
+    return torch.device(str(device))
+
+
 def _extract_model_state_dict(checkpoint):
     """
     Supports:
@@ -46,7 +54,7 @@ def load_model_imagenette(model_path: str, model_name: str = None, device: str =
     Args:
         model_path (str): Path to the saved model checkpoint (.pt file)
         model_name (str, optional): Name of the model. If None, extracted from path.
-        device (str): Device to load the model on ('cuda' or 'cpu')
+        device: Target device for parameters (``str`` or ``torch.device``). Checkpoint is loaded on CPU first.
         verbose (bool): Whether to print loading information
         
     Returns:
@@ -85,8 +93,8 @@ def load_model_imagenette(model_path: str, model_name: str = None, device: str =
         if not os.path.exists(model_path):
             raise FileNotFoundError(f"Model file not found: {model_path}")
         
-        # Load the checkpoint
-        checkpoint = torch.load(model_path, map_location=device, weights_only=False)
+        torch_device = _coerce_torch_device(device)
+        checkpoint = torch.load(model_path, map_location="cpu", weights_only=False)
         
         # Extract model name from path if not provided
         if model_name is None:
@@ -131,7 +139,7 @@ def load_model_imagenette(model_path: str, model_name: str = None, device: str =
             print(f"⚙️ Setting up model for ImageNette (10 classes)...")
         
         model = SetupPretraining.setup_imagenette(model)
-        model = model.to(device)
+        model = model.to(torch_device)
         
         # Load the saved state
         if verbose:
@@ -177,7 +185,7 @@ def load_model_imagenette(model_path: str, model_name: str = None, device: str =
             model_name=model_name,
             checkpoint=checkpoint,
             training_state=training_state,
-            device=device,
+            device=str(torch_device),
             success=True,
         )
         
@@ -201,7 +209,7 @@ def load_model_binary(model_path: str, model_name: str = None, device: str = 'cu
     Args:
         model_path (str): Path to the saved model checkpoint (.pt file)
         model_name (str, optional): Name of the model. If None, extracted from path.
-        device (str): Device to load the model on ('cuda' or 'cpu')
+        device: Target device for parameters (``str`` or ``torch.device``). Checkpoint is loaded on CPU first.
         verbose (bool): Whether to print loading information
         
     Returns:
@@ -222,8 +230,8 @@ def load_model_binary(model_path: str, model_name: str = None, device: str = 'cu
         if not os.path.exists(model_path):
             raise FileNotFoundError(f"Model file not found: {model_path}")
         
-        # Load checkpoint
-        checkpoint = torch.load(model_path, map_location=device, weights_only=False)
+        torch_device = _coerce_torch_device(device)
+        checkpoint = torch.load(model_path, map_location="cpu", weights_only=False)
         
         # Extract model name from path if not provided
         if model_name is None:
@@ -257,7 +265,7 @@ def load_model_binary(model_path: str, model_name: str = None, device: str = 'cu
             print(f"⚙️ Setting up model for binary classification (1 output)...")
         
         model = SetupPretraining.setup_binary(model)
-        model = model.to(device)
+        model = model.to(torch_device)
         
         # Load the saved state
         if verbose:
@@ -274,7 +282,7 @@ def load_model_binary(model_path: str, model_name: str = None, device: str = 'cu
             model=model,
             model_name=model_name,
             checkpoint=checkpoint,
-            device=device,
+            device=str(torch_device),
             success=True,
         )
         
