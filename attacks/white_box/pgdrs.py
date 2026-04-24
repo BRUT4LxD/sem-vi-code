@@ -30,7 +30,7 @@ class PGDRS(Attack):
         model (nn.Module): model to attack.
         eps (float): maximum perturbation. (Default: 8/255)
         alpha (float): step size. (Default: 2/255)
-        steps (int): number of steps. (Default: 40)
+        steps (int): number of steps. (Default: 20)
         noise_type (str): guassian or uniform. (Default: guassian)
         noise_sd (float): standard deviation for normal distributio, or range for . (Default: 0.5)
         noise_batch_size (int): guassian or uniform. (Default: 5)
@@ -47,7 +47,7 @@ class PGDRS(Attack):
 
     """
 
-    def __init__(self, model, eps=8/255, alpha=2/255, steps=40, noise_type="guassian", noise_sd=0.05, noise_batch_size=3, batch_max=2048):
+    def __init__(self, model, eps=8/255, alpha=2/255, steps=20, noise_type="guassian", noise_sd=0.05, noise_batch_size=3, batch_max=2048):
         super().__init__("PGDRS", model)
         self.eps = eps
         self.alpha = alpha

@@ -9,7 +9,7 @@ from data_eng.io import load_model_imagenette
 from evaluation.metrics import Metrics
 from evaluation.visualization import simple_visualize
 from imagenette_lab.training.imagenette_base_trainer import BaseImageNetteTrainer
-from imagenette_training_configs import ImageNetteTrainingConfigs
+from imagenette_lab.training.imagenette_training_configs import ImageNetteTrainingConfigs
 from training.train import Training
 
 
@@ -18,8 +18,13 @@ class ImageNetteStandardTrainer(BaseImageNetteTrainer):
     Standard ImageNette classification training and evaluation.
     """
 
-    def train_model(self, model_name: str, config_name: str = ImageNetteTrainingConfigs.STANDARD,
-                   custom_config: Optional[Dict] = None) -> Dict:
+    def train_model(
+        self,
+        model_name: str,
+        config_name: str = ImageNetteTrainingConfigs.STANDARD,
+        custom_config: Optional[Dict] = None,
+        full_finetune: bool = False,
+    ) -> Dict:
         """
         Train an ImageNette model with specified configuration.
 
@@ -93,7 +98,9 @@ class ImageNetteStandardTrainer(BaseImageNetteTrainer):
                 gradient_clip_norm=config.get('gradient_clip_norm', None),
                 weight_decay=config.get('weight_decay', 0.0),
                 early_stopping_patience=config.get('early_stopping_patience', 5),
-                verbose=config.get('verbose', True)
+                verbose=config.get('verbose', True),
+                full_finetune=full_finetune,
+                tensorboard_runs_root=self.tensorboard_runs_root,
             )
 
             training_time = (datetime.now() - start_time).total_seconds()

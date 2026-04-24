@@ -1,6 +1,6 @@
 import datetime
 import os
-from typing import List
+from typing import Callable, List, Optional
 
 import torch
 from torch.utils.data import DataLoader
@@ -23,6 +23,7 @@ def attack_and_save_images(
     images_per_class: int = 1,
     successfully_attacked_images_folder: str = "",
     attack_test_dataset: bool = False,
+    folder_model_name: Optional[str] = None,
 ):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = attack.model
@@ -77,11 +78,12 @@ def attack_and_save_images(
                 # Increment counter for this class
                 attacked_images_per_class[label] = attacked_images_per_class.get(label, 0) + 1
 
-                # Path: successfully_attacked_images_folder/dataset_name/model_name/attack_name/label/timestamp.png
+                # Path: successfully_attacked_images_folder/dataset_name/{folder_model_name}/attack_name/label/timestamp.png
                 timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S_%f")  # Include microseconds
 
-                # Create directory structure
-                save_dir = os.path.join(successfully_attacked_images_folder, dataset_name, attack.model_name, attack.attack, str(label))
+                # Create directory structure (folder_model_name aligns with transferability / checkpoint labels)
+                name_for_path = folder_model_name if folder_model_name is not None else attack.model_name
+                save_dir = os.path.join(successfully_attacked_images_folder, dataset_name, name_for_path, attack.attack, str(label))
                 os.makedirs(save_dir, exist_ok=True)
 
                 attcked_image_save_path = os.path.join(save_dir, f"{timestamp}.png")
@@ -106,11 +108,24 @@ def attack_and_save_images_multiple(
     images_per_class: int = 1,
     successfully_attacked_images_folder: str = "",
     attack_test_dataset: bool = False,
+    checkpoint_path_for_model: Optional[Callable[[str], str]] = None,
 ):
+    """
+    Args:
+        checkpoint_path_for_model: If set, maps architecture name (e.g. resnet18) to a ``.pt`` path.
+            Default: ``./models/imagenette/{name}_advanced.pt``
+    """
+
+    def _default_checkpoint_path(name: str) -> str:
+        return f"./models/imagenette/{name}_advanced.pt"
+
+    resolve = checkpoint_path_for_model or _default_checkpoint_path
+
     for model_name in model_names:
-        model_path = f"./models/imagenette/{model_name}_advanced.pt"
+        model_path = resolve(model_name)
         result = load_model_imagenette(model_path, model_name, device='cuda')
         model = result.model
+        folder_label = os.path.splitext(os.path.basename(model_path))[0]
         for attack_name in attack_names:
             print(f"🔍 Running {attack_name} attack on {model_name}...")
             if attack_test_dataset:
@@ -126,6 +141,7 @@ def attack_and_save_images_multiple(
                     images_per_class=images_per_class,
                     successfully_attacked_images_folder=successfully_attacked_images_folder,
                     attack_test_dataset=attack_test_dataset,
+                    folder_model_name=folder_label,
                 )
             except Exception as e:
                 print(f"❌ {attack_name} attack on {model_name} failed: {str(e)}")
@@ -144,7 +160,6 @@ if __name__ == "__main__":
         ModelNames().densenet121,
         ModelNames().mobilenet_v2,
         ModelNames().efficientnet_b0,
-        ModelNames().vgg16,
     ]
 
     attack_names = AttackNames().all_attack_names

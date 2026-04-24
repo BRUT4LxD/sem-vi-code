@@ -12,10 +12,6 @@ class ImageNetModels:
     return PretrainedModelDownloader.download_all_models(return_model=True)
 
   @staticmethod
-  def get_all_vgg_models() -> list:
-    return PretrainedModelDownloader.download_vgg_models(return_model=True)
-
-  @staticmethod
   def get_all_resnet_models() -> list:
     return PretrainedModelDownloader.download_resnet_models(return_model=True)
 

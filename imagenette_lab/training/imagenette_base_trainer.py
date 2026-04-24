@@ -1,10 +1,10 @@
 import os
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import torch
 
 from config.imagenette_classes import ImageNetteClasses
-from imagenette_training_configs import ImageNetteTrainingConfigs
+from imagenette_lab.training.imagenette_training_configs import ImageNetteTrainingConfigs
 
 
 class BaseImageNetteTrainer:
@@ -12,13 +12,23 @@ class BaseImageNetteTrainer:
     Base trainer with shared setup and helper methods for ImageNette training.
     """
 
-    def __init__(self, device: str = 'auto', models_dir: str = './models/imagenette'):
+    def __init__(
+        self,
+        device: str = 'auto',
+        models_dir: str = './models/imagenette',
+        noise_detection_dir: Optional[str] = None,
+        adversarial_models_dir: Optional[str] = None,
+        tensorboard_runs_root: Optional[str] = None,
+    ):
         """
         Initialize the ImageNette trainer base.
 
         Args:
             device: Device to use ('auto', 'cuda', or 'cpu')
             models_dir: Directory to save trained models
+            noise_detection_dir: Override directory for noise-detection checkpoints (default: ./models/noise_detection)
+            adversarial_models_dir: Override directory for adversarial-training checkpoints
+            tensorboard_runs_root: If set, TensorBoard logs are written under this directory (instead of ./runs)
         """
         if device == 'auto':
             self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -26,8 +36,9 @@ class BaseImageNetteTrainer:
             self.device = torch.device(device)
 
         self.models_dir = models_dir
-        self.noise_detection_dir = './models/noise_detection'
-        self.adversarial_models_dir = './models/imagenette_adversarial'
+        self.noise_detection_dir = noise_detection_dir or './models/noise_detection'
+        self.adversarial_models_dir = adversarial_models_dir or './models/imagenette_adversarial'
+        self.tensorboard_runs_root = tensorboard_runs_root
         self.AVAILABLE_MODELS = ImageNetteTrainingConfigs.AVAILABLE_MODELS
         self.AVAILABLE_CONFIGS = ImageNetteTrainingConfigs.ALL_CONFIGS
 

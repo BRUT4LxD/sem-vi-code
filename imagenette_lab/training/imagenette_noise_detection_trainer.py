@@ -1,6 +1,6 @@
 import os
 from datetime import datetime
-from typing import Dict, List
+from typing import Dict, List, Optional, Union
 
 import torchvision.datasets as datasets
 from config.imagenet_models import ImageNetModels
@@ -21,7 +21,7 @@ class ImageNetteNoiseDetectionTrainer(BaseImageNetteTrainer):
     def train_noise_detection_model(
         self,
         model_name: str,
-        attacked_images_folder: str = "data/attacks/imagenette_models",
+        attacked_images_folder: Union[str, List[str]] = "data/attacks/imagenette_models",
         clean_train_folder: str = "./data/imagenette/train",
         clean_test_folder: str = "./data/imagenette/val",
         attacked_subset_size: int = 10000,
@@ -34,7 +34,8 @@ class ImageNetteNoiseDetectionTrainer(BaseImageNetteTrainer):
         scheduler_type: str = 'plateau',
         weight_decay: float = 0.0001,
         gradient_clip_norm: float = 1.0,
-        verbose: bool = True
+        save_model_path: Optional[str] = None,
+        verbose: bool = True,
     ) -> Dict:
         """
         Train a binary classifier to detect adversarial noise in ImageNette images.
@@ -75,6 +76,11 @@ class ImageNetteNoiseDetectionTrainer(BaseImageNetteTrainer):
 
             # Load attacked and clean datasets separately; build balanced binary splits here.
             print("\n📁 Loading attacked ImageNette dataset for binary classification...")
+            roots = attacked_images_folder
+            if isinstance(roots, str):
+                print(f"   Attacked roots: {roots}")
+            else:
+                print(f"   Attacked roots (merged): {roots}")
             attacked_train_loader, attacked_test_loader = load_attacked_imagenette(
                 path_to_data=attacked_images_folder,
                 batch_size=batch_size,
@@ -120,11 +126,14 @@ class ImageNetteNoiseDetectionTrainer(BaseImageNetteTrainer):
             model = ImageNetModels.get_model(model_name)
 
             # Setup save path
-            training_day = datetime.now().strftime("%Y%m%d")
-            save_path = os.path.join(
-                self.noise_detection_dir,
-                f"{model_name}_noise_detector_{training_day}.pt",
-            )
+            if save_model_path:
+                save_path = save_model_path
+            else:
+                training_day = datetime.now().strftime("%Y%m%d")
+                save_path = os.path.join(
+                    self.noise_detection_dir,
+                    f"{model_name}_noise_detector_{training_day}.pt",
+                )
 
             # Train noise detection model
             print("\n🚀 Starting noise detection training...")
@@ -149,7 +158,8 @@ class ImageNetteNoiseDetectionTrainer(BaseImageNetteTrainer):
                 scheduler_params=None,
                 gradient_clip_norm=gradient_clip_norm,
                 weight_decay=weight_decay,
-                verbose=verbose
+                verbose=verbose,
+                tensorboard_runs_root=self.tensorboard_runs_root,
             )
 
             training_time = (datetime.now() - start_time).total_seconds()
@@ -200,7 +210,7 @@ class ImageNetteNoiseDetectionTrainer(BaseImageNetteTrainer):
     def train_multiple_noise_detectors(
         self,
         model_names: List[str],
-        attacked_images_folder: str = "data/attacks/imagenette_models",
+        attacked_images_folder: Union[str, List[str]] = "data/attacks/imagenette_models",
         clean_train_folder: str = "./data/imagenette/train",
         clean_test_folder: str = "./data/imagenette/val",
         attacked_subset_size: int = 10000,
@@ -283,11 +293,7 @@ class ImageNetteNoiseDetectionTrainer(BaseImageNetteTrainer):
 
 if __name__ == "__main__":
     model_names = [
-        # ModelNames().resnet18,
-        # ModelNames().densenet121,
-        # ModelNames().mobilenet_v2,
-        # ModelNames().efficientnet_b0,
-        ModelNames().vgg16,
+        ModelNames().resnet18,
     ]
 
     attacked_images_folder = "data/attacks/imagenette_models"

@@ -4,9 +4,10 @@ import time
 import traceback
 import torch
 import csv
-from typing import Dict, List, Optional, Set
+from typing import Callable, Dict, List, Optional, Set
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+
 from attacks.attack import Attack
 from attacks.system_under_attack import SystemUnderAttack
 from attacks.attack_factory import AttackFactory
@@ -200,6 +201,7 @@ class ImageNetteDirectAttacks:
         model_names: Optional[List[str]] = None,
         loaded_models: Optional[List[LoadedModel]] = None,
         results_folder: str = "",
+        checkpoint_path_for_model: Optional[Callable[[str], str]] = None,
     ):
         """
         Run attacks on multiple models and save results to CSV files.
@@ -216,11 +218,14 @@ class ImageNetteDirectAttacks:
             results_folder: Folder to save CSV results (empty string to skip saving).
         """
         if loaded_models is not None:
-            models_to_run: List[LoadedModel] = loaded_models
+            models_to_run: List[LoadedModel] = list(loaded_models)
         elif model_names is not None:
             models_to_run = []
             for name in model_names:
-                model_path = f"./models/imagenette/{name}_advanced.pt"
+                if checkpoint_path_for_model is not None:
+                    model_path = checkpoint_path_for_model(name)
+                else:
+                    model_path = f"./models/imagenette/{name}_advanced.pt"
                 lm = load_model_imagenette(model_path, name, device=self.device_name)
                 if not lm.success:
                     print(f"❌ Failed to load model {name}: {lm.error}")
@@ -259,10 +264,7 @@ class ImageNetteDirectAttacks:
                 print(f"  ⚔️  Running {attack_name} attack...")
 
                 try:
-                    # Create attack
                     attack = AttackFactory.get_attack(attack_name, model)
-
-                    # Run attack
                     ev = self.attack_images_imagenette(attack, data_loader)
 
                     if ev is not None:
@@ -337,6 +339,7 @@ def run_attacks_on_models(
     loaded_models: Optional[List[LoadedModel]] = None,
     device: str = 'cuda',
     results_folder: str = "",
+    checkpoint_path_for_model: Optional[Callable[[str], str]] = None,
 ):
     direct_attacks = ImageNetteDirectAttacks(device=device)
     return direct_attacks.run_attacks_on_models(
@@ -345,6 +348,7 @@ def run_attacks_on_models(
         model_names=model_names,
         loaded_models=loaded_models,
         results_folder=results_folder,
+        checkpoint_path_for_model=checkpoint_path_for_model,
     )
 
 
@@ -398,7 +402,7 @@ if __name__ == "__main__":
         # './models/imagenette_adversarial/efficientnet_b0_adv_preattacked_20260415.pt',
         # './models/imagenette_adversarial/mobilenet_v2_adv_preattacked_20260415.pt',
         # './models/imagenette_adversarial/resnet18_adv_preattacked_20260415.pt',
-        './models/imagenette_adversarial/vgg16_adv_preattacked_20260415.pt',
+        './models/imagenette_adversarial/resnet18_adv_preattacked_20260415.pt',
         ]
     print(f"Model files: {model_files}")
 
@@ -414,17 +418,7 @@ if __name__ == "__main__":
         if lm.success:
             loaded_models.append(lm)
 
-    attack_names = [
-        AttackNames().Pixle,
-        AttackNames().SPSA,
-        AttackNames().Square,
-        AttackNames().TIFGSM,
-        AttackNames().TPGD,
-        AttackNames().UPGD,
-        AttackNames().VNIFGSM,
-        AttackNames().VNIFGSM,
-    ]
-
+    attack_names = AttackNames().all_attack_names
     _, test_loader = load_imagenette(batch_size=4, test_subset_size=500)
 
     runner = ImageNetteDirectAttacks(device=device)

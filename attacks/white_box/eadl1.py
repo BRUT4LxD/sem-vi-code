@@ -27,12 +27,12 @@ class EADL1(Attack):
         - output: :math:`(N, C, H, W)`.
 
     Examples::
-        >>> attack = torchattacks.EADL1(model, kappa=0, lr=0.01, max_iterations=100)
+        >>> attack = torchattacks.EADL1(model, kappa=0, lr=0.01, max_iterations=45)
         >>> adv_images = attack(images, labels)
 
     """
 
-    def __init__(self, model, kappa=0, lr=0.01, binary_search_steps=9, max_iterations=100, abort_early=True, initial_const=0.001, beta=0.001):
+    def __init__(self, model, kappa=0, lr=0.01, binary_search_steps=9, max_iterations=45, abort_early=True, initial_const=0.001, beta=0.001):
         super().__init__("EADL1", model)
         self.kappa = kappa
         self.lr = lr

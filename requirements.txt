@@ -20,3 +20,6 @@ tqdm>=4.66.1
 
 # Logging and monitoring (Python 3.8 compatible)
 tensorboard>=2.14.0
+
+# Config files (experiments YAML; optional if using stdlib fallback in paths.py)
+pyyaml>=6.0.1

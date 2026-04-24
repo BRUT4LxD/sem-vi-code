@@ -83,16 +83,10 @@ raw_efficientnet_model = ImageNetModels().get_model(model_name)
 trained_efficientnet = load_model(raw_efficientnet_model, f"./models/imagenette/{model_name}.pt")
 adv_efficientnet = load_model(raw_efficientnet_model, f"./models/adversarial_models/{model_name}/13-02-2024_22-59.pt")
 
-model_name = ModelNames().vgg16
-raw_vgg_model = ImageNetModels().get_model(model_name)
-trained_vgg = load_model(raw_vgg_model, f"./models/imagenette/{model_name}.pt")
-adv_vgg = load_model(raw_vgg_model, f"./models/adversarial_models/{model_name}/15-02-2024_07-37.pt")
-
-
-model_names = [ModelNames().resnet18, ModelNames().densenet121, ModelNames().mobilenet_v2, ModelNames().efficientnet_b0, ModelNames().vgg16]
-trained_models = [trained_resnet, trained_densenet, trained_mobilenet, trained_efficientnet, trained_vgg]
-adv_models = [adv_resnet, adv_densenet, adv_mobilenet, adv_efficientnet, adv_vgg]
-source_models = [raw_resnet_model, raw_densenet_model, raw_mobilenet_model, raw_efficientnet_model, raw_vgg_model]
+model_names = [ModelNames().resnet18, ModelNames().densenet121, ModelNames().mobilenet_v2, ModelNames().efficientnet_b0]
+trained_models = [trained_resnet, trained_densenet, trained_mobilenet, trained_efficientnet]
+adv_models = [adv_resnet, adv_densenet, adv_mobilenet, adv_efficientnet]
+source_models = [raw_resnet_model, raw_densenet_model, raw_mobilenet_model, raw_efficientnet_model]
 binary_models = []
 
 
@@ -121,13 +115,6 @@ binary_models = []
 #   print(f"Validation accuracy: {res}")
 #   res.save_csv(0, results_path)
 
-# _ = adv_vgg.eval()
-# _ = adv_vgg.to(device)
-# Validation.validate_imagenet_with_imagenette_classes(
-#   model=adv_vgg,
-#   test_loader=test_loader,
-#   model_name=ModelNames().vgg16,
-# )
 
 # multiattacks = []
 # attacks_save_folder_path = f"./results/attacks/source_models"

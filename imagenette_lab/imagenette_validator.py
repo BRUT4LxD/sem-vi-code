@@ -37,6 +37,37 @@ from data_eng.dataset_loader import load_attacked_imagenette
 from data_eng.transforms import imagenette_transformer
 from evaluation.metrics import Metrics
 
+
+def _project_root() -> str:
+    """Repository root (parent of ``imagenette_lab``)."""
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def _path_relative_to_project_for_csv(path: str) -> str:
+    """
+    Return ``path`` as relative to the project root for stable, portable CSVs.
+    If the file is outside the repo or relpath fails, return ``path`` unchanged.
+    """
+    if not path or not str(path).strip():
+        return path
+    root = os.path.abspath(_project_root())
+    p = path.strip()
+    if not os.path.isabs(p):
+        candidate = os.path.normpath(os.path.join(root, p))
+        if os.path.isfile(candidate):
+            p = candidate
+        else:
+            p = os.path.abspath(os.path.normpath(p))
+    p = os.path.abspath(os.path.normpath(p))
+    try:
+        rel = os.path.relpath(p, root)
+    except ValueError:
+        return path
+    if rel.startswith(".." + os.sep) or rel == "..":
+        return path
+    return rel.replace("\\", "/")
+
+
 class ImageNetteValidator:
     """
     Comprehensive validator for trained ImageNette models.
@@ -445,7 +476,9 @@ class ImageNetteValidator:
             summary_data.append(
                 {
                     "model_name": result["model_name"],
-                    "model_path": result.get("source_model_path", ""),
+                    "model_path": _path_relative_to_project_for_csv(
+                        result.get("source_model_path", "")
+                    ),
                     "architecture_hint": result.get("source_architecture", ""),
                     "accuracy": result["accuracy"],
                     "precision": result["precision"],
@@ -1216,12 +1249,10 @@ if __name__ == "__main__":
         (ModelNames().efficientnet_b0, "./models/imagenette_adversarial/efficientnet_b0_adv_preattacked_20260415.pt"),
         (ModelNames().mobilenet_v2, "./models/imagenette_adversarial/mobilenet_v2_adv_preattacked_20260415.pt"),
         (ModelNames().resnet18, "./models/imagenette_adversarial/resnet18_adv_preattacked_20260415.pt"),
-        (ModelNames().vgg16, "./models/imagenette_adversarial/vgg16_adv_preattacked_20260415.pt"),
         (ModelNames().resnet18, "./models/imagenette/resnet18_advanced.pt"),
         (ModelNames().densenet121, "./models/imagenette/densenet121_advanced.pt"),
         (ModelNames().mobilenet_v2, "./models/imagenette/mobilenet_v2_advanced.pt"),
         (ModelNames().efficientnet_b0, "./models/imagenette/efficientnet_b0_advanced.pt"),
-        (ModelNames().vgg16, "./models/imagenette/vgg16_advanced.pt"),
     ]
 
     validator = ImageNetteValidator(

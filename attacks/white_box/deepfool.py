@@ -11,18 +11,18 @@ class DeepFool(Attack):
     Distance Measure : L2
     Arguments:
         model (nn.Module): model to attack.
-        steps (int): number of steps. (Default: 50)
+        steps (int): number of steps. (Default: 20)
         overshoot (float): parameter for enhancing the noise. (Default: 0.02)
     Shape:
         - images: :math:`(N, C, H, W)` where `N = number of batches`, `C = number of channels`,        `H = height` and `W = width`. It must have a range [0, 1].
         - labels: :math:`(N)` where each value :math:`y_i` is :math:`0 \leq y_i \leq` `number of labels`.
         - output: :math:`(N, C, H, W)`.
     Examples::
-        >>> attack = torchattacks.DeepFool(model, steps=50, overshoot=0.02)
+        >>> attack = torchattacks.DeepFool(model, steps=20, overshoot=0.02)
         >>> adv_images = attack(images, labels)
     """
 
-    def __init__(self, model, steps=50, overshoot=0.02):
+    def __init__(self, model, steps=20, overshoot=0.02):
         super().__init__("DeepFool", model)
         self.steps = steps
         self.overshoot = overshoot

@@ -4,7 +4,9 @@ import gc
 import time
 import datetime
 import traceback
+import hashlib
 import torch
+from collections import defaultdict
 from typing import Callable, List, Dict, Tuple, Optional, Set, NamedTuple, TypeVar
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -16,7 +18,6 @@ from attacks.attack_names import AttackNames
 from data_eng.io import load_model_imagenette
 from data_eng.dataset_loader import load_imagenette
 from domain.model.model_names import ModelNames
-from shared.model_utils import ModelUtils
 
 
 T = TypeVar("T")
@@ -58,8 +59,78 @@ def _defragment_cuda_memory() -> None:
             pass
 
 
-# Small batches on target forward reduce activation VRAM (e.g. VGG with many adv images).
-_TARGET_TRANSFER_MICRO_BATCH: int = 16
+def _image_tensor_hash(image_tensor: torch.Tensor) -> str:
+    """
+    Stable hash for an ImageNette sample tensor.
+    Quantizes to uint8 [0,255] and hashes raw bytes.
+    """
+    x = image_tensor.detach().cpu().clamp(0.0, 1.0)
+    x_u8 = torch.round(x * 255.0).to(torch.uint8).contiguous()
+    return hashlib.sha256(x_u8.numpy().tobytes()).hexdigest()
+
+
+def _build_correctly_classified_index(
+    refs: List["ModelCheckpoint"],
+    test_loader: DataLoader,
+    device: torch.device,
+    batch_size: int = 32,
+) -> Dict[str, Set["ModelCheckpoint"]]:
+    """
+    Build map: image_hash -> set(ModelCheckpoint) for models that classify clean image correctly.
+    """
+    del batch_size  # kept for signature readability and potential future tuning
+    correct_by_hash: Dict[str, Set["ModelCheckpoint"]] = defaultdict(set)
+    print("🧮 Building clean-correct hash index across models...")
+
+    for model_ref in tqdm(refs, desc="Precompute clean-correct", unit="model"):
+        model_result = load_model_imagenette(
+            model_ref.path, model_ref.architecture, device=device
+        )
+        if not model_result.success or model_result.model is None:
+            print(
+                f"⚠️ Skipping clean-index model {model_ref.label}: "
+                f"{(model_result.error or 'unknown')}"
+            )
+            continue
+        model = model_result.model
+        model.eval()
+        with torch.no_grad():
+            for images, labels in test_loader:
+                logits = model(images.to(device))
+                preds = torch.argmax(logits, dim=1).cpu()
+                labels_cpu = labels.cpu()
+                correct_mask = preds == labels_cpu
+                if not bool(correct_mask.any().item()):
+                    continue
+                for i in range(images.size(0)):
+                    if bool(correct_mask[i].item()):
+                        img_hash = _image_tensor_hash(images[i])
+                        correct_by_hash[img_hash].add(model_ref)
+
+        del model
+        del model_result
+        _defragment_cuda_memory()
+
+    print(f"✅ Clean-correct index ready: {len(correct_by_hash)} unique images")
+    return correct_by_hash
+
+
+def _build_source_hash_to_targets_index(
+    clean_correct_index: Dict[str, Set["ModelCheckpoint"]],
+    source: "ModelCheckpoint",
+    targets: List["ModelCheckpoint"],
+) -> Dict[str, List["ModelCheckpoint"]]:
+    """
+    Precompute, for a fixed source, which targets are clean-correct for each image hash.
+    """
+    source_hash_to_targets: Dict[str, List["ModelCheckpoint"]] = {}
+    for img_hash, classifiers in clean_correct_index.items():
+        if source not in classifiers:
+            continue
+        eligible_targets = [t for t in targets if t in classifiers]
+        if eligible_targets:
+            source_hash_to_targets[img_hash] = eligible_targets
+    return source_hash_to_targets
 
 
 def run_transferability_with_allocation_retry(
@@ -264,8 +335,14 @@ def _load_recorded_transfer_keys(csv_path: str) -> Set[Tuple[str, str, str]]:
 
 
 class TransferabilityResult:
-    """Class to store transferability attack results"""
-    
+    """
+    Stores transferability attack results.
+
+    ``total_successful_attacks`` is the denominator used for ``transfer_rate`` in a given
+    source-target-attack row. For in-memory transfer, candidate samples are prefiltered using
+    clean-correct hashes for source and target before attack generation.
+    """
+
     def __init__(self, source_model: str, target_model: str, attack_name: str, 
                  transfer_success: int, total_successful_attacks: int, total_images: int):
         self.source_model = source_model
@@ -400,6 +477,9 @@ def imagenette_transferability_model2model_in_memory(
     """
     In-memory transferability: model to model.
 
+    For each source-target pair, a sample is attack-eligible only if both source and target classify
+    the clean image correctly (based on a precomputed image-hash index).
+
     Args:
         models: List of ``(model_name, model_path)``. CSV ``source_model`` / ``target_model`` are
             checkpoint stems (basename without ``.pt``); ``model_name`` selects architecture when it is a known
@@ -425,6 +505,7 @@ def imagenette_transferability_model2model_in_memory(
 
     _, test_loader = load_imagenette(batch_size=batch_size, test_subset_size=-1)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    clean_correct_index = _build_correctly_classified_index(refs, test_loader, device)
 
     for source in tqdm(refs, desc="M2M[in-mem] source models", unit="model"):
         source_label = source.label
@@ -441,6 +522,10 @@ def imagenette_transferability_model2model_in_memory(
                 continue
             source_model = source_result.model
             source_model.eval()
+            source_targets_all = [t for t in refs if t.path != source.path]
+            source_hash_to_targets_all = _build_source_hash_to_targets_index(
+                clean_correct_index, source, source_targets_all
+            )
 
             for attack_name in tqdm(
                 attack_names,
@@ -467,47 +552,71 @@ def imagenette_transferability_model2model_in_memory(
                             pending_targets.append(t)
                     if not pending_targets:
                         continue
+                    pending_target_set = set(pending_targets)
                     attack = AttackFactory.get_attack(attack_name, source_model)
 
-                    adversarial_examples = []
-                    source_labels = []
+                    target_adv_examples: Dict[ModelCheckpoint, List[torch.Tensor]] = {
+                        t: [] for t in pending_targets
+                    }
+                    target_labels: Dict[ModelCheckpoint, List[int]] = {
+                        t: [] for t in pending_targets
+                    }
                     successful_attacks_count = 0
 
-                    for images, labels in tqdm(
-                        test_loader,
+                    with tqdm(
+                        total=images_per_attack,
                         desc=f"M2M craft | src={source_label} atk={attack_name}",
                         leave=False,
-                        unit="batch",
-                    ):
-                        if successful_attacks_count >= images_per_attack:
-                            break
+                        unit="succ",
+                    ) as craft_pbar:
+                        for images, labels in test_loader:
+                            if successful_attacks_count >= images_per_attack:
+                                break
 
-                        images, labels = images.to(device), labels.to(device)
+                            before = successful_attacks_count
+                            image_hashes = [_image_tensor_hash(images[i]) for i in range(images.size(0))]
+                            eligible_targets_per_idx: List[List[ModelCheckpoint]] = []
+                            eligible_indices: List[int] = []
+                            for i, img_hash in enumerate(image_hashes):
+                                targets_that_didnt_missclassify = [
+                                    t
+                                    for t in source_hash_to_targets_all.get(img_hash, [])
+                                    if t in pending_target_set
+                                ]
+                                if not targets_that_didnt_missclassify:
+                                    continue
+                                eligible_indices.append(i)
+                                eligible_targets_per_idx.append(targets_that_didnt_missclassify)
 
-                        images, labels = ModelUtils.remove_missclassified_imagenette(
-                            source_model, images, labels
-                        )
+                            if not eligible_indices:
+                                continue
 
-                        if labels.numel() == 0:
-                            continue
+                            idx = torch.tensor(eligible_indices, dtype=torch.long)
+                            selected_images = images.index_select(0, idx).to(device)
+                            selected_labels = labels.index_select(0, idx).to(device)
+                            adv_images = attack(selected_images, selected_labels)
 
-                        adv_images = attack(images, labels)
+                            with torch.no_grad():
+                                source_outputs = source_model(adv_images)
+                                source_predictions = torch.argmax(source_outputs, dim=1)
 
-                        with torch.no_grad():
-                            source_outputs = source_model(adv_images)
-                            source_predictions = torch.argmax(source_outputs, dim=1)
+                                for i in range(len(adv_images)):
+                                    if successful_attacks_count >= images_per_attack:
+                                        break
 
-                            for i in range(len(adv_images)):
-                                if successful_attacks_count >= images_per_attack:
-                                    break
+                                    label = selected_labels[i].item()
+                                    predicted_label = source_predictions[i].item()
 
-                                label = labels[i].item()
-                                predicted_label = source_predictions[i].item()
+                                    if predicted_label != label:
+                                        successful_attacks_count += 1
+                                        adv_cpu = adv_images[i].detach().cpu()
+                                        for target_ref in eligible_targets_per_idx[i]:
+                                            target_adv_examples[target_ref].append(adv_cpu)
+                                            target_labels[target_ref].append(label)
 
-                                if predicted_label != label:
-                                    adversarial_examples.append(adv_images[i].cpu())
-                                    source_labels.append(label)
-                                    successful_attacks_count += 1
+                            gained = successful_attacks_count - before
+                            if gained > 0:
+                                craft_pbar.update(gained)
 
                     if successful_attacks_count == 0:
                         print(
@@ -515,13 +624,7 @@ def imagenette_transferability_model2model_in_memory(
                         )
                         continue
 
-                    if adversarial_examples:
-                        all_adv_images = torch.stack(adversarial_examples)
-                        all_source_labels = torch.tensor(source_labels)
-                        adv_gpu = all_adv_images.to(device)
-                        labels_gpu = all_source_labels.to(device)
-                        tb = _TARGET_TRANSFER_MICRO_BATCH
-
+                    if successful_attacks_count > 0:
                         for target in tqdm(
                             pending_targets,
                             desc=f"M2M transfer | src={source_label} atk={attack_name}",
@@ -543,25 +646,44 @@ def imagenette_transferability_model2model_in_memory(
                                 target_model = target_result.model
                                 target_model.eval()
 
+                                target_key = _checkpoint_csv_name(target.path)
+                                if not target_adv_examples[target]:
+                                    print(
+                                        f"⚠️ {source_label} → {target.label} ({attack_name}): "
+                                        "no source-successful AE eligible for this pair."
+                                    )
+                                    result = TransferabilityResult(
+                                        source_model=_checkpoint_csv_name(source.path),
+                                        target_model=target_key,
+                                        attack_name=attack_name,
+                                        transfer_success=0,
+                                        total_successful_attacks=0,
+                                        total_images=successful_attacks_count,
+                                    )
+                                    results.append(result)
+                                    logger.append_result(result)
+                                    continue
+
+                                all_adv_images = torch.stack(target_adv_examples[target]).to(device)
+                                all_source_labels = torch.tensor(target_labels[target], device=device)
                                 transfer_success_count = 0
-                                with torch.no_grad():
-                                    for start in range(0, adv_gpu.size(0), tb):
-                                        batch_adv = adv_gpu[start : start + tb]
-                                        batch_lbl = labels_gpu[start : start + tb]
+                                target_batch = 32
+                                for start in range(0, all_adv_images.size(0), target_batch):
+                                    batch_adv = all_adv_images[start : start + target_batch]
+                                    batch_lbl = all_source_labels[start : start + target_batch]
+                                    with torch.no_grad():
                                         target_outputs = target_model(batch_adv)
-                                        target_predictions = torch.argmax(
-                                            target_outputs, dim=1
+                                        target_predictions = torch.argmax(target_outputs, dim=1)
+                                        transfer_success_count += int(
+                                            (target_predictions != batch_lbl).sum().item()
                                         )
-                                        transfer_success_count += (
-                                            target_predictions != batch_lbl
-                                        ).sum().item()
 
                                 result = TransferabilityResult(
                                     source_model=_checkpoint_csv_name(source.path),
-                                    target_model=_checkpoint_csv_name(target.path),
+                                    target_model=target_key,
                                     attack_name=attack_name,
                                     transfer_success=transfer_success_count,
-                                    total_successful_attacks=len(all_adv_images),
+                                    total_successful_attacks=len(target_adv_examples[target]),
                                     total_images=successful_attacks_count,
                                 )
 
@@ -570,7 +692,8 @@ def imagenette_transferability_model2model_in_memory(
 
                                 print(
                                     f"✅ {source_label} → {target.label} ({attack_name}): "
-                                    f"{transfer_success_count}/{len(all_adv_images)} "
+                                    f"{transfer_success_count}/{len(target_adv_examples[target])} "
+                                    f"(crafted={successful_attacks_count}) "
                                     f"({result.transfer_rate:.2%})"
                                 )
 
@@ -597,9 +720,6 @@ def imagenette_transferability_model2model_in_memory(
                                 if target_result is not None:
                                     del target_result
                                 _defragment_cuda_memory()
-
-                        del adv_gpu, labels_gpu
-                        _defragment_cuda_memory()
 
                 except Exception as e:
                     if _is_allocation_error(e):
@@ -633,8 +753,8 @@ def imagenette_transferability_attack2model_in_memory(
     In-memory attack-to-model transferability.
 
     Adversarial examples are crafted on the **first** ``(model_name, model_path)`` pair; transfer
-    is evaluated on the remaining checkpoints. See :func:`imagenette_transferability_model2model_in_memory`
-    for tuple semantics.
+    is evaluated on the remaining checkpoints. Candidate samples are prefiltered with clean-correct
+    hashes so source and target are both correct on clean before attacking.
     """
     print("🔄 Starting in-memory attack-to-model transferability analysis...")
 
@@ -649,6 +769,11 @@ def imagenette_transferability_attack2model_in_memory(
     logger.begin_incremental_csv("attack2model_transferability", "in_memory")
     _, test_loader = load_imagenette(batch_size=batch_size, test_subset_size=-1)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    clean_correct_index = _build_correctly_classified_index(refs, test_loader, device)
+    source_targets_all = [t for t in refs if t.path != source.path]
+    source_hash_to_targets_all = _build_source_hash_to_targets_index(
+        clean_correct_index, source, source_targets_all
+    )
 
     for attack_name in tqdm(
         attack_names,
@@ -674,6 +799,7 @@ def imagenette_transferability_attack2model_in_memory(
                     pending_targets.append(t)
             if not pending_targets:
                 continue
+            pending_target_set = set(pending_targets)
 
             source_result = load_model_imagenette(
                 source.path, source.architecture, device=device
@@ -690,57 +816,74 @@ def imagenette_transferability_attack2model_in_memory(
 
             attack = AttackFactory.get_attack(attack_name, source_model)
 
-            adversarial_examples = []
-            source_labels = []
+            target_adv_examples: Dict[ModelCheckpoint, List[torch.Tensor]] = {
+                t: [] for t in pending_targets
+            }
+            target_labels: Dict[ModelCheckpoint, List[int]] = {
+                t: [] for t in pending_targets
+            }
             successful_attacks_count = 0
 
-            for images, labels in tqdm(
-                test_loader,
+            with tqdm(
+                total=images_per_attack,
                 desc=f"A2M craft | src={source.label} atk={attack_name}",
                 leave=False,
-                unit="batch",
-            ):
-                if successful_attacks_count >= images_per_attack:
-                    break
+                unit="succ",
+            ) as craft_pbar:
+                for images, labels in test_loader:
+                    if successful_attacks_count >= images_per_attack:
+                        break
 
-                images, labels = images.to(device), labels.to(device)
+                    before = successful_attacks_count
+                    image_hashes = [_image_tensor_hash(images[i]) for i in range(images.size(0))]
+                    eligible_targets_per_idx: List[List[ModelCheckpoint]] = []
+                    eligible_indices: List[int] = []
+                    for i, img_hash in enumerate(image_hashes):
+                        eligible_targets = [
+                            t
+                            for t in source_hash_to_targets_all.get(img_hash, [])
+                            if t in pending_target_set
+                        ]
+                        if not eligible_targets:
+                            continue
+                        eligible_indices.append(i)
+                        eligible_targets_per_idx.append(eligible_targets)
 
-                images, labels = ModelUtils.remove_missclassified_imagenette(
-                    source_model, images, labels
-                )
+                    if not eligible_indices:
+                        continue
 
-                if labels.numel() == 0:
-                    continue
+                    idx = torch.tensor(eligible_indices, dtype=torch.long)
+                    selected_images = images.index_select(0, idx).to(device)
+                    selected_labels = labels.index_select(0, idx).to(device)
+                    adv_images = attack(selected_images, selected_labels)
 
-                adv_images = attack(images, labels)
+                    with torch.no_grad():
+                        source_outputs = source_model(adv_images)
+                        source_predictions = torch.argmax(source_outputs, dim=1)
 
-                with torch.no_grad():
-                    source_outputs = source_model(adv_images)
-                    source_predictions = torch.argmax(source_outputs, dim=1)
+                        for i in range(len(adv_images)):
+                            if successful_attacks_count >= images_per_attack:
+                                break
 
-                    for i in range(len(adv_images)):
-                        if successful_attacks_count >= images_per_attack:
-                            break
+                            label = selected_labels[i].item()
+                            predicted_label = source_predictions[i].item()
 
-                        label = labels[i].item()
-                        predicted_label = source_predictions[i].item()
+                            if predicted_label != label:
+                                successful_attacks_count += 1
+                                adv_cpu = adv_images[i].detach().cpu()
+                                for target_ref in eligible_targets_per_idx[i]:
+                                    target_adv_examples[target_ref].append(adv_cpu)
+                                    target_labels[target_ref].append(label)
 
-                        if predicted_label != label:
-                            adversarial_examples.append(adv_images[i].cpu())
-                            source_labels.append(label)
-                            successful_attacks_count += 1
+                    gained = successful_attacks_count - before
+                    if gained > 0:
+                        craft_pbar.update(gained)
 
             if successful_attacks_count == 0:
                 print(f"⚠️ No successful attacks for {attack_name}")
                 continue
 
-            if adversarial_examples:
-                all_adv_images = torch.stack(adversarial_examples)
-                all_source_labels = torch.tensor(source_labels)
-                adv_gpu = all_adv_images.to(device)
-                labels_gpu = all_source_labels.to(device)
-                tb = _TARGET_TRANSFER_MICRO_BATCH
-
+            if successful_attacks_count > 0:
                 for target in tqdm(
                     pending_targets,
                     desc=f"A2M transfer | src={source.label} atk={attack_name}",
@@ -762,23 +905,44 @@ def imagenette_transferability_attack2model_in_memory(
                         target_model = target_result.model
                         target_model.eval()
 
+                        target_key = _checkpoint_csv_name(target.path)
+                        if not target_adv_examples[target]:
+                            print(
+                                f"⚠️ {attack_name} → {target.label}: "
+                                "no source-successful AE eligible for this pair."
+                            )
+                            result = TransferabilityResult(
+                                source_model=_checkpoint_csv_name(source.path),
+                                target_model=target_key,
+                                attack_name=attack_name,
+                                transfer_success=0,
+                                total_successful_attacks=0,
+                                total_images=successful_attacks_count,
+                            )
+                            results.append(result)
+                            logger.append_result(result)
+                            continue
+
+                        all_adv_images = torch.stack(target_adv_examples[target]).to(device)
+                        all_source_labels = torch.tensor(target_labels[target], device=device)
                         transfer_success_count = 0
-                        with torch.no_grad():
-                            for start in range(0, adv_gpu.size(0), tb):
-                                batch_adv = adv_gpu[start : start + tb]
-                                batch_lbl = labels_gpu[start : start + tb]
+                        tb = 32
+                        for start in range(0, all_adv_images.size(0), tb):
+                            batch_adv = all_adv_images[start : start + tb]
+                            batch_lbl = all_source_labels[start : start + tb]
+                            with torch.no_grad():
                                 target_outputs = target_model(batch_adv)
                                 target_predictions = torch.argmax(target_outputs, dim=1)
-                                transfer_success_count += (
-                                    target_predictions != batch_lbl
-                                ).sum().item()
+                                transfer_success_count += int(
+                                    (target_predictions != batch_lbl).sum().item()
+                                )
 
                         result = TransferabilityResult(
                             source_model=_checkpoint_csv_name(source.path),
-                            target_model=_checkpoint_csv_name(target.path),
+                            target_model=target_key,
                             attack_name=attack_name,
                             transfer_success=transfer_success_count,
-                            total_successful_attacks=len(all_adv_images),
+                            total_successful_attacks=len(target_adv_examples[target]),
                             total_images=successful_attacks_count,
                         )
 
@@ -787,7 +951,8 @@ def imagenette_transferability_attack2model_in_memory(
 
                         print(
                             f"✅ {attack_name} → {target.label}: "
-                            f"{transfer_success_count}/{len(all_adv_images)} "
+                            f"{transfer_success_count}/{len(target_adv_examples[target])} "
+                            f"(crafted={successful_attacks_count}) "
                             f"({result.transfer_rate:.2%})"
                         )
 
@@ -812,9 +977,6 @@ def imagenette_transferability_attack2model_in_memory(
                         if target_result is not None:
                             del target_result
                         _defragment_cuda_memory()
-
-                del adv_gpu, labels_gpu
-                _defragment_cuda_memory()
 
         except Exception as e:
             if _is_allocation_error(e):
@@ -1306,12 +1468,10 @@ if __name__ == "__main__":
         (ModelNames().efficientnet_b0, "./models/imagenette_adversarial/efficientnet_b0_adv_preattacked_20260415.pt"),
         (ModelNames().mobilenet_v2, "./models/imagenette_adversarial/mobilenet_v2_adv_preattacked_20260415.pt"),
         (ModelNames().resnet18, "./models/imagenette_adversarial/resnet18_adv_preattacked_20260415.pt"),
-        (ModelNames().vgg16, "./models/imagenette_adversarial/vgg16_adv_preattacked_20260415.pt"),
         (ModelNames().resnet18, "./models/imagenette/resnet18_advanced.pt"),
         (ModelNames().densenet121, "./models/imagenette/densenet121_advanced.pt"),
         (ModelNames().mobilenet_v2, "./models/imagenette/mobilenet_v2_advanced.pt"),
         (ModelNames().efficientnet_b0, "./models/imagenette/efficientnet_b0_advanced.pt"),
-        (ModelNames().vgg16, "./models/imagenette/vgg16_advanced.pt"),
     ]
 
     run_transferability_with_allocation_retry(

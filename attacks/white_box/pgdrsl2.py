@@ -30,7 +30,7 @@ class PGDRSL2(Attack):
         model (nn.Module): model to attack.
         eps (float): maximum perturbation. (Default: 1.0)
         alpha (float): step size. (Default: 0.2)
-        steps (int): number of steps. (Default: 10)
+        steps (int): number of steps. (Default: 15)
         noise_type (str): guassian or uniform. (Default: guassian)
         noise_sd (float): standard deviation for normal distributio, or range for . (Default: 0.5)
         noise_batch_size (int): guassian or uniform. (Default: 5)
@@ -48,7 +48,7 @@ class PGDRSL2(Attack):
 
     """
 
-    def __init__(self, model, eps=1.0, alpha=0.2, steps=40, noise_type="guassian", noise_sd=0.05, noise_batch_size=5, batch_max=2048, eps_for_division=1e-10):
+    def __init__(self, model, eps=1.0, alpha=0.2, steps=15, noise_type="guassian", noise_sd=0.05, noise_batch_size=5, batch_max=2048, eps_for_division=1e-10):
         super().__init__("PGDRSL2", model)
         self.eps = eps
         self.alpha = alpha

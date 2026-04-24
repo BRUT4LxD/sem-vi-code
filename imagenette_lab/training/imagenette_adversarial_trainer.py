@@ -37,7 +37,11 @@ class ImageNetteAdversarialTrainer(BaseImageNetteTrainer):
         attacked_subset_size: int = -1,
         augment_clean_to_match_attacked: bool = True,
         train_test_split: Optional[float] = None,
-        verbose: bool = True
+        attacked_images_folder: Optional[str] = None,
+        clean_train_root: Optional[str] = None,
+        clean_val_root: Optional[str] = None,
+        save_model_path: Optional[str] = None,
+        verbose: bool = True,
     ) -> Dict:
         """
         Train a model using adversarial training on ImageNette dataset.
@@ -98,12 +102,21 @@ class ImageNetteAdversarialTrainer(BaseImageNetteTrainer):
             # Load dataset based on mode
             print("\n📁 Loading dataset...")
             if use_preattacked_images:
-                train_loader, test_loader = build_imagenette_adversarial_training_loaders(
+                loader_kwargs = dict(
                     batch_size=batch_size,
                     attacked_subset_size=attacked_subset_size,
                     clean_to_attacked_ratio=1.0,
                     augment_clean_to_match_attacked=augment_clean_to_match_attacked,
                     train_test_split=train_test_split,
+                )
+                if attacked_images_folder is not None:
+                    loader_kwargs["attacked_images_folder"] = attacked_images_folder
+                if clean_train_root is not None:
+                    loader_kwargs["clean_train_root"] = clean_train_root
+                if clean_val_root is not None:
+                    loader_kwargs["clean_val_root"] = clean_val_root
+                train_loader, test_loader = build_imagenette_adversarial_training_loaders(
+                    **loader_kwargs
                 )
             else:
                 # Load clean ImageNette for on-the-fly generation
@@ -115,10 +128,13 @@ class ImageNetteAdversarialTrainer(BaseImageNetteTrainer):
             # Setup save path (distinguish between pre-attacked and on-the-fly modes)
             mode_suffix = "preattacked" if use_preattacked_images else "onthefly"
             training_day = datetime.now().strftime("%Y%m%d")
-            save_path = os.path.join(
-                self.adversarial_models_dir,
-                f"{model_name}_adv_{mode_suffix}_{training_day}.pt",
-            )
+            if save_model_path:
+                save_path = save_model_path
+            else:
+                save_path = os.path.join(
+                    self.adversarial_models_dir,
+                    f"{model_name}_adv_{mode_suffix}_{training_day}.pt",
+                )
 
             # Train model using modern adversarial training
             print("\n🔥 Starting adversarial training...")
@@ -143,7 +159,8 @@ class ImageNetteAdversarialTrainer(BaseImageNetteTrainer):
                 weight_decay=weight_decay,
                 adversarial_ratio=adversarial_ratio,
                 use_preattacked_images=use_preattacked_images,
-                verbose=verbose
+                verbose=verbose,
+                tensorboard_runs_root=self.tensorboard_runs_root,
             )
 
             training_time = (datetime.now() - start_time).total_seconds()
@@ -270,7 +287,6 @@ if __name__ == "__main__":
         ModelNames().densenet121,
         ModelNames().mobilenet_v2,
         ModelNames().efficientnet_b0,
-        ModelNames().vgg16,
     ]
 
     attack_names = AttackNames().all_attack_names

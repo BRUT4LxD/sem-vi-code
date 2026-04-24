@@ -1,0 +1,6 @@
+model_name,model_path,architecture_hint,accuracy,precision,recall,f1,training_epoch,timestamp
+efficientnet_b0_advanced,final_research/models/normal/efficientnet_b0_advanced.pt,efficientnet_b0,0.9556688070297241,0.9563521146774292,0.9559457302093506,0.9558670520782471,3,2026-04-21 01:11:12
+mobilenet_v2_advanced,final_research/models/normal/mobilenet_v2_advanced.pt,mobilenet_v2,0.9416560530662537,0.942317545413971,0.9416057467460632,0.9417741298675537,11,2026-04-21 01:11:35
+densenet121_advanced,final_research/models/normal/densenet121_advanced.pt,densenet121,0.9169426560401917,0.9180979132652283,0.9172542095184326,0.9159598350524902,16,2026-04-21 01:10:48
+resnet18_advanced,final_research/models/normal/resnet18_advanced.pt,resnet18,0.8601273894309998,0.8680069446563721,0.8593504428863525,0.8601375818252563,7,2026-04-21 01:11:59
+vgg11_advanced,final_research/models/normal/vgg11_advanced.pt,vgg11,0.8359235525131226,0.8411257266998291,0.836273193359375,0.8366879820823669,11,2026-04-21 01:12:27

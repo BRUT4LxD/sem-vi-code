@@ -1,5 +1,7 @@
 import torchvision.datasets as datasets
-from torch.utils.data import DataLoader, Subset, SubsetRandomSampler, Dataset
+from typing import List, Union
+
+from torch.utils.data import ConcatDataset, DataLoader, Subset, SubsetRandomSampler, Dataset
 from attacks.attack_names import AttackNames
 from data_eng.transforms import mnist_transformer, cifar_transformer, imagenette_transformer, no_transformer
 from domain.model.model_names import ModelNames
@@ -139,7 +141,7 @@ def load_empty_dataloader():
 
 def load_attacked_imagenette(
     transform=None,
-    path_to_data='data/attacks/imagenette_models',
+    path_to_data: Union[str, List[str]] = 'data/attacks/imagenette_models',
     batch_size=1,
     train_subset_size=-1,
     test_subset_size=-1,
@@ -163,7 +165,7 @@ def load_attacked_imagenette(
 
     Args:
         transform: Image transform (default: imagenette_transformer)
-        path_to_data: Root folder containing attacked images with train/test subfolders
+        path_to_data: Root folder (or list of roots) containing attacked images with train/test subfolders
         batch_size: Batch size for dataloaders
         train_subset_size: Limit training samples (-1 for all)
         test_subset_size: Limit test samples (-1 for all)
@@ -174,27 +176,37 @@ def load_attacked_imagenette(
     """
     trans = transform if transform is not None else imagenette_transformer()
 
+    roots: List[str] = (
+        list(path_to_data) if isinstance(path_to_data, (list, tuple)) else [path_to_data]
+    )
+
     print("📁 Loading attacked ImageNette images...")
-    print(f"   Attacked images folder: {path_to_data}")
+    print(f"   Attacked image root(s): {roots}")
 
-    if not os.path.exists(path_to_data):
-        raise FileNotFoundError(f"Attacked images folder not found: {path_to_data}")
-
-    train_folder = os.path.join(path_to_data, 'train')
-    test_folder = os.path.join(path_to_data, 'test')
+    train_parts = []
+    test_parts = []
+    for root in roots:
+        if not os.path.exists(root):
+            raise FileNotFoundError(f"Attacked images folder not found: {root}")
+        train_folder = os.path.join(root, 'train')
+        test_folder = os.path.join(root, 'test')
+        if os.path.exists(train_folder):
+            train_parts.append(_load_adversarial_with_labels(train_folder, trans))
+        if os.path.exists(test_folder):
+            test_parts.append(_load_adversarial_with_labels(test_folder, trans))
 
     train_dataset = (
-        _load_adversarial_with_labels(train_folder, trans)
-        if os.path.exists(train_folder) else EmptyDataset()
+        ConcatDataset(train_parts) if len(train_parts) > 1
+        else train_parts[0] if train_parts else EmptyDataset()
     )
     test_dataset = (
-        _load_adversarial_with_labels(test_folder, trans)
-        if os.path.exists(test_folder) else EmptyDataset()
+        ConcatDataset(test_parts) if len(test_parts) > 1
+        else test_parts[0] if test_parts else EmptyDataset()
     )
 
     if len(train_dataset) == 0 and len(test_dataset) == 0:
         raise FileNotFoundError(
-            f"No attacked images found in {path_to_data}/train or {path_to_data}/test"
+            f"No attacked images found under any of: {roots}"
         )
 
     print(f"✅ Loaded {len(train_dataset)} train + {len(test_dataset)} test adversarial images")

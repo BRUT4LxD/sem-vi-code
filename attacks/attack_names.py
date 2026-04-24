@@ -20,7 +20,6 @@ class AttackNames():
   JSMA = "JSMA"
   MIFGSM = "MIFGSM"
   NIFGSM = "NIFGSM"
-  OnePixel = "OnePixel"
   PGD = "PGD"
   PGDL2 = "PGDL2"
   PGDRS = "PGDRS"
@@ -37,6 +36,7 @@ class AttackNames():
 
   # Black-box attacks
 
+  OnePixel = "OnePixel"
   Pixle = "Pixle"
   Square = "Square"
 
@@ -67,7 +67,6 @@ class AttackNames():
        
         self.MIFGSM,
         self.NIFGSM,
-        self.OnePixel,
         self.PGD,
         self.PGDL2,
         self.PGDRS,
@@ -85,6 +84,7 @@ class AttackNames():
     ]
 
     self.black_box_attacks = [
+        self.OnePixel,
         self.Pixle,
         self.Square,
     ]

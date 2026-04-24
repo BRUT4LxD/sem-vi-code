@@ -9,6 +9,14 @@ from data_eng.transforms import imagenette_transformer
 
 ATTACKED_IMAGENETTE_FOLDER = "data/attacks/imagenette_models"
 
+
+def _default_clean_train_root() -> str:
+    return "./data/imagenette/train"
+
+
+def _default_clean_val_root() -> str:
+    return "./data/imagenette/val"
+
 class IndexedSubsetDataset(Dataset):
     def __init__(self, base_dataset, indices) -> None:
         self.base_dataset = base_dataset
@@ -90,9 +98,12 @@ def build_imagenette_adversarial_training_loaders(
     clean_to_attacked_ratio: float = 1.0,
     train_test_split: Optional[float] = None,
     random_seed: int = 42,
+    attacked_images_folder: str = ATTACKED_IMAGENETTE_FOLDER,
+    clean_train_root: Optional[str] = None,
+    clean_val_root: Optional[str] = None,
 ):
     attacked_train_loader, attacked_test_loader = load_attacked_imagenette(
-        path_to_data=ATTACKED_IMAGENETTE_FOLDER,
+        path_to_data=attacked_images_folder,
         batch_size=batch_size,
         train_subset_size=attacked_subset_size,
         test_subset_size=attacked_subset_size,
@@ -100,12 +111,14 @@ def build_imagenette_adversarial_training_loaders(
     )
 
     transform = _resolve_dataset_transform(attacked_train_loader.dataset)
+    train_root = clean_train_root or _default_clean_train_root()
+    val_root = clean_val_root or _default_clean_val_root()
     clean_train_dataset = datasets.ImageFolder(
-        root="./data/imagenette/train",
+        root=train_root,
         transform=transform,
     )
     clean_test_dataset = datasets.ImageFolder(
-        root="./data/imagenette/val",
+        root=val_root,
         transform=transform,
     )
 
@@ -153,6 +166,8 @@ def _cap_dataset(dataset, max_size: int, random_seed: int):
 
 
 def _resolve_dataset_transform(dataset):
+    if hasattr(dataset, "datasets") and len(getattr(dataset, "datasets", [])) > 0:
+        return _resolve_dataset_transform(dataset.datasets[0])
     current = dataset
     while current is not None:
         transform = getattr(current, "transform", None)

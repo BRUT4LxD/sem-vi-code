@@ -1,0 +1,53 @@
+# Optional path overrides:
+# paths:
+#   root: final_research
+#   imagenette_train: ./data/imagenette/train
+#   imagenette_val: ./data/imagenette/val
+
+training:
+  config_name: advanced
+  full_finetune: true
+
+attacks:
+  # 50/class * 10 classes = 500 successful adversarials per attack (ImageNette)
+  images_per_class: 50
+  run_train_split: true
+  run_test_split: true
+
+# Mirrors ImageNetteAdversarialProgressiveTrainer.train_progressive_adversarial_model
+# (defaults below match that method; train_multiple_progressive_adversarial_models
+#  uses batch_size 128 by default if you call it elsewhere — this runner passes batch_size from here.)
+progressive:
+  learning_rate: 0.001
+  iterations: 5
+  epochs_per_iteration: 2
+  batch_size: 32
+  images_per_attack_per_iteration: 10
+  # Optional: set validation_images_per_attack_per_iteration (int). If omitted, trainer uses same as images_per_attack_per_iteration.
+  early_stopping_patience: 7
+  scheduler_type: step
+  weight_decay: 0.0001
+  gradient_clip_norm: 1.0
+  # Full-research runner saves PNGs for eval; single-trainer default is false
+  save_generated_images: true
+
+passive_adversarial:
+  num_epochs: 15
+  batch_size: 32
+  learning_rate: 0.001
+
+# Mirrors ImageNetteNoiseDetectionTrainer.train_noise_detection_model
+noise_detection:
+  batch_size: 32
+  learning_rate: 0.001
+  num_epochs: 20
+  attacked_subset_size: 10000
+  clean_to_attacked_ratio: 1.0
+  augment_clean_to_match_attacked: true
+  early_stopping_patience: 10
+  scheduler_type: plateau
+  weight_decay: 0.0001
+  gradient_clip_norm: 1.0
+
+transferability:
+  enabled: true

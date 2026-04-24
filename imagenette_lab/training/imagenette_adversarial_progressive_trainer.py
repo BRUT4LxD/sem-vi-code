@@ -18,7 +18,7 @@ from domain.model.model_names import ModelNames
 from evaluation.metrics import Metrics
 from imagenette_lab.imagenette_direct_attacks import normalize_adversarial_image
 from imagenette_lab.training.imagenette_base_trainer import BaseImageNetteTrainer
-from training.train import Training
+from training.train import Training, _tensorboard_log_dir
 from training.transfer.setup_pretraining import SetupPretraining
 
 
@@ -31,9 +31,26 @@ class ImageNetteAdversarialProgressiveTrainer(BaseImageNetteTrainer):
     attacked dataset, so the training set keeps growing over time.
     """
 
-    def __init__(self, device: str = "auto", models_dir: str = "./models/imagenette"):
-        super().__init__(device=device, models_dir=models_dir)
-        self.progressive_adversarial_models_dir = "./models/imagenette_adversarial_progressive"
+    def __init__(
+        self,
+        device: str = "auto",
+        models_dir: str = "./models/imagenette",
+        progressive_adversarial_models_dir: Optional[str] = None,
+        noise_detection_dir: Optional[str] = None,
+        adversarial_models_dir: Optional[str] = None,
+        tensorboard_runs_root: Optional[str] = None,
+    ):
+        super().__init__(
+            device=device,
+            models_dir=models_dir,
+            noise_detection_dir=noise_detection_dir,
+            adversarial_models_dir=adversarial_models_dir,
+            tensorboard_runs_root=tensorboard_runs_root,
+        )
+        self.progressive_adversarial_models_dir = (
+            progressive_adversarial_models_dir
+            or "./models/imagenette_adversarial_progressive"
+        )
         os.makedirs(self.progressive_adversarial_models_dir, exist_ok=True)
 
     @staticmethod
@@ -45,12 +62,14 @@ class ImageNetteAdversarialProgressiveTrainer(BaseImageNetteTrainer):
         attacked_images_folder: str,
         attack_test_dataset: bool,
         iteration: int,
+        folder_model_name: Optional[str] = None,
     ) -> None:
         dataset_name = "test" if attack_test_dataset else "train"
+        subdir = folder_model_name if folder_model_name is not None else model_name
         save_dir = os.path.join(
             attacked_images_folder,
             dataset_name,
-            model_name,
+            subdir,
             attack_name,
             str(label),
         )
@@ -71,6 +90,7 @@ class ImageNetteAdversarialProgressiveTrainer(BaseImageNetteTrainer):
         attacked_images_folder: str,
         iteration: int,
         verbose: bool,
+        folder_model_name: Optional[str] = None,
     ) -> Tuple[List[Tuple[torch.Tensor, int]], AttackDistanceScore]:
         if images_per_attack <= 0:
             return [], AttackDistanceScore(0.0, 0.0, 0.0, 0.0, 0.0)
@@ -146,6 +166,7 @@ class ImageNetteAdversarialProgressiveTrainer(BaseImageNetteTrainer):
                             attacked_images_folder=attacked_images_folder,
                             attack_test_dataset=attack_test_dataset,
                             iteration=iteration,
+                            folder_model_name=folder_model_name,
                         )
 
                     progress_bar.set_postfix({"saved": successful_examples})
@@ -189,6 +210,7 @@ class ImageNetteAdversarialProgressiveTrainer(BaseImageNetteTrainer):
         writer: SummaryWriter = None,
         save_generated_images: bool = False,
         attacked_images_folder: str = "data/attacks/imagenette_models",
+        saved_attack_folder_name: Optional[str] = None,
         verbose: bool = True,
     ) -> Dict:
         """
@@ -244,9 +266,11 @@ class ImageNetteAdversarialProgressiveTrainer(BaseImageNetteTrainer):
 
         if writer is None:
             run_stamp = datetime.now().strftime("%d-%m-%Y_%H-%M")
-            log_dir = (
-                f"runs/adversarial_training_progressive/"
-                f"{model_name}/{run_stamp}_lr={learning_rate}"
+            log_dir = _tensorboard_log_dir(
+                self.tensorboard_runs_root,
+                "adversarial_training_progressive",
+                model_name,
+                f"{run_stamp}_lr={learning_rate}",
             )
             writer = SummaryWriter(log_dir=log_dir)
             if verbose:
@@ -298,6 +322,7 @@ class ImageNetteAdversarialProgressiveTrainer(BaseImageNetteTrainer):
                 attacked_images_folder=attacked_images_folder,
                 iteration=iteration,
                 verbose=verbose,
+                folder_model_name=saved_attack_folder_name,
             )
             new_test_examples, _ = self._collect_successful_adversarial_examples(
                 model=current_model,
@@ -309,6 +334,7 @@ class ImageNetteAdversarialProgressiveTrainer(BaseImageNetteTrainer):
                 attacked_images_folder=attacked_images_folder,
                 iteration=iteration,
                 verbose=verbose,
+                folder_model_name=saved_attack_folder_name,
             )
 
             if not new_train_examples:
@@ -409,6 +435,7 @@ class ImageNetteAdversarialProgressiveTrainer(BaseImageNetteTrainer):
             gradient_clip_norm=gradient_clip_norm,
             weight_decay=weight_decay,
             verbose=verbose,
+            tensorboard_runs_root=self.tensorboard_runs_root,
         )
 
         total_time = training_results["total_training_time"]
@@ -452,8 +479,15 @@ class ImageNetteAdversarialProgressiveTrainer(BaseImageNetteTrainer):
         batch_size: int = 128,
         images_per_attack_per_iteration: int = 10,
         validation_images_per_attack_per_iteration: Optional[int] = None,
+        early_stopping_patience: int = 7,
+        scheduler_type: str = "step",
+        scheduler_params: dict = None,
+        weight_decay: float = 0.0001,
+        gradient_clip_norm: float = 1.0,
         save_generated_images: bool = False,
         attacked_images_folder: str = "data/attacks/imagenette_models",
+        saved_attack_folder_names: Optional[List[Optional[str]]] = None,
+        save_model_paths: Optional[List[Optional[str]]] = None,
     ) -> List[Dict]:
         print(f"\n{'=' * 70}")
         print("🚀 Training Multiple Progressive Adversarial Models")
@@ -469,6 +503,13 @@ class ImageNetteAdversarialProgressiveTrainer(BaseImageNetteTrainer):
             model_name = model.__class__.__name__
             print(f"\n📊 Model {i}/{len(models)}: {model_name}")
 
+            folder_name = None
+            if saved_attack_folder_names is not None and i - 1 < len(saved_attack_folder_names):
+                folder_name = saved_attack_folder_names[i - 1]
+            save_path = None
+            if save_model_paths is not None and i - 1 < len(save_model_paths):
+                save_path = save_model_paths[i - 1]
+
             result = self.train_progressive_adversarial_model(
                 model=model,
                 attack_names=attack_names,
@@ -480,8 +521,15 @@ class ImageNetteAdversarialProgressiveTrainer(BaseImageNetteTrainer):
                 validation_images_per_attack_per_iteration=(
                     validation_images_per_attack_per_iteration
                 ),
+                early_stopping_patience=early_stopping_patience,
+                scheduler_type=scheduler_type,
+                scheduler_params=scheduler_params,
+                weight_decay=weight_decay,
+                gradient_clip_norm=gradient_clip_norm,
                 save_generated_images=save_generated_images,
                 attacked_images_folder=attacked_images_folder,
+                save_model_path=save_path,
+                saved_attack_folder_name=folder_name,
                 verbose=True,
             )
             results.append(result)
@@ -500,11 +548,7 @@ class ImageNetteAdversarialProgressiveTrainer(BaseImageNetteTrainer):
 
 if __name__ == "__main__":
     model_names = [
-        # ModelNames().resnet18,
-        # ModelNames().densenet121,
-        # ModelNames().mobilenet_v2,
-        # ModelNames().efficientnet_b0,
-        ModelNames().vgg16,
+        ModelNames().resnet18,
     ]
 
     print(f"Model names: {model_names}")
@@ -527,8 +571,8 @@ if __name__ == "__main__":
         iterations=30,
         epochs_per_iteration=50,
         batch_size=32,
-        images_per_attack_per_iteration=5,
-        validation_images_per_attack_per_iteration=1,
+        images_per_attack_per_iteration=10,
+        validation_images_per_attack_per_iteration=2,
         save_generated_images=True,
         attacked_images_folder="data/attacks/imagenette_models",
     )

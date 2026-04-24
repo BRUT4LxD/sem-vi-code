@@ -58,7 +58,7 @@ class ImageNetteTrainingConfigs:
     
     # Advanced configuration for maximum performance
     ADVANCED_CONFIG = {
-        'num_epochs': 30,
+        'num_epochs': 50,
         'learning_rate': 0.001,
         'batch_size': 64,
         'train_subset_size': -1,  # Use full ImageNette dataset
@@ -83,9 +83,8 @@ class ImageNetteTrainingConfigs:
     AVAILABLE_MODELS = [
         ModelNames.resnet18,
         ModelNames.densenet121,
-        ModelNames.vgg16,
+        ModelNames.efficientnet_b0,
         ModelNames.mobilenet_v2,
-        ModelNames.efficientnet_b0
     ]
     
     @classmethod

@@ -32,7 +32,6 @@ print(f"🚀 Using device: {device}")
 available_models = [
     ModelNames.resnet18,
     ModelNames.densenet121,
-    ModelNames.vgg16,
     ModelNames.mobilenet_v2,
     ModelNames.efficientnet_b0
 ]
@@ -157,7 +156,7 @@ def train_multiple_models(model_names, config_name='quick_test'):
     
     return results
 
-model_names = [ModelNames.resnet18, ModelNames.densenet121, ModelNames.vgg16, ModelNames.mobilenet_v2, ModelNames.efficientnet_b0]
+model_names = [ModelNames.resnet18, ModelNames.densenet121, ModelNames.mobilenet_v2, ModelNames.efficientnet_b0]
 # results = train_multiple_models(model_names, 'advanced')
 _, test_loader = load_imagenette(
             batch_size=16,

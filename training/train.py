@@ -17,6 +17,13 @@ from torch.nn import Module, CrossEntropyLoss, BCELoss, BCEWithLogitsLoss
 from torch.optim import Adam
 from typing import Callable, Dict, List, Optional
 
+
+def _tensorboard_log_dir(runs_root: Optional[str], *relative_parts: str) -> str:
+    """TensorBoard log directory: ``runs_root / *parts`` or legacy ``runs / *parts``."""
+    base = runs_root if runs_root else "runs"
+    return os.path.join(base, *relative_parts)
+
+
 class Training:
 
     @staticmethod
@@ -108,7 +115,10 @@ class Training:
         scheduler_params: dict = None,
         gradient_clip_norm: float = None,
         weight_decay: float = 0.0,
-        verbose: bool = True) -> dict:
+        verbose: bool = True,
+        full_finetune: bool = False,
+        tensorboard_runs_root: Optional[str] = None,
+    ) -> dict:
         """
         Robust ImageNette training method with comprehensive observability and error handling.
         
@@ -123,6 +133,8 @@ class Training:
             model_name: Name of the model for logging
             writer: TensorBoard writer for logging
             setup_model: Whether to setup model for ImageNette (10 classes)
+            full_finetune: If True, replace head then train all layers (passed to SetupPretraining.setup_imagenette)
+            tensorboard_runs_root: If set, TensorBoard logs go under this directory instead of ``./runs``
             validation_frequency: How often to run validation (every N epochs)
             early_stopping_patience: Number of epochs to wait before early stopping
             min_delta: Minimum change to qualify as improvement
@@ -160,7 +172,12 @@ class Training:
         # Setup TensorBoard logging
         if writer is None and verbose:
             date = datetime.now().strftime("%d-%m-%Y_%H-%M")
-            log_dir = f'runs/imagenette_training/{model_name}/{date}_lr={learning_rate}'
+            log_dir = _tensorboard_log_dir(
+                tensorboard_runs_root,
+                "imagenette_training",
+                model_name,
+                f"{date}_lr={learning_rate}",
+            )
             writer = SummaryWriter(log_dir=log_dir)
             if verbose:
                 print(f"📊 TensorBoard logging to: {log_dir}")
@@ -170,7 +187,7 @@ class Training:
             if verbose:
                 print(f"⚙️ Setting up {model_name} for ImageNette training...")
             try:
-                model = SetupPretraining.setup_imagenette(model)
+                model = SetupPretraining.setup_imagenette(model, full_finetune=full_finetune)
                 if verbose:
                     print(f"✅ Model setup complete - ready for ImageNette (10 classes)")
             except Exception as e:
@@ -748,6 +765,7 @@ class Training:
         weight_decay: float = 0.0001,
         verbose: bool = True,
         full_finetune: bool = True,
+        tensorboard_runs_root: Optional[str] = None,
     ) -> dict:
         """
         Train a binary classifier to detect adversarial noise in ImageNette images.
@@ -810,7 +828,12 @@ class Training:
         # Setup TensorBoard logging
         if writer is None:
             date = datetime.now().strftime("%d-%m-%Y_%H-%M")
-            log_dir = f'runs/binary_training/{model_name}/{date}_lr={learning_rate}'
+            log_dir = _tensorboard_log_dir(
+                tensorboard_runs_root,
+                "binary_training",
+                model_name,
+                f"{date}_lr={learning_rate}",
+            )
             writer = SummaryWriter(log_dir=log_dir)
             if verbose:
                 print(f"📊 TensorBoard logging to: {log_dir}")
@@ -1099,7 +1122,9 @@ class Training:
         weight_decay: float = 0.0,
         adversarial_ratio: float = 0.5,
         use_preattacked_images: bool = False,
-        verbose: bool = True) -> dict:
+        verbose: bool = True,
+        tensorboard_runs_root: Optional[str] = None,
+    ) -> dict:
         """
         Train ImageNette model with adversarial training for improved robustness.
         
@@ -1160,7 +1185,12 @@ class Training:
         
         model_name = model.__class__.__name__
         date = datetime.now().strftime("%d-%m-%Y_%H-%M")
-        log_dir = f'runs/adversarial_training/{model_name}/{date}_lr={learning_rate}'
+        log_dir = _tensorboard_log_dir(
+            tensorboard_runs_root,
+            "adversarial_training",
+            model_name,
+            f"{date}_lr={learning_rate}",
+        )
         writer = Training._create_or_get_writer(writer, log_dir, verbose)
         
         # Move model to device
@@ -1323,6 +1353,7 @@ class Training:
         gradient_clip_norm: float = None,
         weight_decay: float = 0.0,
         verbose: bool = True,
+        tensorboard_runs_root: Optional[str] = None,
     ) -> dict:
         """
         Train ImageNette model with progressive adversarial dataset growth.
@@ -1355,7 +1386,12 @@ class Training:
 
         model_name = model.__class__.__name__
         date = datetime.now().strftime("%d-%m-%Y_%H-%M")
-        log_dir = f'runs/adversarial_training_progressive/{model_name}/{date}'
+        log_dir = _tensorboard_log_dir(
+            tensorboard_runs_root,
+            "adversarial_training_progressive",
+            model_name,
+            date,
+        )
         writer = Training._create_or_get_writer(writer, log_dir, verbose)
 
         model = model.to(device)
