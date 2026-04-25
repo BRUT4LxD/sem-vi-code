@@ -12,29 +12,17 @@ End-to-end pipeline rooted at `final_research/` (override via `paths.root` in `c
 From the repository root:
 
 ```bash
-python -m experiments.imagenette_full_research.runner --config experiments/imagenette_full_research/config.yaml
+python -m experiments.imagenette_full_research.runner
 ```
 
-Resume training steps that write checkpoints when outputs already exist:
+`config.yaml` is the only input surface. Edit `run.resume`, `run.phases`, `training.architectures`, and `attacks.names` there before launching the runner.
 
-```bash
-python -m experiments.imagenette_full_research.runner --config experiments/imagenette_full_research/config.yaml --resume
-```
+Available phases for `run.phases`:
 
-`config.yaml` is read with PyYAML when installed (`pip install pyyaml`, also listed in `requirements.txt`). If PyYAML is missing, a small built-in parser handles the same flat section layout as the default config.
-
-Run selected phases only (`--only` is comma-separated):
-
-- `train_baseline`, `validate_normal`, `attacks_normal`, `direct_normal`
-- `progressive_active`, `validate_progressive_active`, `attacks_progressive_active`, `direct_progressive_active`
-- `passive`, `validate_passive`, `attacks_passive`, `direct_passive`
+- `train_baseline`, `validate_normal`, `direct_normal`
+- `progressive_active`, `validate_progressive_active`, `direct_progressive_active`
+- `passive`, `validate_passive`, `direct_passive`
 - `noise`, `transferability`
-
-Example:
-
-```bash
-python -m experiments.imagenette_full_research.runner --only validate_normal,noise
-```
 
 ## Notes
 

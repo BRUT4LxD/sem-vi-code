@@ -68,3 +68,16 @@ class ArchitectureFreezePolicy:
                 if "classifier" in name:
                     for param in module.parameters():
                         param.requires_grad = True
+
+        elif "inception" in model_name:
+            for name, module in model.named_modules():
+                if "fc" in name or "Mixed_7" in name:
+                    for param in module.parameters():
+                        param.requires_grad = True
+
+        elif "swin" in model_name:
+            # Last feature stage + norm before head + head (name patterns match torchvision)
+            for name, module in model.named_modules():
+                if "head" in name or name == "norm" or name.startswith("features.3"):
+                    for param in module.parameters():
+                        param.requires_grad = True

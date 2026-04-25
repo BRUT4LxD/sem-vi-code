@@ -66,6 +66,7 @@ class ImageNetteStandardTrainer(BaseImageNetteTrainer):
             print(f"   Batch Size: {config['batch_size']}")
             print(f"   Train Samples: {config.get('train_subset_size', 'Full ImageNette dataset')}")
             print(f"   Test Samples: {config.get('test_subset_size', 'Full ImageNette dataset')}")
+            print(f"   Full fine-tune: {full_finetune}")
 
             # Create ImageNette dataset
             print("\n📥 Loading ImageNette dataset...")
@@ -134,13 +135,19 @@ class ImageNetteStandardTrainer(BaseImageNetteTrainer):
                 'success': False
             }
 
-    def train_multiple_models(self, model_names: List[str], config_name: str = ImageNetteTrainingConfigs.STANDARD) -> List[Dict]:
+    def train_multiple_models(
+        self,
+        model_names: List[str],
+        config_name: str = ImageNetteTrainingConfigs.STANDARD,
+        full_finetune: bool = False,
+    ) -> List[Dict]:
         """
         Train multiple ImageNette models with the same configuration.
 
         Args:
             model_names: List of model names to train
             config_name: Training configuration to use (must be from ImageNetteTrainingConfigs)
+            full_finetune: If True, replace head then unfreeze all layers (ImageNette setup)
 
         Returns:
             List of training results for each model
@@ -161,7 +168,7 @@ class ImageNetteStandardTrainer(BaseImageNetteTrainer):
 
         for i, model_name in enumerate(model_names, 1):
             print(f"\n📊 Model {i}/{len(model_names)}: {model_name}")
-            result = self.train_model(model_name, config_name)
+            result = self.train_model(model_name, config_name, full_finetune=full_finetune)
             results.append(result)
 
             if result['success']:

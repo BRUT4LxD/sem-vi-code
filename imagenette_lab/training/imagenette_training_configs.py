@@ -67,7 +67,7 @@ class ImageNetteTrainingConfigs:
         'scheduler_params': {'eta_min': 1e-6},
         'weight_decay': 1e-4,
         'gradient_clip_norm': 1.0,
-        'early_stopping_patience': 5,
+        'early_stopping_patience': 10,
         'verbose': True,
         'description': 'Full ImageNette dataset configuration for maximum performance'
     }
@@ -85,6 +85,8 @@ class ImageNetteTrainingConfigs:
         ModelNames.densenet121,
         ModelNames.efficientnet_b0,
         ModelNames.mobilenet_v2,
+        ModelNames.swin_t,
+        ModelNames.inception_v3,
     ]
     
     @classmethod

@@ -4,11 +4,66 @@
 #   imagenette_train: ./data/imagenette/train
 #   imagenette_val: ./data/imagenette/val
 
+run:
+  resume: false
+  phases:
+    # - train_baseline
+    # - validate_normal
+    - direct_normal
+    - progressive_active
+    - validate_progressive_active
+    - direct_progressive_active
+    - passive
+    - validate_passive
+    - direct_passive
+    - noise
+    - transferability
+
 training:
   config_name: advanced
   full_finetune: true
+  # Baseline models to train (must match ImageNetteTrainingConfigs.AVAILABLE_MODELS)
+  architectures:
+    - resnet18
+    - densenet121
+    - efficientnet_b0
+    - mobilenet_v2
+    - swin_t
+    - inception_v3
 
 attacks:
+  names:
+    - APGD
+    - APGDT
+    - BIM
+    - CW
+    - DeepFool
+    - DIFGSM
+    - EADEN
+    - EADL1
+    - EOTPGD
+    - FAB
+    - FFGSM
+    - FGSM
+    - GN
+    - Jitter
+    - MIFGSM
+    - NIFGSM
+    - PGD
+    - PGDL2
+    - PGDRS
+    - PGDRSL2
+    - RFGSM
+    - SINIFGSM
+    - SPSA
+    - TIFGSM
+    - TPGD
+    - UPGD
+    - VMIFGSM
+    - VNIFGSM
+    - OnePixel
+    - Pixle
+    - Square
   # 50/class * 10 classes = 500 successful adversarials per attack (ImageNette)
   images_per_class: 50
   run_train_split: true
@@ -19,11 +74,11 @@ attacks:
 #  uses batch_size 128 by default if you call it elsewhere — this runner passes batch_size from here.)
 progressive:
   learning_rate: 0.001
-  iterations: 5
+  iterations: 30
   epochs_per_iteration: 2
   batch_size: 32
   images_per_attack_per_iteration: 10
-  # Optional: set validation_images_per_attack_per_iteration (int). If omitted, trainer uses same as images_per_attack_per_iteration.
+  validation_images_per_attack_per_iteration: 2
   early_stopping_patience: 7
   scheduler_type: step
   weight_decay: 0.0001
@@ -32,15 +87,24 @@ progressive:
   save_generated_images: true
 
 passive_adversarial:
-  num_epochs: 15
-  batch_size: 32
+  use_preattacked_images: true
+  attacked_subset_size: 20000
+  augment_clean_to_match_attacked: true
+  train_test_split: 0.2
   learning_rate: 0.001
+  num_epochs: 100
+  batch_size: 128
+  adversarial_ratio: 0.5
+  early_stopping_patience: 7
+  scheduler_type: step
+  weight_decay: 0.0001
+  gradient_clip_norm: 1.0
 
 # Mirrors ImageNetteNoiseDetectionTrainer.train_noise_detection_model
 noise_detection:
   batch_size: 32
   learning_rate: 0.001
-  num_epochs: 20
+  num_epochs: 100
   attacked_subset_size: 10000
   clean_to_attacked_ratio: 1.0
   augment_clean_to_match_attacked: true

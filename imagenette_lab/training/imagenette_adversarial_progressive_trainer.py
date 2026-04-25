@@ -200,7 +200,7 @@ class ImageNetteAdversarialProgressiveTrainer(BaseImageNetteTrainer):
         epochs_per_iteration: int = 2,
         batch_size: int = 32,
         images_per_attack_per_iteration: int = 10,
-        validation_images_per_attack_per_iteration: Optional[int] = None,
+        validation_images_per_attack_per_iteration: int = 2,
         early_stopping_patience: int = 7,
         scheduler_type: str = "step",
         scheduler_params: dict = None,

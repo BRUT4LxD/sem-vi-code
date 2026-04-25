@@ -99,6 +99,8 @@ class SetupPretraining:
         return f"classifier: {model.classifier}"
     elif hasattr(model, '_fc'):
         return f"_fc: {model._fc}"
+    elif hasattr(model, 'head'):
+        return f"head: {model.head}"
     else:
         return "No classifier found"
   
@@ -142,9 +144,34 @@ class SetupPretraining:
         in_features = model._fc.in_features
         model._fc = nn.Linear(in_features, 10).to(device)
         print(f"Replaced _fc layer: {in_features} -> 10")
+
+    elif hasattr(model, 'head'):
+        # Swin, ViT (torchvision) and other backbones with a `head` module
+        if isinstance(model.head, nn.Linear):
+            in_features = model.head.in_features
+            model.head = nn.Linear(in_features, 10).to(device)
+            print(f"Replaced head (Linear): {in_features} -> 10")
+        elif isinstance(model.head, nn.Sequential):
+            last_linear_idx = -1
+            for i, layer in enumerate(model.head):
+                if isinstance(layer, nn.Linear):
+                    last_linear_idx = i
+            if last_linear_idx == -1:
+                raise ValueError("No linear layer found in model.head (Sequential)")
+            in_features = model.head[last_linear_idx].in_features
+            model.head[last_linear_idx] = nn.Linear(in_features, 10).to(device)
+            print(
+                f"Replaced head[{last_linear_idx}] (Sequential): {in_features} -> 10"
+            )
+        else:
+            raise ValueError(
+                f"Model.head type not supported for ImageNette: {type(model.head)}"
+            )
         
     else:
         raise ValueError("Model type not recognized. Can't replace the classifier.")
+
+    SetupPretraining._disable_inception_aux_logits(model)
   
   @staticmethod
   def _replace_classifier_binary(model):
@@ -186,9 +213,48 @@ class SetupPretraining:
         in_features = model._fc.in_features
         model._fc = nn.Linear(in_features, 1).to(device)
         print(f"Replaced _fc layer for binary classification: {in_features} -> 1")
+
+    elif hasattr(model, 'head'):
+        if isinstance(model.head, nn.Linear):
+            in_features = model.head.in_features
+            model.head = nn.Linear(in_features, 1).to(device)
+            print(f"Replaced head (Linear) for binary: {in_features} -> 1")
+        elif isinstance(model.head, nn.Sequential):
+            last_linear_idx = -1
+            for i, layer in enumerate(model.head):
+                if isinstance(layer, nn.Linear):
+                    last_linear_idx = i
+            if last_linear_idx == -1:
+                raise ValueError("No linear layer found in model.head (Sequential)")
+            in_features = model.head[last_linear_idx].in_features
+            model.head[last_linear_idx] = nn.Linear(in_features, 1).to(device)
+            print(
+                f"Replaced head[{last_linear_idx}] (Sequential) for binary: {in_features} -> 1"
+            )
+        else:
+            raise ValueError(
+                f"Model.head type not supported for binary: {type(model.head)}"
+            )
         
     else:
         raise ValueError("Model type not recognized. Can't replace the classifier.")
+
+    SetupPretraining._disable_inception_aux_logits(model)
+
+  @staticmethod
+  def _disable_inception_aux_logits(model):
+    """
+    Disable Inception's auxiliary classifier for ImageNette's 224px pipeline.
+
+    Torchvision Inception can train with an AuxLogits branch, but with 224x224
+    inputs that branch can shrink to 3x3 before a 5x5 conv. The main classifier
+    works, so remove the aux path for this project's standard ImageNette setup.
+    """
+    if model.__class__.__name__.lower().startswith("inception"):
+        if hasattr(model, "aux_logits"):
+            model.aux_logits = False
+        if hasattr(model, "AuxLogits"):
+            model.AuxLogits = None
   
   @staticmethod
   def verify_model_setup(model, expected_classes=10):

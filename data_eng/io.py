@@ -100,9 +100,9 @@ def load_model_imagenette(model_path: str, model_name: str = None, device: str =
         if model_name is None:
             from domain.model.model_names import ModelNames
             # Iterate over all model names and check if the model path contains the model name
-            for model_name in ModelNames().all_model_names:
-                if model_name in model_path:
-                    model_name = model_name
+            for candidate_model_name in sorted(ModelNames().all_model_names, key=len, reverse=True):
+                if candidate_model_name in model_path:
+                    model_name = candidate_model_name
                     break
             
             if model_name is None:
@@ -236,7 +236,7 @@ def load_model_binary(model_path: str, model_name: str = None, device: str = 'cu
         # Extract model name from path if not provided
         if model_name is None:
             from domain.model.model_names import ModelNames
-            for mn in ModelNames().all_model_names:
+            for mn in sorted(ModelNames().all_model_names, key=len, reverse=True):
                 if mn in model_path:
                     model_name = mn
                     break

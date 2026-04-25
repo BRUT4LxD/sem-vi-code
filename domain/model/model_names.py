@@ -84,5 +84,18 @@ class ModelNames:
       ModelNames.swin_v2_t, ModelNames.swin_v2_s, ModelNames.swin_v2_b,
     ]
 
-    self.all_model_names = self.resnet_model_names + self.densenet_model_names + self.efficientnet_model_names + self.mobilenet_model_names
+    self.other_model_names = [
+      ModelNames.inception_v3,
+      ModelNames.maxvit_t,
+    ]
+
+    self.all_model_names = (
+      self.resnet_model_names
+      + self.densenet_model_names
+      + self.efficientnet_model_names
+      + self.mobilenet_model_names
+      + self.swin_model_names
+      + self.vit_model_names
+      + self.other_model_names
+    )
 

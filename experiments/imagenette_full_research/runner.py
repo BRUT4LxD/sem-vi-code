@@ -3,7 +3,7 @@ Single entry point for the ImageNette full-research pipeline.
 
 Run from repository root::
 
-    python -m experiments.imagenette_full_research.runner --config experiments/imagenette_full_research/config.yaml
+    python -m experiments.imagenette_full_research.runner
 
 Or::
 
@@ -12,22 +12,26 @@ Or::
 
 from __future__ import annotations
 
-import argparse
 import glob
 import logging
 import os
 import sys
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import List, Tuple
 
 _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
+_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
+
 from attacks.attack_names import AttackNames
 from config.imagenet_models import ImageNetModels
 from data_eng.dataset_loader import load_imagenette
 from domain.model.model_names import ModelNames
-from experiments.imagenette_full_research.paths import FullResearchPaths, load_yaml_dict, paths_from_mapping
+from experiments.imagenette_full_research.pipeline_config import (
+    FullResearchConfig,
+    load_full_research_config,
+)
 from imagenette_lab.imagenette_direct_attacks import ImageNetteDirectAttacks
 from imagenette_lab.imagenette_transferability_attacks import imagenette_transferability_model2model_from_files
 from imagenette_lab.imagenette_validator import ImageNetteValidator
@@ -57,8 +61,8 @@ def _stem(path: str) -> str:
 def _checkpoint_tuple(ckpt_path: str) -> Tuple[str, str]:
     """``(architecture_hint, path)`` for validation / loading."""
     stem = _stem(ckpt_path)
-    arch = stem.split("_")[0]
-    for name in ModelNames().all_model_names:
+    arch = stem
+    for name in sorted(ModelNames().all_model_names, key=len, reverse=True):
         if stem.startswith(name):
             arch = name
             break
@@ -73,86 +77,93 @@ def _transfer_tuples_from_dir(models_dir: str) -> List[Tuple[str, str]]:
     return out
 
 
-def run(config: Dict[str, Any], paths: FullResearchPaths, resume: bool, phases: Optional[Sequence[str]]) -> None:
+def _validated_attack_names(raw_attack_names: List[str]) -> List[str]:
+    attacks = AttackNames()
+    allowed = set(attacks.all_attack_names)
+
+    if not raw_attack_names:
+        raise ValueError("attacks.names must contain at least one attack")
+
+    for attack_name in raw_attack_names:
+        if attack_name not in allowed:
+            raise ValueError(
+                f"attacks.names: unknown attack {attack_name!r}. "
+                f"Allowed: {sorted(allowed)}"
+            )
+
+    return raw_attack_names
+
+
+def run(config: FullResearchConfig) -> None:
+    paths = config.paths
     paths.ensure_dirs()
-    train_cfg = config.get("training", {})
-    prog_cfg = config.get("progressive", {})
-    pas_cfg = config.get("passive_adversarial", {})
-    noise_cfg = config.get("noise_detection", {})
-    trans_cfg = config.get("transferability", {})
+    phases = config.run.phases
 
-    config_name = train_cfg.get("config_name", ImageNetteTrainingConfigs.ADVANCED)
-    full_finetune = bool(train_cfg.get("full_finetune", True))
+    config_name = config.training.config_name
+    full_finetune = config.training.full_finetune
+    resume = config.run.resume
 
-    archs = _default_architectures()
-    attack_names = AttackNames().all_attack_names
+    _allowed = set(ImageNetteTrainingConfigs.AVAILABLE_MODELS)
+    if config.training.architectures:
+        archs = config.training.architectures
+        for a in archs:
+            if a not in _allowed:
+                raise ValueError(
+                    f"training.architectures: unknown model {a!r}. "
+                    f"Allowed: {sorted(_allowed)}"
+                )
+    else:
+        archs = _default_architectures()
+    attack_names = _validated_attack_names(config.attacks.names)
 
     def want(phase: str) -> bool:
-        return phases is None or phase in phases
+        return not phases or phase in phases
 
     # --- Phase 1: baseline training ---
-    # if want("train_baseline"):
-    #     trainer = ImageNetteStandardTrainer(
-    #         device="auto",
-    #         models_dir=paths.models_normal,
-    #         tensorboard_runs_root=paths.runs,
-    #     )
-    #     for arch in archs:
-    #         save_path = os.path.join(paths.models_normal, f"{arch}_{config_name}.pt")
-    #         if resume and os.path.isfile(save_path):
-    #             log.info("Skipping baseline train (exists): %s", save_path)
-    #             continue
-    #         log.info("Baseline training: %s", arch)
-    #         trainer.train_model(
-    #             arch,
-    #             config_name=config_name,
-    #             full_finetune=full_finetune,
-    #         )
+    if want("train_baseline") :
+        trainer = ImageNetteStandardTrainer(
+            device="auto",
+            models_dir=paths.models_normal,
+            tensorboard_runs_root=paths.runs,
+        )
+        for arch in archs:
+            save_path = os.path.join(paths.models_normal, f"{arch}_{config_name}.pt")
+            if resume and os.path.isfile(save_path):
+                log.info("Skipping baseline train (exists): %s", save_path)
+                continue
+            log.info("Baseline training: %s", arch)
+            trainer.train_model(
+                arch,
+                config_name=config_name,
+                full_finetune=full_finetune,
+            )
 
-    # # --- Clean validation (normal) ---
-    # if want("validate_normal"):
-    #     val = ImageNetteValidator(
-    #         models_dir=paths.models_normal,
-    #         results_dir=paths.results_normal,
-    #         device="auto",
-    #     )
-    #     tuples = []
-    #     for ck in glob.glob(os.path.join(paths.models_normal, "*.pt")):
-    #         tuples.append(_checkpoint_tuple(ck))
-    #     if tuples:
-    #         results = val.validate_models_from_tuples(tuples)
-    #         val.save_models_from_tuples_summary(results, output_filename="clean_validation_summary.csv")
-
-    # --- Generation phase removed by request ---
-    if want("attacks_normal"):
-        log.info("Skipping attacks_normal: generation step removed (direct attacks run in-memory).")
+    # --- Clean validation (normal) ---
+    if want("validate_normal"):
+        val = ImageNetteValidator(
+            models_dir=paths.models_normal,
+            results_dir=paths.results_normal,
+            device="auto",
+        )
+        tuples = []
+        for ck in glob.glob(os.path.join(paths.models_normal, "*.pt")):
+            tuples.append(_checkpoint_tuple(ck))
+        if tuples:
+            results = val.validate_models_from_tuples(tuples)
+            val.save_models_from_tuples_summary(results, output_filename="clean_validation_summary.csv")
 
     # --- Direct attacks in-memory (normal) ---
     if want("direct_normal"):
-        _, test_loader = load_imagenette(batch_size=8, test_subset_size=-1)
+        _, test_loader = load_imagenette(batch_size=1, test_subset_size=500)
         da = ImageNetteDirectAttacks(device="auto")
 
         def ck_normal(name: str) -> str:
             return os.path.join(paths.models_normal, f"{name}_{config_name}.pt")
 
-        new_attack_names = [
-            AttackNames().SPSA,
-            AttackNames().TIFGSM,
-            AttackNames().TPGD,
-            AttackNames().UPGD,
-            AttackNames().VMIFGSM,
-            AttackNames().VNIFGSM,
-            AttackNames().OnePixel,
-            AttackNames().Pixle,
-            AttackNames().Square,
-        ]
-
-        extra_attack_models = [ModelNames().resnet18]
-
         da.run_attacks_on_models(
-            attack_names=new_attack_names,
+            attack_names=attack_names,
             data_loader=test_loader,
-            model_names=extra_attack_models,
+            model_names=archs,
             results_folder=paths.results_attacks_normal,
             checkpoint_path_for_model=ck_normal,
         )
@@ -177,26 +188,24 @@ def run(config: Dict[str, Any], paths: FullResearchPaths, resume: bool, phases: 
             save_paths.append(os.path.join(paths.models_progressive_active, f"{stem}.pt"))
             folder_names.append(stem)
 
-        _vip = prog_cfg.get("validation_images_per_attack_per_iteration", None)
-        validation_images_per_attack = (
-            int(_vip) if _vip is not None else None
-        )
         prog_trainer.train_multiple_progressive_adversarial_models(
             models=models,
             attack_names=attack_names,
-            learning_rate=float(prog_cfg.get("learning_rate", 0.001)),
-            iterations=int(prog_cfg.get("iterations", 5)),
-            epochs_per_iteration=int(prog_cfg.get("epochs_per_iteration", 2)),
-            batch_size=int(prog_cfg.get("batch_size", 32)),
-            images_per_attack_per_iteration=int(
-                prog_cfg.get("images_per_attack_per_iteration", 10)
+            learning_rate=config.progressive.learning_rate,
+            iterations=config.progressive.iterations,
+            epochs_per_iteration=config.progressive.epochs_per_iteration,
+            batch_size=config.progressive.batch_size,
+            images_per_attack_per_iteration=(
+                config.progressive.images_per_attack_per_iteration
             ),
-            validation_images_per_attack_per_iteration=validation_images_per_attack,
-            early_stopping_patience=int(prog_cfg.get("early_stopping_patience", 7)),
-            scheduler_type=str(prog_cfg.get("scheduler_type", "step")),
-            weight_decay=float(prog_cfg.get("weight_decay", 0.0001)),
-            gradient_clip_norm=float(prog_cfg.get("gradient_clip_norm", 1.0)),
-            save_generated_images=bool(prog_cfg.get("save_generated_images", True)),
+            validation_images_per_attack_per_iteration=(
+                config.progressive.validation_images_per_attack_per_iteration
+            ),
+            early_stopping_patience=config.progressive.early_stopping_patience,
+            scheduler_type=config.progressive.scheduler_type,
+            weight_decay=config.progressive.weight_decay,
+            gradient_clip_norm=config.progressive.gradient_clip_norm,
+            save_generated_images=config.progressive.save_generated_images,
             attacked_images_folder=paths.data_attacks_progressive_active,
             saved_attack_folder_names=folder_names,
             save_model_paths=save_paths,
@@ -215,10 +224,6 @@ def run(config: Dict[str, Any], paths: FullResearchPaths, resume: bool, phases: 
         if tuples:
             results = val.validate_models_from_tuples(tuples)
             val.save_models_from_tuples_summary(results, output_filename="clean_validation_summary.csv")
-
-    # --- Generation phase removed by request ---
-    if want("attacks_progressive_active"):
-        log.info("Skipping attacks_progressive_active: generation step removed (direct attacks run in-memory).")
 
     if want("direct_progressive_active"):
         _, test_loader = load_imagenette(batch_size=8, test_subset_size=-1)
@@ -255,10 +260,24 @@ def run(config: Dict[str, Any], paths: FullResearchPaths, resume: bool, phases: 
             adv_trainer.train_adversarial_model(
                 model=model,
                 attack_names=None,
-                use_preattacked_images=True,
-                batch_size=int(pas_cfg.get("batch_size", 32)),
-                num_epochs=int(pas_cfg.get("num_epochs", 15)),
-                learning_rate=float(pas_cfg.get("learning_rate", 0.001)),
+                use_preattacked_images=(
+                    config.passive_adversarial.use_preattacked_images
+                ),
+                batch_size=config.passive_adversarial.batch_size,
+                num_epochs=config.passive_adversarial.num_epochs,
+                learning_rate=config.passive_adversarial.learning_rate,
+                adversarial_ratio=config.passive_adversarial.adversarial_ratio,
+                early_stopping_patience=(
+                    config.passive_adversarial.early_stopping_patience
+                ),
+                scheduler_type=config.passive_adversarial.scheduler_type,
+                weight_decay=config.passive_adversarial.weight_decay,
+                gradient_clip_norm=config.passive_adversarial.gradient_clip_norm,
+                attacked_subset_size=config.passive_adversarial.attacked_subset_size,
+                augment_clean_to_match_attacked=(
+                    config.passive_adversarial.augment_clean_to_match_attacked
+                ),
+                train_test_split=config.passive_adversarial.train_test_split,
                 attacked_images_folder=paths.data_attacks_progressive_active,
                 clean_train_root=paths.imagenette_train,
                 clean_val_root=paths.imagenette_val,
@@ -278,10 +297,6 @@ def run(config: Dict[str, Any], paths: FullResearchPaths, resume: bool, phases: 
         if tuples:
             results = val.validate_models_from_tuples(tuples)
             val.save_models_from_tuples_summary(results, output_filename="clean_validation_passive_summary.csv")
-
-    # --- Generation phase removed by request ---
-    if want("attacks_passive"):
-        log.info("Skipping attacks_passive: generation step removed (direct attacks run in-memory).")
 
     if want("direct_passive"):
         _, test_loader = load_imagenette(batch_size=8, test_subset_size=-1)
@@ -317,23 +332,27 @@ def run(config: Dict[str, Any], paths: FullResearchPaths, resume: bool, phases: 
                 attacked_images_folder=attacked_roots,
                 clean_train_folder=paths.imagenette_train,
                 clean_test_folder=paths.imagenette_val,
-                batch_size=int(noise_cfg.get("batch_size", 32)),
-                learning_rate=float(noise_cfg.get("learning_rate", 0.001)),
-                num_epochs=int(noise_cfg.get("num_epochs", 20)),
-                attacked_subset_size=int(noise_cfg.get("attacked_subset_size", 10000)),
-                clean_to_attacked_ratio=float(noise_cfg.get("clean_to_attacked_ratio", 1.0)),
-                augment_clean_to_match_attacked=bool(
-                    noise_cfg.get("augment_clean_to_match_attacked", True)
+                batch_size=config.noise_detection.batch_size,
+                learning_rate=config.noise_detection.learning_rate,
+                num_epochs=config.noise_detection.num_epochs,
+                attacked_subset_size=config.noise_detection.attacked_subset_size,
+                clean_to_attacked_ratio=(
+                    config.noise_detection.clean_to_attacked_ratio
                 ),
-                early_stopping_patience=int(noise_cfg.get("early_stopping_patience", 10)),
-                scheduler_type=str(noise_cfg.get("scheduler_type", "plateau")),
-                weight_decay=float(noise_cfg.get("weight_decay", 0.0001)),
-                gradient_clip_norm=float(noise_cfg.get("gradient_clip_norm", 1.0)),
+                augment_clean_to_match_attacked=(
+                    config.noise_detection.augment_clean_to_match_attacked
+                ),
+                early_stopping_patience=(
+                    config.noise_detection.early_stopping_patience
+                ),
+                scheduler_type=config.noise_detection.scheduler_type,
+                weight_decay=config.noise_detection.weight_decay,
+                gradient_clip_norm=config.noise_detection.gradient_clip_norm,
                 save_model_path=save_p,
             )
 
     # --- Transferability (from files) ---
-    if want("transferability") and bool(trans_cfg.get("enabled", True)):
+    if want("transferability") and config.transferability.enabled:
         models_n = _transfer_tuples_from_dir(paths.models_normal)
         if models_n:
             imagenette_transferability_model2model_from_files(
@@ -352,39 +371,13 @@ def run(config: Dict[str, Any], paths: FullResearchPaths, resume: bool, phases: 
             )
 
 
-def main(argv: Optional[Sequence[str]] = None) -> None:
+def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
-    parser = argparse.ArgumentParser(description="ImageNette full research runner")
-    parser.add_argument(
-        "--config",
-        type=str,
-        default="",
-        help="Optional YAML/JSON file with paths + phase settings",
-    )
-    parser.add_argument(
-        "--resume",
-        action="store_true",
-        help="Skip training steps when output checkpoints already exist",
-    )
-    parser.add_argument(
-        "--only",
-        type=str,
-        default="",
-        help="Comma-separated phases to run (default: all). See runner.py for names.",
-    )
-    args = parser.parse_args(argv)
+    if len(sys.argv) > 1:
+        raise SystemExit("This runner does not accept CLI arguments. Edit config.yaml instead.")
 
-    raw = load_yaml_dict(args.config) if args.config else {}
-    if isinstance(raw, dict) and "paths" in raw:
-        path_dict = raw.get("paths") or {}
-    else:
-        path_dict = {}
-    paths = paths_from_mapping(path_dict if isinstance(path_dict, dict) else {})
-    cfg: Dict[str, Any] = dict(raw) if isinstance(raw, dict) else {}
-
-    phases = [p.strip() for p in args.only.split(",") if p.strip()] if args.only else None
-
-    run(cfg, paths, resume=args.resume, phases=phases)
+    config = load_full_research_config(_CONFIG_PATH)
+    run(config)
 
 
 if __name__ == "__main__":
