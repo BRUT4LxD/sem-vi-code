@@ -27,6 +27,7 @@ _CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 from attacks.attack_names import AttackNames
 from config.imagenet_models import ImageNetModels
 from data_eng.dataset_loader import load_imagenette
+from data_eng.io import load_model_imagenette
 from domain.model.model_names import ModelNames
 from experiments.imagenette_full_research.pipeline_config import (
     FullResearchConfig,
@@ -151,6 +152,8 @@ def run(config: FullResearchConfig) -> None:
         if tuples:
             results = val.validate_models_from_tuples(tuples)
             val.save_models_from_tuples_summary(results, output_filename="clean_validation_summary.csv")
+            for result in results:
+                val.save_model_per_class_results(result)
 
     # --- Direct attacks in-memory (normal) ---
     if want("direct_normal"):
@@ -180,10 +183,19 @@ def run(config: FullResearchConfig) -> None:
         save_paths: List[str] = []
         folder_names: List[str] = []
         for arch in archs:
-            m = ImageNetModels.get_model(arch)
-            m.__class__.__name__ = arch
-            m = SetupPretraining.setup_imagenette(m, full_finetune=True)
-            models.append(m)
+            normal_checkpoint = os.path.join(paths.models_normal, f"{arch}_{config_name}.pt")
+            loaded = load_model_imagenette(
+                normal_checkpoint,
+                model_name=arch,
+                device=str(prog_trainer.device),
+                verbose=False,
+            )
+            if not loaded.success:
+                raise RuntimeError(
+                    f"Failed to load normal model for progressive_active: "
+                    f"{normal_checkpoint}. {loaded.error}"
+                )
+            models.append(loaded.model)
             stem = f"{arch}_progressive_adv"
             save_paths.append(os.path.join(paths.models_progressive_active, f"{stem}.pt"))
             folder_names.append(stem)

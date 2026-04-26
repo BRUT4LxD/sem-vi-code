@@ -8,6 +8,7 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 from evaluation.validation import Validation, ValidationAccuracyResult
+from data_eng.image_transformations import ImageEncoder
 from training.architecture_freeze_policy import ArchitectureFreezePolicy
 from training.transfer.setup_pretraining import SetupPretraining
 from attacks.attack_factory import AttackFactory
@@ -118,6 +119,7 @@ class Training:
         verbose: bool = True,
         full_finetune: bool = False,
         tensorboard_runs_root: Optional[str] = None,
+        image_encoder: Optional[ImageEncoder] = None,
     ) -> dict:
         """
         Robust ImageNette training method with comprehensive observability and error handling.
@@ -231,6 +233,7 @@ class Training:
             print(f"   Batch Size: {train_loader.batch_size}")
             print(f"   Scheduler: {scheduler_type}")
             print(f"   Early Stopping: {early_stopping_patience} epochs")
+            print(f"   Image encoder: {image_encoder.__class__.__name__ if image_encoder else 'None'}")
         
         # Training loop
         start_time = datetime.now()
@@ -241,14 +244,15 @@ class Training:
             # Training phase
             train_metrics = Training._train_epoch(
                 model, train_loader, criterion, optimizer, device, 
-                gradient_clip_norm, verbose, epoch, num_epochs
+                gradient_clip_norm, verbose, epoch, num_epochs, image_encoder
             )
             
             # Validation phase
             val_metrics = None
             if test_loader is not None and (epoch + 1) % validation_frequency == 0:
                 val_metrics = Validation.validate_imagenette_epoch(
-                    model, test_loader, criterion, device, verbose, epoch, num_epochs
+                    model, test_loader, criterion, device, verbose, epoch, num_epochs,
+                    image_encoder=image_encoder,
                 )
             
             # Update learning rate
@@ -351,7 +355,18 @@ class Training:
             return None
 
     @staticmethod
-    def _train_epoch(model, train_loader, criterion, optimizer, device, gradient_clip_norm, verbose, epoch, num_epochs):
+    def _train_epoch(
+        model,
+        train_loader,
+        criterion,
+        optimizer,
+        device,
+        gradient_clip_norm,
+        verbose,
+        epoch,
+        num_epochs,
+        image_encoder: Optional[ImageEncoder] = None,
+    ):
         """Train for one epoch."""
         model.train()
         total_loss = 0.0
@@ -363,6 +378,7 @@ class Training:
         
         for batch_idx, (data, target) in enumerate(progress_bar):
             data, target = data.to(device), target.to(device)
+            data = Training._encode_batch_images(data, image_encoder)
             
             optimizer.zero_grad()
             output = model(data)
@@ -391,6 +407,15 @@ class Training:
         accuracy = 100. * correct_predictions / total_samples
         
         return {'loss': avg_loss, 'accuracy': accuracy}
+
+    @staticmethod
+    def _encode_batch_images(
+        data: torch.Tensor,
+        image_encoder: Optional[ImageEncoder],
+    ) -> torch.Tensor:
+        if image_encoder is None:
+            return data
+        return torch.stack([image_encoder.encode(image) for image in data], dim=0)
 
 
     @staticmethod

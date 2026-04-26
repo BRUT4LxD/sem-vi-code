@@ -8,16 +8,16 @@ run:
   resume: false
   phases:
     # - train_baseline
-    # - validate_normal
-    - direct_normal
-    - progressive_active
-    - validate_progressive_active
-    - direct_progressive_active
-    - passive
-    - validate_passive
-    - direct_passive
-    - noise
-    - transferability
+    - validate_normal
+    # - direct_normal
+    # - progressive_active
+    # - validate_progressive_active
+    # - direct_progressive_active
+    # - passive
+    # - validate_passive
+    # - direct_passive
+    # - noise
+    # - transferability
 
 training:
   config_name: advanced
@@ -73,9 +73,9 @@ attacks:
 # (defaults below match that method; train_multiple_progressive_adversarial_models
 #  uses batch_size 128 by default if you call it elsewhere — this runner passes batch_size from here.)
 progressive:
-  learning_rate: 0.001
+  learning_rate: 0.0001
   iterations: 30
-  epochs_per_iteration: 2
+  epochs_per_iteration: 50
   batch_size: 32
   images_per_attack_per_iteration: 10
   validation_images_per_attack_per_iteration: 2
@@ -91,7 +91,7 @@ passive_adversarial:
   attacked_subset_size: 20000
   augment_clean_to_match_attacked: true
   train_test_split: 0.2
-  learning_rate: 0.001
+  learning_rate: 0.0001
   num_epochs: 100
   batch_size: 128
   adversarial_ratio: 0.5
@@ -103,8 +103,8 @@ passive_adversarial:
 # Mirrors ImageNetteNoiseDetectionTrainer.train_noise_detection_model
 noise_detection:
   batch_size: 32
-  learning_rate: 0.001
-  num_epochs: 100
+  learning_rate: 0.0001
+  num_epochs: 200
   attacked_subset_size: 10000
   clean_to_attacked_ratio: 1.0
   augment_clean_to_match_attacked: true

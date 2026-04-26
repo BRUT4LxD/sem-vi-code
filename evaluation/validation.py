@@ -1,7 +1,8 @@
-from typing import List
+from typing import List, Optional
 import torch
 from tqdm import tqdm
 from torch.utils.data import DataLoader
+from data_eng.image_transformations import ImageEncoder
 from config.imagenet_classes import ImageNetClasses
 from config.imagenet_models import ImageNetModels
 from config.imagenette_classes import ImageNetteClasses
@@ -237,7 +238,8 @@ class Validation:
         device='cuda',
         verbose=True,
         epoch=None,
-        num_epochs=None
+        num_epochs=None,
+        image_encoder: Optional[ImageEncoder] = None,
     ) -> dict:
         """
         Validate model for one epoch during ImageNette training.
@@ -265,6 +267,8 @@ class Validation:
             
             for data, target in progress_bar:
                 data, target = data.to(device), target.to(device)
+                if image_encoder is not None:
+                    data = torch.stack([image_encoder.encode(image) for image in data], dim=0)
                 output = model(data)
                 loss = criterion(output, target)
                 

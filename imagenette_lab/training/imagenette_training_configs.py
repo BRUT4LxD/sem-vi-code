@@ -58,8 +58,8 @@ class ImageNetteTrainingConfigs:
     
     # Advanced configuration for maximum performance
     ADVANCED_CONFIG = {
-        'num_epochs': 50,
-        'learning_rate': 0.001,
+        'num_epochs': 100,
+        'learning_rate': 0.0001,
         'batch_size': 64,
         'train_subset_size': -1,  # Use full ImageNette dataset
         'test_subset_size': -1,   # Use full ImageNette dataset
@@ -67,7 +67,7 @@ class ImageNetteTrainingConfigs:
         'scheduler_params': {'eta_min': 1e-6},
         'weight_decay': 1e-4,
         'gradient_clip_norm': 1.0,
-        'early_stopping_patience': 10,
+        'early_stopping_patience': 20,
         'verbose': True,
         'description': 'Full ImageNette dataset configuration for maximum performance'
     }

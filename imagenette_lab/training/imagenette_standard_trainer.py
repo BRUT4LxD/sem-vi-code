@@ -4,8 +4,15 @@ from typing import Dict, List, Optional
 
 from config.imagenet_models import ImageNetModels
 from config.imagenette_classes import ImageNetteClasses
+from domain.model.model_names import ModelNames
 from data_eng.dataset_loader import load_imagenette
 from data_eng.io import load_model_imagenette
+from data_eng.image_transformations import (
+    ImageEncoder,
+    ImageEncodingParams,
+    ImageEncodingStrategy,
+    create_image_encoder,
+)
 from evaluation.metrics import Metrics
 from evaluation.visualization import simple_visualize
 from imagenette_lab.training.imagenette_base_trainer import BaseImageNetteTrainer
@@ -24,6 +31,8 @@ class ImageNetteStandardTrainer(BaseImageNetteTrainer):
         config_name: str = ImageNetteTrainingConfigs.STANDARD,
         custom_config: Optional[Dict] = None,
         full_finetune: bool = False,
+        image_encoder: Optional[ImageEncoder] = None,
+        path_to_data: Optional[str] = None,
     ) -> Dict:
         """
         Train an ImageNette model with specified configuration.
@@ -32,6 +41,7 @@ class ImageNetteStandardTrainer(BaseImageNetteTrainer):
             model_name: Name of the model to train
             config_name: Name of the training configuration (must be from ImageNetteTrainingConfigs)
             custom_config: Custom configuration to override defaults
+            path_to_data: Root ImageNette folder with train/val subfolders
 
         Returns:
             dict: Training results including model, metrics, and metadata
@@ -57,6 +67,7 @@ class ImageNetteStandardTrainer(BaseImageNetteTrainer):
             config = ImageNetteTrainingConfigs.get_config(config_name)
             if custom_config:
                 config.update(custom_config)
+            path_to_data = path_to_data or './data/imagenette'
 
             print("📊 ImageNette Training Configuration:")
             print(f"   Model: {model_name}")
@@ -67,10 +78,13 @@ class ImageNetteStandardTrainer(BaseImageNetteTrainer):
             print(f"   Train Samples: {config.get('train_subset_size', 'Full ImageNette dataset')}")
             print(f"   Test Samples: {config.get('test_subset_size', 'Full ImageNette dataset')}")
             print(f"   Full fine-tune: {full_finetune}")
+            print(f"   Image encoder: {image_encoder.__class__.__name__ if image_encoder else 'None'}")
+            print(f"   Data path: {path_to_data}")
 
             # Create ImageNette dataset
             print("\n📥 Loading ImageNette dataset...")
             train_loader, test_loader = load_imagenette(
+                path_to_data=path_to_data,
                 batch_size=config['batch_size'],
                 train_subset_size=config.get('train_subset_size', -1),
                 test_subset_size=config.get('test_subset_size', -1),
@@ -102,6 +116,7 @@ class ImageNetteStandardTrainer(BaseImageNetteTrainer):
                 verbose=config.get('verbose', True),
                 full_finetune=full_finetune,
                 tensorboard_runs_root=self.tensorboard_runs_root,
+                image_encoder=image_encoder,
             )
 
             training_time = (datetime.now() - start_time).total_seconds()
@@ -140,6 +155,8 @@ class ImageNetteStandardTrainer(BaseImageNetteTrainer):
         model_names: List[str],
         config_name: str = ImageNetteTrainingConfigs.STANDARD,
         full_finetune: bool = False,
+        image_encoder: Optional[ImageEncoder] = None,
+        path_to_data: Optional[str] = None,
     ) -> List[Dict]:
         """
         Train multiple ImageNette models with the same configuration.
@@ -148,6 +165,8 @@ class ImageNetteStandardTrainer(BaseImageNetteTrainer):
             model_names: List of model names to train
             config_name: Training configuration to use (must be from ImageNetteTrainingConfigs)
             full_finetune: If True, replace head then unfreeze all layers (ImageNette setup)
+            image_encoder: Optional encoder applied to each image after it is loaded
+            path_to_data: Root ImageNette folder with train/val subfolders
 
         Returns:
             List of training results for each model
@@ -168,7 +187,13 @@ class ImageNetteStandardTrainer(BaseImageNetteTrainer):
 
         for i, model_name in enumerate(model_names, 1):
             print(f"\n📊 Model {i}/{len(model_names)}: {model_name}")
-            result = self.train_model(model_name, config_name, full_finetune=full_finetune)
+            result = self.train_model(
+                model_name,
+                config_name,
+                full_finetune=full_finetune,
+                image_encoder=image_encoder,
+                path_to_data=path_to_data,
+            )
             results.append(result)
 
             if result['success']:
@@ -365,3 +390,35 @@ class ImageNetteStandardTrainer(BaseImageNetteTrainer):
             'num_classes': 10,
             'success': validation_result['success']
         }
+
+
+def main() -> None:
+    path_to_data = './data/imagenette_encoded/arnold_cat_map'
+    models_to_train = [
+        ModelNames.resnet18,
+        ModelNames.efficientnet_b0,
+        ModelNames.swin_t,
+        ModelNames.inception_v3,
+    ]
+
+    image_encoder = create_image_encoder(
+        ImageEncodingParams(
+            strategy=ImageEncodingStrategy.ARNOLD_CAT_MAP,
+        )
+    )
+
+    trainer = ImageNetteStandardTrainer(
+        models_dir="./models/imagenette_encoded/gaussian_blur",
+    )
+
+    for model_name in models_to_train:
+        trainer.train_model(
+            model_name=model_name,
+            config_name=ImageNetteTrainingConfigs.ADVANCED,
+            full_finetune=True,
+            path_to_data=path_to_data,
+        )
+
+
+if __name__ == "__main__":
+    main()

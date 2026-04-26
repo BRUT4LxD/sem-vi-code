@@ -1,7 +1,61 @@
-model_name,model_path,architecture_hint,accuracy,precision,recall,f1,training_epoch,timestamp
-efficientnet_b0_advanced,final_research/models/normal/efficientnet_b0_advanced.pt,efficientnet_b0,0.9454777240753174,0.94670569896698,0.9454454183578491,0.9454392194747925,2,2026-04-25 02:18:21
-mobilenet_v2_advanced,final_research/models/normal/mobilenet_v2_advanced.pt,mobilenet_v2,0.9424203634262085,0.9432255029678345,0.9428484439849854,0.9425381422042847,5,2026-04-25 02:19:10
-inception_v3_advanced,final_research/models/normal/inception_v3_advanced.pt,inception_v3,0.9284076690673828,0.9281341433525085,0.928899884223938,0.928175687789917,43,2026-04-25 02:18:46
-resnet18_advanced,final_research/models/normal/resnet18_advanced.pt,resnet18,0.9210191369056702,0.9212944507598877,0.9213017225265503,0.9210315942764282,45,2026-04-25 02:19:33
-densenet121_advanced,final_research/models/normal/densenet121_advanced.pt,densenet121,0.909554123878479,0.9111677408218384,0.9102066159248352,0.9094300866127014,7,2026-04-25 02:17:56
-swin_t_advanced,final_research/models/normal/swin_t_advanced.pt,swin_t,0.8703184723854065,0.8740030527114868,0.8713188171386719,0.8696600198745728,8,2026-04-25 02:20:01
+model_name,class_name,accuracy,precision,recall,f1
+densenet121,tench,96.12%,100.00%,96.12%,98.02%
+densenet121,parachute,95.90%,100.00%,95.90%,97.91%
+densenet121,golf ball,93.73%,100.00%,93.73%,96.77%
+densenet121,French horn,93.15%,100.00%,93.15%,96.45%
+densenet121,cassette player,93.00%,100.00%,93.00%,96.37%
+densenet121,garbage truck,91.77%,100.00%,91.77%,95.71%
+densenet121,English springer,91.39%,100.00%,91.39%,95.50%
+densenet121,church,90.22%,100.00%,90.22%,94.86%
+densenet121,gas pump,83.05%,100.00%,83.05%,90.74%
+densenet121,chain saw,81.87%,100.00%,81.87%,90.03%
+efficientnet_b0,parachute,98.21%,100.00%,98.21%,99.09%
+efficientnet_b0,tench,97.93%,100.00%,97.93%,98.96%
+efficientnet_b0,church,97.80%,100.00%,97.80%,98.89%
+efficientnet_b0,English springer,97.72%,100.00%,97.72%,98.85%
+efficientnet_b0,golf ball,95.24%,100.00%,95.24%,97.56%
+efficientnet_b0,cassette player,94.68%,100.00%,94.68%,97.27%
+efficientnet_b0,French horn,93.65%,100.00%,93.65%,96.72%
+efficientnet_b0,gas pump,91.89%,100.00%,91.89%,95.77%
+efficientnet_b0,chain saw,90.16%,100.00%,90.16%,94.82%
+efficientnet_b0,garbage truck,88.17%,100.00%,88.17%,93.72%
+inception_v3,English springer,96.96%,100.00%,96.96%,98.46%
+inception_v3,tench,95.87%,100.00%,95.87%,97.89%
+inception_v3,cassette player,95.52%,100.00%,95.52%,97.71%
+inception_v3,parachute,95.38%,100.00%,95.38%,97.64%
+inception_v3,golf ball,94.99%,100.00%,94.99%,97.43%
+inception_v3,garbage truck,94.09%,100.00%,94.09%,96.95%
+inception_v3,church,93.64%,100.00%,93.64%,96.72%
+inception_v3,French horn,90.86%,100.00%,90.86%,95.21%
+inception_v3,gas pump,86.87%,100.00%,86.87%,92.98%
+inception_v3,chain saw,84.72%,100.00%,84.72%,91.73%
+mobilenet_v2,tench,96.64%,100.00%,96.64%,98.29%
+mobilenet_v2,English springer,96.46%,100.00%,96.46%,98.20%
+mobilenet_v2,garbage truck,95.89%,100.00%,95.89%,97.90%
+mobilenet_v2,church,95.84%,100.00%,95.84%,97.88%
+mobilenet_v2,cassette player,95.80%,100.00%,95.80%,97.85%
+mobilenet_v2,golf ball,95.74%,100.00%,95.74%,97.82%
+mobilenet_v2,parachute,94.62%,100.00%,94.62%,97.23%
+mobilenet_v2,chain saw,91.97%,100.00%,91.97%,95.82%
+mobilenet_v2,French horn,91.12%,100.00%,91.12%,95.35%
+mobilenet_v2,gas pump,88.78%,100.00%,88.78%,94.06%
+resnet18,tench,95.87%,100.00%,95.87%,97.89%
+resnet18,parachute,95.38%,100.00%,95.38%,97.64%
+resnet18,English springer,95.19%,100.00%,95.19%,97.54%
+resnet18,church,95.11%,100.00%,95.11%,97.49%
+resnet18,golf ball,92.23%,100.00%,92.23%,95.96%
+resnet18,cassette player,92.16%,100.00%,92.16%,95.92%
+resnet18,garbage truck,91.77%,100.00%,91.77%,95.71%
+resnet18,French horn,89.85%,100.00%,89.85%,94.65%
+resnet18,chain saw,87.82%,100.00%,87.82%,93.52%
+resnet18,gas pump,85.92%,100.00%,85.92%,92.43%
+swin_t,parachute,93.08%,100.00%,93.08%,96.41%
+swin_t,garbage truck,92.54%,100.00%,92.54%,96.13%
+swin_t,tench,92.25%,100.00%,92.25%,95.97%
+swin_t,English springer,91.90%,100.00%,91.90%,95.78%
+swin_t,church,89.73%,100.00%,89.73%,94.59%
+swin_t,French horn,89.59%,100.00%,89.59%,94.51%
+swin_t,golf ball,89.47%,100.00%,89.47%,94.44%
+swin_t,cassette player,86.83%,100.00%,86.83%,92.95%
+swin_t,chain saw,76.94%,100.00%,76.94%,86.97%
+swin_t,gas pump,68.97%,100.00%,68.97%,81.64%
