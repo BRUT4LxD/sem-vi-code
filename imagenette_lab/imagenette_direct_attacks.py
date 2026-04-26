@@ -25,16 +25,15 @@ DIRECT_ATTACK_CSV_FIELDNAMES: List[str] = [
     'prec',
     'rec',
     'f1',
-    'l0_pixels',
-    'l1',
-    'l2',
-    'linf',
+    'L0_pixels',
+    'L1',
+    'L2',
+    'Linf',
     'power_mse',
     'clean_accuracy',
-    'accuracy_drop',
-    'relative_accuracy_drop',
+    'AD',
+    'RAD',
     'asr_unconditional',
-    'asr_conditional',
     'time',
     'n_samples',
 ]
@@ -277,18 +276,17 @@ class ImageNetteDirectAttacks:
                         result_dict['f1'] = ev.f1
 
                         distance_score = ev.distance_score
-                        result_dict['l0_pixels'] = distance_score.l0_pixels
-                        result_dict['l1'] = distance_score.l1
-                        result_dict['l2'] = distance_score.l2
-                        result_dict['linf'] = distance_score.linf
+                        result_dict['L0_pixels'] = distance_score.l0_pixels
+                        result_dict['L1'] = distance_score.l1
+                        result_dict['L2'] = distance_score.l2
+                        result_dict['Linf'] = distance_score.linf
                         result_dict['power_mse'] = distance_score.power_mse
 
                         # Add accuracy drop metrics
                         result_dict['clean_accuracy'] = ev.clean_accuracy
-                        result_dict['accuracy_drop'] = ev.accuracy_drop
-                        result_dict['relative_accuracy_drop'] = ev.relative_accuracy_drop
+                        result_dict['AD'] = ev.accuracy_drop
+                        result_dict['RAD'] = ev.relative_accuracy_drop
                         result_dict['asr_unconditional'] = ev.asr_unconditional
-                        result_dict['asr_conditional'] = ev.asr_conditional
 
                         result_dict['time'] = ev.time
                         result_dict['n_samples'] = ev.n_samples
