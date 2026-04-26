@@ -270,10 +270,10 @@ class ImageNetteDirectAttacks:
                         result_dict = {}
                         result_dict['model_name'] = model_name
                         result_dict['attack_name'] = attack_name
-                        result_dict['acc'] = ev.acc
-                        result_dict['prec'] = ev.prec
-                        result_dict['rec'] = ev.rec
-                        result_dict['f1'] = ev.f1
+                        result_dict['acc'] = ev.acc / 100.0
+                        result_dict['prec'] = ev.prec / 100.0
+                        result_dict['rec'] = ev.rec / 100.0
+                        result_dict['f1'] = ev.f1 / 100.0
 
                         distance_score = ev.distance_score
                         result_dict['L0_pixels'] = distance_score.l0_pixels
