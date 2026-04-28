@@ -213,6 +213,7 @@ def run(config: FullResearchConfig) -> None:
             validation_images_per_attack_per_iteration=(
                 config.progressive.validation_images_per_attack_per_iteration
             ),
+            max_tries_per_attack=config.progressive.max_tries_per_attack,
             early_stopping_patience=config.progressive.early_stopping_patience,
             scheduler_type=config.progressive.scheduler_type,
             weight_decay=config.progressive.weight_decay,

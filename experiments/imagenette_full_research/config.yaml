@@ -8,9 +8,9 @@ run:
   resume: false
   phases:
     # - train_baseline
-    - validate_normal
+    # - validate_normal
     # - direct_normal
-    # - progressive_active
+    - progressive_active
     # - validate_progressive_active
     # - direct_progressive_active
     # - passive
@@ -24,7 +24,7 @@ training:
   full_finetune: true
   # Baseline models to train (must match ImageNetteTrainingConfigs.AVAILABLE_MODELS)
   architectures:
-    - resnet18
+    # - resnet18
     - densenet121
     - efficientnet_b0
     - mobilenet_v2
@@ -79,6 +79,7 @@ progressive:
   batch_size: 32
   images_per_attack_per_iteration: 10
   validation_images_per_attack_per_iteration: 2
+  max_tries_per_attack: 50
   early_stopping_patience: 7
   scheduler_type: step
   weight_decay: 0.0001

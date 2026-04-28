@@ -91,9 +91,14 @@ class ImageNetteAdversarialProgressiveTrainer(BaseImageNetteTrainer):
         iteration: int,
         verbose: bool,
         folder_model_name: Optional[str] = None,
+        max_tries_per_attack: int = 100,
     ) -> Tuple[List[Tuple[torch.Tensor, int]], AttackDistanceScore]:
         if images_per_attack <= 0:
             return [], AttackDistanceScore(0.0, 0.0, 0.0, 0.0, 0.0)
+        if max_tries_per_attack <= 0:
+            raise ValueError(
+                f"max_tries_per_attack must be positive, got {max_tries_per_attack}"
+            )
 
         model.eval()
         examples: List[Tuple[torch.Tensor, int]] = []
@@ -103,7 +108,7 @@ class ImageNetteAdversarialProgressiveTrainer(BaseImageNetteTrainer):
             attack = AttackFactory.get_attack(attack_name, model)
             successful_examples = 0
             attempted_examples = 0
-            max_attempts = images_per_attack * 100
+            consecutive_failed_attempts = 0
 
             progress_bar = tqdm(
                 data_loader,
@@ -113,7 +118,10 @@ class ImageNetteAdversarialProgressiveTrainer(BaseImageNetteTrainer):
             )
 
             for images, labels in progress_bar:
-                if successful_examples >= images_per_attack or attempted_examples >= max_attempts:
+                if (
+                    successful_examples >= images_per_attack
+                    or consecutive_failed_attempts >= max_tries_per_attack
+                ):
                     break
 
                 images = images.to(self.device)
@@ -134,14 +142,25 @@ class ImageNetteAdversarialProgressiveTrainer(BaseImageNetteTrainer):
                     adv_predictions = torch.argmax(model(adv_images), dim=1)
 
                 for i in range(len(adv_images)):
-                    if successful_examples >= images_per_attack or attempted_examples >= max_attempts:
+                    if (
+                        successful_examples >= images_per_attack
+                        or consecutive_failed_attempts >= max_tries_per_attack
+                    ):
                         break
 
                     attempted_examples += 1
                     label = labels[i].item()
                     if adv_predictions[i].item() == label:
+                        consecutive_failed_attempts += 1
+                        progress_bar.set_postfix(
+                            {
+                                "saved": successful_examples,
+                                "failed_streak": consecutive_failed_attempts,
+                            }
+                        )
                         continue
 
+                    consecutive_failed_attempts = 0
                     src_image = images[i].detach().cpu()
                     adv_image = adv_images[i].detach().cpu()
                     examples.append((adv_image, label))
@@ -169,12 +188,18 @@ class ImageNetteAdversarialProgressiveTrainer(BaseImageNetteTrainer):
                             folder_model_name=folder_model_name,
                         )
 
-                    progress_bar.set_postfix({"saved": successful_examples})
+                    progress_bar.set_postfix(
+                        {
+                            "saved": successful_examples,
+                            "failed_streak": consecutive_failed_attempts,
+                        }
+                    )
 
             if successful_examples < images_per_attack:
                 cap_note = (
-                    f" Reached attempt cap ({attempted_examples}/{max_attempts})."
-                    if attempted_examples >= max_attempts
+                    f" Reached consecutive failure cap "
+                    f"({consecutive_failed_attempts}/{max_tries_per_attack})."
+                    if consecutive_failed_attempts >= max_tries_per_attack
                     else ""
                 )
                 print(
@@ -211,6 +236,7 @@ class ImageNetteAdversarialProgressiveTrainer(BaseImageNetteTrainer):
         save_generated_images: bool = False,
         attacked_images_folder: str = "data/attacks/imagenette_models",
         saved_attack_folder_name: Optional[str] = None,
+        max_tries_per_attack: int = 100,
         verbose: bool = True,
     ) -> Dict:
         """
@@ -233,6 +259,10 @@ class ImageNetteAdversarialProgressiveTrainer(BaseImageNetteTrainer):
         if images_per_attack_per_iteration <= 0:
             raise ValueError(
                 "images_per_attack_per_iteration must be positive"
+            )
+        if max_tries_per_attack <= 0:
+            raise ValueError(
+                f"max_tries_per_attack must be positive, got {max_tries_per_attack}"
             )
 
         available_attacks = AttackNames().all_attack_names
@@ -288,6 +318,10 @@ class ImageNetteAdversarialProgressiveTrainer(BaseImageNetteTrainer):
             f"   Validation images per attack per iteration: "
             f"{validation_images_per_attack_per_iteration}"
         )
+        print(
+            f"   Max consecutive failed tries per attack: "
+            f"{max_tries_per_attack}"
+        )
         print(f"   Batch size: {batch_size}")
         print(f"   Learning rate: {learning_rate}")
         print(f"   Save generated images: {save_generated_images}")
@@ -323,6 +357,7 @@ class ImageNetteAdversarialProgressiveTrainer(BaseImageNetteTrainer):
                 iteration=iteration,
                 verbose=verbose,
                 folder_model_name=saved_attack_folder_name,
+                max_tries_per_attack=max_tries_per_attack,
             )
             new_test_examples, _ = self._collect_successful_adversarial_examples(
                 model=current_model,
@@ -335,6 +370,7 @@ class ImageNetteAdversarialProgressiveTrainer(BaseImageNetteTrainer):
                 iteration=iteration,
                 verbose=verbose,
                 folder_model_name=saved_attack_folder_name,
+                max_tries_per_attack=max_tries_per_attack,
             )
 
             if not new_train_examples:
@@ -488,6 +524,7 @@ class ImageNetteAdversarialProgressiveTrainer(BaseImageNetteTrainer):
         attacked_images_folder: str = "data/attacks/imagenette_models",
         saved_attack_folder_names: Optional[List[Optional[str]]] = None,
         save_model_paths: Optional[List[Optional[str]]] = None,
+        max_tries_per_attack: int = 100,
     ) -> List[Dict]:
         print(f"\n{'=' * 70}")
         print("🚀 Training Multiple Progressive Adversarial Models")
@@ -530,6 +567,7 @@ class ImageNetteAdversarialProgressiveTrainer(BaseImageNetteTrainer):
                 attacked_images_folder=attacked_images_folder,
                 save_model_path=save_path,
                 saved_attack_folder_name=folder_name,
+                max_tries_per_attack=max_tries_per_attack,
                 verbose=True,
             )
             results.append(result)
@@ -573,6 +611,7 @@ if __name__ == "__main__":
         batch_size=32,
         images_per_attack_per_iteration=10,
         validation_images_per_attack_per_iteration=2,
+        max_tries_per_attack=100,
         save_generated_images=True,
         attacked_images_folder="data/attacks/imagenette_models",
     )

@@ -40,6 +40,7 @@ class ProgressiveConfig:
     batch_size: int = 32
     images_per_attack_per_iteration: int = 10
     validation_images_per_attack_per_iteration: Optional[int] = None
+    max_tries_per_attack: int = 100
     early_stopping_patience: int = 7
     scheduler_type: str = "step"
     weight_decay: float = 0.0001
@@ -161,6 +162,7 @@ def load_full_research_config(path: str) -> FullResearchConfig:
                 is not None
                 else None
             ),
+            max_tries_per_attack=int(progressive.get("max_tries_per_attack", 100)),
             early_stopping_patience=int(
                 progressive.get("early_stopping_patience", 7)
             ),
