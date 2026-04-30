@@ -90,6 +90,10 @@ Różnica jest więc zasadnicza: w wariancie aktywnym model sam współtworzy da
 
 Pasywna odmiana pozwala sprawdzić, czy zbiór antagonistyczny wygenerowany w aktywnym procesie ma wartość transferowalną jako materiał treningowy dla nowego modelu. Innymi słowy, bada ona, czy historia słabości jednego modelu lub jednej procedury aktywnej może poprawić odporność modelu trenowanego później bez aktywnego generowania ataków.
 
+Dodatkową zaletą wariantu pasywnego jest możliwość ponownego użycia oraz agregacji zapisanych obrazów antagonistycznych bez konieczności każdorazowego uruchamiania pełnego aktywnego procesu douczania. Jeżeli zbiór zaatakowanych obrazów został już dostarczony lub wcześniej wygenerowany, można wykorzystać go jako gotowy zasób treningowy dla innego modelu albo włączyć go do szerszego zbioru danych. Pozwala to oddzielić kosztowny etap aktywnego generowania ataków od późniejszego etapu uczenia modeli na danych czystych i zaatakowanych.
+
+Ma to znaczenie praktyczne w sytuacjach, w których aktywne douczanie całego modelu uwzględniającego dodatkowe dane byłoby zbyt kosztowne obliczeniowo lub czasowo. Wariant pasywny umożliwia wtedy wykorzystanie efektów wcześniejszego aktywnego eksperymentu oraz tego z drugiej porcji danych.
+
 ## Zakres eksperymentu
 
 Aktualna konfiguracja eksperymentu jest zdefiniowana w `experiments/imagenette_full_research/config.yaml`.
