@@ -33,6 +33,7 @@ training:
   config_name: advanced
   full_finetune: true
   architectures:
+    - resnet18
     - densenet121
     - efficientnet_b0
     - mobilenet_v2
@@ -142,19 +143,30 @@ W praktyce oznacza to, że progresywny etap jest kontynuacją normalnego trening
 
 Na początku każdej iteracji trainer korzysta z czystych loaderów ImageNette:
 
-- loader z `batch_size=1` do generowania nowych ataków,
-- loader z `batch_size=batch_size` do budowania czystej części zbioru treningowego i walidacyjnego.
+- `generation_train_loader` i `generation_test_loader` z `batch_size=1` oraz `shuffle=True` do generowania nowych ataków,
+- `clean_train_loader` i `clean_test_loader` z `batch_size=batch_size` oraz `shuffle=False` do budowania czystej części zbioru treningowego i walidacyjnego.
+
+Oznacza to, że wybór oraz kolejność czystych obrazów używanych do ataku są losowane przez loader generacyjny. Trainer nie atakuje deterministycznie pierwszych `N` obrazów z katalogu. Dla każdego ataku przechodzi po czystym loaderze w losowej kolejności i zbiera skuteczne przykłady do momentu osiągnięcia limitu `images_per_attack_per_iteration` albo przerwania przez `max_tries_per_attack`. W praktyce dwa uruchomienia tego samego eksperymentu mogą wygenerować inny zestaw przykładów adversarialnych, jeżeli nie ustawiono jawnie seedów dla `torch`, `random`, `numpy`, generatorów `DataLoader` oraz losowości samych ataków.
+
+Losowość dotyczy przede wszystkim doboru kandydatów do ataku i kolejności ich przetwarzania. Dodatkowo część algorytmów ataku posiada własny komponent stochastyczny, więc nawet dla tego samego obrazu wynik perturbacji może zależeć od stanu generatorów losowych.
 
 Dla każdego ataku wykonywana jest następująca procedura:
 
-1. Model klasyfikuje czysty obraz.
-2. Obrazy błędnie sklasyfikowane na czysto są odrzucane.
-3. Dla poprawnie sklasyfikowanych obrazów generowany jest przykład adversarialny.
-4. Przykład jest uznany za skuteczny, jeśli predykcja modelu po ataku różni się od etykiety.
-5. Skuteczne przykłady są zapisywane w pamięci jako `(adv_image, label)`.
-6. Jeżeli `save_generated_images: true`, obraz jest także zapisywany na dysku jako PNG.
+1. Dla bieżącego ataku tworzona jest instancja przez `AttackFactory.get_attack(attack_name, model)`.
+2. Loader generacyjny zwraca czysty obraz i etykietę.
+3. Aktualny model klasyfikuje czysty obraz.
+4. Jeżeli model myli się na czystym obrazie, próbka jest odrzucana i nie jest używana do generowania przykładu adversarialnego.
+5. Dla poprawnie sklasyfikowanego obrazu generowany jest przykład adversarialny.
+6. Wynik ataku jest przycinany do zakresu `[0, 1]` przez `normalize_adversarial_image(...)`.
+7. Model klasyfikuje wygenerowany obraz adversarialny.
+8. Przykład jest uznany za skuteczny, jeśli predykcja modelu po ataku różni się od etykiety.
+9. Skuteczne przykłady są zapisywane w pamięci jako `(adv_image, label)`.
+10. Dla skutecznych przykładów zapisywany jest także `AttackResult`, który służy do obliczania średnich metryk odległości perturbacji.
+11. Jeżeli `save_generated_images: true`, obraz jest także zapisywany na dysku jako PNG.
 
 Mechanizm `max_tries_per_attack` działa jako limit kolejnych porażek. Każdy skuteczny przykład zeruje licznik nieudanych prób, a każda nieskuteczna próba zwiększa licznik `failed_streak`. Jeżeli licznik osiągnie wartość z konfiguracji, generowanie dla danego ataku zostaje zakończone.
+
+Warto podkreślić, że `max_tries_per_attack` nie jest limitem całkowitej liczby prób. Jest to limit kolejnych nieudanych prób. Jeżeli atak regularnie znajduje skuteczne przykłady, licznik jest resetowany po każdym sukcesie i proces może trwać dłużej. Jeżeli przez dłuższą serię kandydatów nie udaje się znaleźć skutecznego przykładu, generowanie dla tego ataku kończy się wcześniej.
 
 ### 3. Kumulowanie danych
 
@@ -171,6 +183,10 @@ combined_val_dataset   = clean_val_dataset   + progressive_test_dataset
 ```
 
 W efekcie model w kolejnych iteracjach trenuje na coraz większym zbiorze, który zawiera zarówno czyste dane, jak i wszystkie skuteczne przykłady adversarialne wygenerowane w poprzednich rundach.
+
+Nowo wygenerowane przykłady nie zastępują starszych przykładów adversarialnych. Są do nich dokładane. Oznacza to, że model w iteracji `k` widzi czyste dane oraz sumę skutecznych ataków wygenerowanych w iteracjach `1..k`. Zbiór adversarialny pełni więc rolę pamięci historycznych podatności modelu.
+
+Czysty zbiór danych jest dołączany w całości przez `clean_train_loader.dataset` i `clean_test_loader.dataset`, natomiast część adversarialna jest skumulowaną listą tensorów wygenerowanych aktywnie podczas treningu. Przy każdej iteracji tworzony jest nowy `ConcatDataset`, a następnie nowy `DataLoader`. Loader treningowy dla połączonego zbioru używa `shuffle=True`, więc kolejność batchy w trakcie fine-tuningu również jest losowa.
 
 ### 4. Trening w iteracji
 
@@ -210,32 +226,33 @@ flowchart TD
     E --> F{Dla każdego modelu}
 
     F --> G[Iteracja progresywna i = 1..N]
-    G --> H[Wczytaj czyste dane ImageNette]
-    H --> I{Dla każdego ataku}
+    G --> H[Utwórz clean loadery oraz generation loadery]
+    H --> I[Losowo iteruj po czystych obrazach z generation loader]
+    I --> J{Dla każdego ataku}
 
-    I --> J[Wybierz poprawnie sklasyfikowane czyste obrazy]
-    J --> K[Wygeneruj obrazy adversarialne]
-    K --> L{Czy atak zmienił predykcję?}
-    L -- Tak --> M[Dodaj przykład do progressive dataset]
-    M --> N[Wyzeruj failed_streak]
-    L -- Nie --> O[Zwiększ failed_streak]
-    O --> P{failed_streak >= max_tries_per_attack?}
-    P -- Tak --> Q[Zakończ generowanie dla tego ataku]
-    P -- Nie --> J
-    N --> R{Osiągnięto images_per_attack_per_iteration?}
-    R -- Nie --> J
-    R -- Tak --> Q
+    J --> K[Odrzuć obrazy błędne na czysto]
+    K --> L[Wygeneruj obrazy adversarialne]
+    L --> M{Czy atak zmienił predykcję?}
+    M -- Tak --> N[Dodaj przykład do progressive dataset]
+    N --> O[Wyzeruj failed_streak]
+    M -- Nie --> P[Zwiększ failed_streak]
+    P --> Q{failed_streak >= max_tries_per_attack?}
+    Q -- Tak --> R[Zakończ generowanie dla tego ataku]
+    Q -- Nie --> I
+    O --> S{Osiągnięto images_per_attack_per_iteration?}
+    S -- Nie --> I
+    S -- Tak --> R
 
-    Q --> S[Połącz clean dataset z progressive dataset]
-    S --> T[Trenuj model przez epochs_per_iteration]
-    T --> U[Waliduj na combined val oraz adversarial val]
-    U --> V[Zapisz najlepszy checkpoint iteracji]
-    V --> W{Czy są kolejne iteracje?}
-    W -- Tak --> G
-    W -- Nie --> X[Zapisz końcowy wynik modelu]
-    X --> Y{Czy są kolejne modele?}
-    Y -- Tak --> F
-    Y -- Nie --> Z[Koniec fazy progressive_active]
+    R --> T[Połącz clean dataset z progressive dataset]
+    T --> U[Trenuj model przez epochs_per_iteration]
+    U --> V[Waliduj na combined val oraz adversarial val]
+    V --> W[Zapisz najlepszy checkpoint iteracji]
+    W --> X{Czy są kolejne iteracje?}
+    X -- Tak --> G
+    X -- Nie --> Y[Zapisz końcowy wynik modelu]
+    Y --> Z{Czy są kolejne modele?}
+    Z -- Tak --> F
+    Z -- Nie --> AA[Koniec fazy progressive_active]
 ```
 
 ## Interpretacja metody
@@ -247,6 +264,7 @@ Metoda działa więc jak aktywne wzmacnianie odporności: model jest uczony na c
 ## Ograniczenia i założenia
 
 - Generowane są wyłącznie przykłady z obrazów poprawnie sklasyfikowanych przed atakiem.
+- Obrazy kandydackie do ataku są pobierane z loaderów z `shuffle=True`, więc bez kontrolowanych seedów dobór i kolejność próbek nie są deterministyczne.
 - Zbiór adversarialny rośnie w pamięci procesu, dlatego koszt pamięci zwiększa się wraz z liczbą iteracji i liczbą ataków.
 - `max_tries_per_attack` jest heurystyką kosztu obliczeniowego: mniejsza wartość przyspiesza eksperyment, ale może zmniejszyć liczbę znalezionych skutecznych przykładów.
 - Skuteczność treningu zależy od różnorodności ataków w `attacks.names`; zbyt wąski zestaw ataków może prowadzić do odporności wyspecjalizowanej tylko pod konkretne metody.
