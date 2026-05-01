@@ -12,6 +12,8 @@ Dodatkową motywacją jest zwiększenie kosztu adaptacji po stronie atakującego
 
 Można interpretować to jako problem liczby „refleksji” lub poziomów adaptacji. Model po jednej iteracji jest odporny na pewien zbiór ataków, więc atakujący może dostosować się do tej wersji. Po wielu iteracjach model uwzględnia jednak historię kolejnych prób obejścia odporności. Im dalsza iteracja procesu, tym trudniej założyć, że atakujący odtworzy dokładnie tę samą ścieżkę treningową i przygotuje perturbację skuteczną względem końcowego modelu. Z tego powodu ataki projektowane względem wcześniejszych lub mniej zaadaptowanych wersji modelu powinny stawać się coraz mniej skuteczne.
 
+Metoda może również ograniczać przenaszalność ataków między modelami. Jeżeli model staje się mniej wrażliwy na subtelne, specjalnie zaprojektowane zmiany konkretnych pikseli, to perturbacje wygenerowane dla jednej architektury lub jednej wersji modelu powinny rzadziej zachowywać skuteczność po przeniesieniu na inny model. Innymi słowy, progresywne uczenie antagonistyczne nie tylko wzmacnia odporność wobec ataków generowanych bezpośrednio na dany model, ale może także zmniejszać użyteczność perturbacji jako uniwersalnych lub transferowalnych wzorców błędu.
+
 Implementacja znajduje się w `imagenette_lab/training/imagenette_adversarial_progressive_trainer.py`, a etap eksperymentu uruchamiany jest z fazy `progressive_active` w `experiments/imagenette_full_research/runner.py`.
 
 ## Wkład metody
@@ -26,6 +28,7 @@ Najważniejsze elementy metody:
 - **Kontrola kosztu przez `failed_streak`**: parametr `max_tries_per_attack` ogranicza liczbę kolejnych nieskutecznych prób, dzięki czemu ataki, które przestają znajdować błędy modelu, nie dominują czasu obliczeniowego eksperymentu.
 - **Jednoczesne monitorowanie danych czystych i antagonistycznych**: trening odbywa się na zbiorze mieszanym, a walidacja obejmuje zarówno połączony zbiór walidacyjny, jak i skumulowaną część antagonistyczną.
 - **Zwiększenie kosztu adaptacji atakującego**: końcowy model jest wynikiem wielu iteracji generowania, selekcji i douczania, więc jego odtworzenie przez atakującego wymagałoby rekonstrukcji całej ścieżki treningowej, a nie tylko znajomości architektury i pojedynczej procedury ataku.
+- **Potencjalne ograniczenie przenaszalności ataków**: model uczony na wielu iteracjach subtelnych perturbacji powinien słabiej reagować na specyficzne wzorce pikselowe, co może zmniejszać skuteczność ataków przenoszonych z innych modeli.
 
 Tak zdefiniowany proces można traktować jako formę aktywnego curriculum learning, w którym poziom trudności danych rośnie wraz z modelem. Model sam, poprzez swoje aktualne błędy, współdecyduje o tym, jakie przykłady zostaną dołączone do kolejnych etapów treningu.
 
@@ -56,6 +59,8 @@ Dodatkowo kumulowanie wcześniejszych skutecznych przykładów zmniejsza ryzyko 
 Drugim elementem hipotezy jest założenie, że skuteczność ataków projektowanych względem wcześniejszych etapów treningu będzie spadać wraz z odległością od końcowej iteracji modelu. Model po wielu rundach powinien być mniej wrażliwy na małe, celowo zaprojektowane zmiany w obrazie, ponieważ takie zmiany były wielokrotnie odkrywane, filtrowane i włączane do zbioru uczącego. Dotyczy to również silnego scenariusza ataku białej skrzynki: nawet jeśli atakujący zna architekturę i aktualne wagi modelu, końcowy model powinien mieć mniejszą podatność na subtelne perturbacje, ponieważ jego proces treningowy był systematycznie wzmacniany przykładami tego typu.
 
 W tym sensie progresywność pełni także funkcję utrudnienia dla atakującego. Im więcej iteracji aktywnego uczenia antagonistycznego, tym więcej etapów adaptacji należałoby odtworzyć, aby przygotować atak odpowiadający końcowej wersji modelu. Prawdopodobieństwo, że atakujący dokładnie powtórzy wieloetapową ścieżkę generowania przykładów, selekcji skutecznych perturbacji i douczania modelu, jest niższe niż w przypadku jednorazowego treningu antagonistycznego.
+
+Trzecim elementem hipotezy jest spadek przenaszalności ataków między modelami. Jeżeli końcowy model jest mniej podatny na lokalne, wyinżynierowane zmiany pikseli, to przykłady antagonistyczne wygenerowane na innym modelu powinny mieć mniejszą szansę wywołania błędnej decyzji. Taki efekt byłby szczególnie istotny w scenariuszach, w których atakujący nie atakuje bezpośrednio końcowego modelu, lecz korzysta z modelu zastępczego i próbuje przenieść perturbację na właściwy system.
 
 ## Uzasadnienie nazwy metody
 
