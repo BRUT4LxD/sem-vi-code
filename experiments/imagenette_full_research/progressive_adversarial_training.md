@@ -6,6 +6,12 @@ Progresywne uczenie antagonistyczne jest wariantem treningu odpornościowego, w 
 
 W klasycznym treningu antagonistycznym istnieje ryzyko, że model szybko dopasuje się do ograniczonego, wcześniej wygenerowanego zbioru ataków. Podejście progresywne ogranicza ten problem, ponieważ po każdej rundzie fine-tuningu ataki są generowane ponownie. Zbiór antagonistyczny staje się historią słabości modelu z kolejnych etapów treningu, a nie pojedynczą migawką podatności sprzed uczenia.
 
+Jednym z głównych celów tej metody jest uzyskanie niewrażliwości modelu na subtelne, celowo zaprojektowane zmiany w obrazie. Ataki antagonistyczne często nie polegają na semantycznej zmianie treści obrazu, lecz na wprowadzeniu niewielkich perturbacji, które są słabo zauważalne dla człowieka, ale znacząco zmieniają odpowiedź modelu. Progresywne uczenie antagonistyczne ma stopniowo zmniejszać wpływ takich wyinżynierowanych modyfikacji, ponieważ model jest wielokrotnie trenowany na przykładach, które wcześniej wykorzystywały jego aktualne słabości.
+
+Dodatkową motywacją jest zwiększenie kosztu adaptacji po stronie atakującego. Jeżeli atakujący wie, że model był trenowany antagonistycznie, może próbować odtworzyć podobny trening i przygotować atak przeciwko modelowi o zbliżonej odporności. W przypadku pojedynczego etapu treningu antagonistycznego taka strategia jest relatywnie prostsza do przewidzenia. W przypadku treningu progresywnego atakujący musiałby jednak odtworzyć nie tylko samą metodę ataku, lecz także sekwencję kolejnych iteracji, losowy dobór próbek, skuteczne przykłady zaakceptowane w każdej rundzie oraz zmiany wag modelu po każdej fazie douczania.
+
+Można interpretować to jako problem liczby „refleksji” lub poziomów adaptacji. Model po jednej iteracji jest odporny na pewien zbiór ataków, więc atakujący może dostosować się do tej wersji. Po wielu iteracjach model uwzględnia jednak historię kolejnych prób obejścia odporności. Im dalsza iteracja procesu, tym trudniej założyć, że atakujący odtworzy dokładnie tę samą ścieżkę treningową i przygotuje perturbację skuteczną względem końcowego modelu. Z tego powodu ataki projektowane względem wcześniejszych lub mniej zaadaptowanych wersji modelu powinny stawać się coraz mniej skuteczne.
+
 Implementacja znajduje się w `imagenette_lab/training/imagenette_adversarial_progressive_trainer.py`, a etap eksperymentu uruchamiany jest z fazy `progressive_active` w `experiments/imagenette_full_research/runner.py`.
 
 ## Wkład metody
@@ -19,6 +25,7 @@ Najważniejsze elementy metody:
 - **Aktywny dobór trudnych przykładów**: do zbioru antagonistycznego trafiają wyłącznie przykłady, które faktycznie zmieniły decyzję modelu. Metoda nie zakłada, że każda perturbacja jest równie wartościowa treningowo.
 - **Kontrola kosztu przez `failed_streak`**: parametr `max_tries_per_attack` ogranicza liczbę kolejnych nieskutecznych prób, dzięki czemu ataki, które przestają znajdować błędy modelu, nie dominują czasu obliczeniowego eksperymentu.
 - **Jednoczesne monitorowanie danych czystych i antagonistycznych**: trening odbywa się na zbiorze mieszanym, a walidacja obejmuje zarówno połączony zbiór walidacyjny, jak i skumulowaną część antagonistyczną.
+- **Zwiększenie kosztu adaptacji atakującego**: końcowy model jest wynikiem wielu iteracji generowania, selekcji i douczania, więc jego odtworzenie przez atakującego wymagałoby rekonstrukcji całej ścieżki treningowej, a nie tylko znajomości architektury i pojedynczej procedury ataku.
 
 Tak zdefiniowany proces można traktować jako formę aktywnego curriculum learning, w którym poziom trudności danych rośnie wraz z modelem. Model sam, poprzez swoje aktualne błędy, współdecyduje o tym, jakie przykłady zostaną dołączone do kolejnych etapów treningu.
 
@@ -45,6 +52,10 @@ Hipoteza badawcza stojąca za metodą jest następująca:
 Uzasadnienie tej hipotezy wynika z adaptacyjnego charakteru procedury. Jeżeli model po danej iteracji przestaje być podatny na część wcześniejszych perturbacji, kolejne ataki są generowane już względem jego nowszej wersji. Proces powinien więc przesuwać uwagę treningu z łatwych, wcześniej opanowanych przypadków na te przykłady, które nadal odsłaniają aktualne słabości modelu.
 
 Dodatkowo kumulowanie wcześniejszych skutecznych przykładów zmniejsza ryzyko zapominania odporności uzyskanej w poprzednich iteracjach. Model nie trenuje wyłącznie na najnowszym zestawie ataków, lecz na pełnej historii znalezionych przykładów antagonistycznych.
+
+Drugim elementem hipotezy jest założenie, że skuteczność ataków projektowanych względem wcześniejszych etapów treningu będzie spadać wraz z odległością od końcowej iteracji modelu. Model po wielu rundach powinien być mniej wrażliwy na małe, celowo zaprojektowane zmiany w obrazie, ponieważ takie zmiany były wielokrotnie odkrywane, filtrowane i włączane do zbioru uczącego. Dotyczy to również silnego scenariusza ataku białej skrzynki: nawet jeśli atakujący zna architekturę i aktualne wagi modelu, końcowy model powinien mieć mniejszą podatność na subtelne perturbacje, ponieważ jego proces treningowy był systematycznie wzmacniany przykładami tego typu.
+
+W tym sensie progresywność pełni także funkcję utrudnienia dla atakującego. Im więcej iteracji aktywnego uczenia antagonistycznego, tym więcej etapów adaptacji należałoby odtworzyć, aby przygotować atak odpowiadający końcowej wersji modelu. Prawdopodobieństwo, że atakujący dokładnie powtórzy wieloetapową ścieżkę generowania przykładów, selekcji skutecznych perturbacji i douczania modelu, jest niższe niż w przypadku jednorazowego treningu antagonistycznego.
 
 ## Uzasadnienie nazwy metody
 
