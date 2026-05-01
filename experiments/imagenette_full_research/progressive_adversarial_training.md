@@ -301,6 +301,101 @@ Jeżeli `save_generated_images` jest włączone, obrazy są zapisywane w struktu
 <attacked_images_folder>/<train|test>/<model_progressive_adv>/<attack>/<label>/progressive_iter<it>_<timestamp>.png
 ```
 
+## Pseudokod algorytmu
+
+Poniższy pseudokod przedstawia aktywną odmianę progresywnego uczenia antagonistycznego, czyli wariant używany w fazie `progressive_active`.
+
+```text
+Wejście:
+    A              = lista architektur modeli
+    T              = lista ataków antagonistycznych
+    I              = liczba iteracji progresywnych
+    E              = liczba epok treningu w jednej iteracji
+    K_train        = liczba skutecznych obrazów antagonistycznych
+                     generowanych na atak dla zbioru treningowego
+    K_val          = liczba skutecznych obrazów antagonistycznych
+                     generowanych na atak dla zbioru walidacyjnego
+    F_max          = maksymalna liczba kolejnych nieudanych prób
+    D_train_clean  = czysty zbiór treningowy
+    D_val_clean    = czysty zbiór walidacyjny
+
+Dla każdej architektury a w A:
+    model <- wczytaj wytrenowany normalnie checkpoint modelu a
+
+    D_train_adv <- pusty zbiór przykładów antagonistycznych
+    D_val_adv   <- pusty zbiór przykładów antagonistycznych
+
+    Dla iteracji i = 1..I:
+        D_train_new <- pusty zbiór nowych przykładów treningowych
+        D_val_new   <- pusty zbiór nowych przykładów walidacyjnych
+
+        Dla każdego ataku t w T:
+            attack <- utwórz atak t dla aktualnego modelu
+
+            train_successes <- 0
+            train_failed_streak <- 0
+
+            Dopóki train_successes < K_train
+                  oraz train_failed_streak < F_max:
+
+                (x, y) <- pobierz kolejny losowy czysty obraz z D_train_clean
+
+                Jeżeli model(x) != y:
+                    pomiń x
+                    kontynuuj
+
+                x_adv <- attack(x, y)
+                x_adv <- przytnij x_adv do zakresu [0, 1]
+
+                Jeżeli model(x_adv) != y:
+                    dodaj (x_adv, y) do D_train_new
+                    train_successes <- train_successes + 1
+                    train_failed_streak <- 0
+                W przeciwnym razie:
+                    train_failed_streak <- train_failed_streak + 1
+
+            val_successes <- 0
+            val_failed_streak <- 0
+
+            Dopóki val_successes < K_val
+                  oraz val_failed_streak < F_max:
+
+                (x, y) <- pobierz kolejny losowy czysty obraz z D_val_clean
+
+                Jeżeli model(x) != y:
+                    pomiń x
+                    kontynuuj
+
+                x_adv <- attack(x, y)
+                x_adv <- przytnij x_adv do zakresu [0, 1]
+
+                Jeżeli model(x_adv) != y:
+                    dodaj (x_adv, y) do D_val_new
+                    val_successes <- val_successes + 1
+                    val_failed_streak <- 0
+                W przeciwnym razie:
+                    val_failed_streak <- val_failed_streak + 1
+
+        D_train_adv <- D_train_adv ∪ D_train_new
+        D_val_adv   <- D_val_adv ∪ D_val_new
+
+        D_train_combined <- D_train_clean ∪ D_train_adv
+        D_val_combined   <- D_val_clean ∪ D_val_adv
+
+        Trenuj model przez maksymalnie E epok na D_train_combined
+        Waliduj model na D_val_combined oraz D_val_adv
+        Zapisz najlepszy checkpoint iteracji
+
+    Zapisz wynik końcowy modelu
+
+Wyjście:
+    wytrenowane modele progresywne,
+    skumulowane zbiory przykładów antagonistycznych,
+    metryki treningowe i walidacyjne.
+```
+
+Najważniejszą własnością algorytmu jest to, że `D_train_adv` i `D_val_adv` nie są resetowane między iteracjami. Są one rozszerzane o nowe skuteczne przykłady, dzięki czemu model trenuje na historii przypadków, które w kolejnych etapach okazały się dla niego problematyczne.
+
 ## Diagram przepływu
 
 ```mermaid
