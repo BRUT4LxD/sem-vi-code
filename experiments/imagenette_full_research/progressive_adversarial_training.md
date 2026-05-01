@@ -25,7 +25,7 @@ Najważniejsze elementy metody:
 - **Generowanie ataków względem aktualnego modelu**: w każdej iteracji przykłady antagonistyczne są tworzone na podstawie bieżących wag sieci, a nie względem modelu sprzed rozpoczęcia treningu odpornościowego.
 - **Kumulowanie historycznych słabości modelu**: skuteczne przykłady z poprzednich iteracji nie są usuwane. Trafiają do rosnącego zbioru, który reprezentuje historię podatności modelu.
 - **Aktywny dobór trudnych przykładów**: do zbioru antagonistycznego trafiają wyłącznie przykłady, które faktycznie zmieniły decyzję modelu. Metoda nie zakłada, że każda perturbacja jest równie wartościowa treningowo.
-- **Kontrola kosztu przez `failed_streak`**: parametr `max_tries_per_attack` ogranicza liczbę kolejnych nieskutecznych prób, dzięki czemu ataki, które przestają znajdować błędy modelu, nie dominują czasu obliczeniowego eksperymentu.
+- **Kontrola kosztu przez cierpliwość Fmax**: metoda ogranicza liczbę kolejnych nieskutecznych prób, dzięki czemu ataki, które przestają znajdować błędy modelu, nie dominują czasu obliczeniowego eksperymentu.
 - **Jednoczesne monitorowanie danych czystych i antagonistycznych**: trening odbywa się na zbiorze mieszanym, a walidacja obejmuje zarówno połączony zbiór walidacyjny, jak i skumulowaną część antagonistyczną.
 - **Zwiększenie kosztu adaptacji atakującego**: końcowy model jest wynikiem wielu iteracji generowania, selekcji i douczania, więc jego odtworzenie przez atakującego wymagałoby rekonstrukcji całej ścieżki treningowej, a nie tylko znajomości architektury i pojedynczej procedury ataku.
 - **Potencjalne ograniczenie przenaszalności ataków**: model uczony na wielu iteracjach subtelnych perturbacji powinien słabiej reagować na specyficzne wzorce pikselowe, co może zmniejszać skuteczność ataków przenoszonych z innych modeli.
@@ -61,6 +61,28 @@ Drugim elementem hipotezy jest założenie, że skuteczność ataków projektowa
 W tym sensie progresywność pełni także funkcję utrudnienia dla atakującego. Im więcej iteracji aktywnego uczenia antagonistycznego, tym więcej etapów adaptacji należałoby odtworzyć, aby przygotować atak odpowiadający końcowej wersji modelu. Prawdopodobieństwo, że atakujący dokładnie powtórzy wieloetapową ścieżkę generowania przykładów, selekcji skutecznych perturbacji i douczania modelu, jest niższe niż w przypadku jednorazowego treningu antagonistycznego.
 
 Trzecim elementem hipotezy jest spadek przenaszalności ataków między modelami. Jeżeli końcowy model jest mniej podatny na lokalne, wyinżynierowane zmiany pikseli, to przykłady antagonistyczne wygenerowane na innym modelu powinny mieć mniejszą szansę wywołania błędnej decyzji. Taki efekt byłby szczególnie istotny w scenariuszach, w których atakujący nie atakuje bezpośrednio końcowego modelu, lecz korzysta z modelu zastępczego i próbuje przenieść perturbację na właściwy system.
+
+## Założenia metody
+
+Metoda opiera się na kilku założeniach dotyczących modelu, danych, ataków oraz kosztu obliczeniowego eksperymentu.
+
+- **Model bazowy powinien mieć sensowną jakość na danych czystych**. Aktywne generowanie przykładów antagonistycznych filtruje próbki błędnie sklasyfikowane przed atakiem. Oznacza to, że metoda zakłada istnienie modelu, który poprawnie rozpoznaje istotną część czystych obrazów i dopiero na tej podstawie można szukać perturbacji zmieniających jego decyzję.
+
+- **Skuteczny przykład antagonistyczny jest wartościowy treningowo**. Jeżeli perturbacja zmienia decyzję modelu dla obrazu poprawnie sklasyfikowanego przed atakiem, to taki przykład ujawnia realną słabość aktualnego modelu. Z tego powodu metoda zapisuje i kumuluje tylko skuteczne przypadki.
+
+- **Słabości modelu zmieniają się po douczaniu**. Po każdej iteracji aktualizowane są wagi modelu, więc wcześniejsze perturbacje mogą przestać być wystarczająco skuteczne. Dlatego nowe ataki są generowane względem bieżącej wersji modelu, a nie wyłącznie raz przed rozpoczęciem treningu.
+
+- **Starsze skuteczne ataki nadal mają wartość**. Nawet jeżeli model po kilku iteracjach staje się odporniejszy, wcześniejsze przykłady antagonistyczne reprezentują historię podatności, której model nie powinien zapomnieć. Z tego powodu zbiór antagonistyczny jest kumulowany, a nie nadpisywany w każdej iteracji.
+
+- **Mieszanina danych czystych i antagonistycznych jest konieczna dla zachowania jakości klasyfikacji**. Celem metody nie jest wyłącznie obniżenie skuteczności ataków, ale także utrzymanie kompetencji modelu na obrazach niezmodyfikowanych. Dlatego trening odbywa się na połączonym zbiorze czystym i antagonistycznym.
+
+- **Subtelne perturbacje można częściowo neutralizować przez ekspozycję iteracyjną**. Metoda zakłada, że wielokrotne uczenie na przykładach zawierających małe, celowo zaprojektowane zmiany pikseli zmniejsza wrażliwość modelu na podobne modyfikacje w przyszłości.
+
+- **Wiele iteracji zwiększa koszt adaptacji atakującego**. Końcowy model jest wynikiem całej ścieżki generowania ataków, selekcji skutecznych przykładów i douczania. Atakujący, który chciałby przygotować równie dopasowany atak, musiałby odtworzyć nie tylko architekturę i wagi, ale także wieloetapowy proces adaptacji.
+
+- **Cierpliwość Fmax jest heurystyką kosztu obliczeniowego**. Długa seria kolejnych nieskutecznych prób sugeruje, że dany atak w aktualnej iteracji przestaje efektywnie znajdować nowe słabości modelu. Cierpliwość Fmax pozwala zakończyć takie generowanie wcześniej i przenieść zasoby obliczeniowe na kolejne ataki lub kolejne etapy.
+
+- **Aktywnie wygenerowany zbiór może mieć wartość pasywną**. Zapisane przykłady antagonistyczne mogą być później użyte do uczenia innych modeli, bez ponownego uruchamiania aktywnego procesu generowania ataków.
 
 ## Uzasadnienie nazwy metody
 
@@ -221,7 +243,7 @@ Znaczenie parametrów:
 - `batch_size`: rozmiar batcha dla treningu i walidacji na połączonym zbiorze.
 - `images_per_attack_per_iteration`: docelowa liczba skutecznych przykładów antagonistycznych generowanych dla każdego ataku na split treningowy w jednej iteracji.
 - `validation_images_per_attack_per_iteration`: docelowa liczba skutecznych przykładów antagonistycznych generowanych dla każdego ataku na split walidacyjny w jednej iteracji.
-- `max_tries_per_attack`: limit kolejnych nieudanych prób dla danego ataku. Jeżeli w ostatnich `X` próbach nie uda się wygenerować skutecznego przykładu, generowanie dla tego ataku jest przerywane.
+- Cierpliwość Fmax (`max_tries_per_attack`): limit kolejnych nieudanych prób dla danego ataku. Jeżeli w ostatnich `X` próbach nie uda się wygenerować skutecznego przykładu, generowanie dla tego ataku jest przerywane.
 - `early_stopping_patience`: liczba epok bez poprawy, po której trening w bieżącej iteracji może zostać zatrzymany.
 - `scheduler_type`: typ scheduler'a uczenia, w tym przypadku `step`.
 - `weight_decay`: regularyzacja L2 w optymalizatorze.
@@ -248,7 +270,7 @@ Na początku każdej iteracji trainer korzysta z czystych loaderów ImageNette:
 - `generation_train_loader` i `generation_test_loader` z `batch_size=1` oraz `shuffle=True` do generowania nowych ataków,
 - `clean_train_loader` i `clean_test_loader` z `batch_size=batch_size` oraz `shuffle=False` do budowania czystej części zbioru treningowego i walidacyjnego.
 
-Oznacza to, że wybór oraz kolejność czystych obrazów używanych do ataku są losowane przez loader generacyjny. Trainer nie atakuje deterministycznie pierwszych `N` obrazów z katalogu. Dla każdego ataku przechodzi po czystym loaderze w losowej kolejności i zbiera skuteczne przykłady do momentu osiągnięcia limitu `images_per_attack_per_iteration` albo przerwania przez `max_tries_per_attack`. W praktyce dwa uruchomienia tego samego eksperymentu mogą wygenerować inny zestaw przykładów antagonistycznych, jeżeli nie ustawiono jawnie seedów dla `torch`, `random`, `numpy`, generatorów `DataLoader` oraz losowości samych ataków.
+Oznacza to, że wybór oraz kolejność czystych obrazów używanych do ataku są losowane przez loader generacyjny. Trainer nie atakuje deterministycznie pierwszych `N` obrazów z katalogu. Dla każdego ataku przechodzi po czystym loaderze w losowej kolejności i zbiera skuteczne przykłady do momentu osiągnięcia limitu `images_per_attack_per_iteration` albo przerwania przez cierpliwość Fmax. W praktyce dwa uruchomienia tego samego eksperymentu mogą wygenerować inny zestaw przykładów antagonistycznych, jeżeli nie ustawiono jawnie seedów dla `torch`, `random`, `numpy`, generatorów `DataLoader` oraz losowości samych ataków.
 
 Losowość dotyczy przede wszystkim doboru kandydatów do ataku i kolejności ich przetwarzania. Dodatkowo część algorytmów ataku posiada własny komponent stochastyczny, więc nawet dla tego samego obrazu wynik perturbacji może zależeć od stanu generatorów losowych.
 
@@ -266,9 +288,9 @@ Dla każdego ataku wykonywana jest następująca procedura:
 10. Dla skutecznych przykładów zapisywany jest także `AttackResult`, który służy do obliczania średnich metryk odległości perturbacji.
 11. Jeżeli `save_generated_images: true`, obraz jest także zapisywany na dysku jako PNG.
 
-Mechanizm `max_tries_per_attack` działa jako limit kolejnych porażek. Każdy skuteczny przykład zeruje licznik nieudanych prób, a każda nieskuteczna próba zwiększa licznik `failed_streak`. Jeżeli licznik osiągnie wartość z konfiguracji, generowanie dla danego ataku zostaje zakończone.
+Mechanizm cierpliwości Fmax działa jako limit kolejnych porażek. Każdy skuteczny przykład zeruje licznik nieudanych prób, a każda nieskuteczna próba zwiększa licznik `failed_streak`. Jeżeli licznik osiągnie wartość z konfiguracji, generowanie dla danego ataku zostaje zakończone.
 
-Warto podkreślić, że `max_tries_per_attack` nie jest limitem całkowitej liczby prób. Jest to limit kolejnych nieudanych prób. Jeżeli atak regularnie znajduje skuteczne przykłady, licznik jest resetowany po każdym sukcesie i proces może trwać dłużej. Jeżeli przez dłuższą serię kandydatów nie udaje się znaleźć skutecznego przykładu, generowanie dla tego ataku kończy się wcześniej.
+Warto podkreślić, że cierpliwość Fmax nie jest limitem całkowitej liczby prób. Jest to limit kolejnych nieudanych prób. Jeżeli atak regularnie znajduje skuteczne przykłady, licznik jest resetowany po każdym sukcesie i proces może trwać dłużej. Jeżeli przez dłuższą serię kandydatów nie udaje się znaleźć skutecznego przykładu, generowanie dla tego ataku kończy się wcześniej.
 
 ### 3. Kumulowanie danych
 
@@ -331,7 +353,7 @@ Wejście:
                      generowanych na atak dla zbioru treningowego
     K_val          = liczba skutecznych obrazów antagonistycznych
                      generowanych na atak dla zbioru walidacyjnego
-    F_max          = maksymalna liczba kolejnych nieudanych prób
+    Fmax           = maksymalna liczba kolejnych nieudanych prób
     D_train_clean  = czysty zbiór treningowy
     D_val_clean    = czysty zbiór walidacyjny
 
@@ -352,7 +374,7 @@ Dla każdej architektury a w A:
             train_failed_streak <- 0
 
             Dopóki train_successes < K_train
-                  oraz train_failed_streak < F_max:
+                  oraz train_failed_streak < Fmax:
 
                 (x, y) <- pobierz kolejny losowy czysty obraz z D_train_clean
 
@@ -374,7 +396,7 @@ Dla każdej architektury a w A:
             val_failed_streak <- 0
 
             Dopóki val_successes < K_val
-                  oraz val_failed_streak < F_max:
+                  oraz val_failed_streak < Fmax:
 
                 (x, y) <- pobierz kolejny losowy czysty obraz z D_val_clean
 
@@ -433,7 +455,7 @@ flowchart TD
     M -- Tak --> N[Dodaj przykład do progressive dataset]
     N --> O[Wyzeruj failed_streak]
     M -- Nie --> P[Zwiększ failed_streak]
-    P --> Q{failed_streak >= max_tries_per_attack?}
+    P --> Q{failed_streak >= Fmax?}
     Q -- Tak --> R[Zakończ generowanie dla tego ataku]
     Q -- Nie --> I
     O --> S{Osiągnięto images_per_attack_per_iteration?}
@@ -454,7 +476,7 @@ flowchart TD
 
 ## Interpretacja metody
 
-Najważniejszą cechą tej procedury jest sprzężenie zwrotne pomiędzy modelem i generatorem ataków. Model po każdej iteracji zmienia swoje granice decyzyjne, więc kolejne ataki są generowane względem nowszej, potencjalnie odporniejszej wersji modelu. Jeżeli atak nadal znajduje skuteczne perturbacje, przykłady trafiają do zbioru treningowego. Jeżeli przez dłuższą serię prób atak nie znajduje skutecznego przykładu, mechanizm `max_tries_per_attack` ogranicza koszt obliczeniowy i przechodzi dalej.
+Najważniejszą cechą tej procedury jest sprzężenie zwrotne pomiędzy modelem i generatorem ataków. Model po każdej iteracji zmienia swoje granice decyzyjne, więc kolejne ataki są generowane względem nowszej, potencjalnie odporniejszej wersji modelu. Jeżeli atak nadal znajduje skuteczne perturbacje, przykłady trafiają do zbioru treningowego. Jeżeli przez dłuższą serię prób atak nie znajduje skutecznego przykładu, mechanizm cierpliwości Fmax ogranicza koszt obliczeniowy i przechodzi dalej.
 
 Metoda działa więc jak aktywne wzmacnianie odporności: model jest uczony na czystych danych oraz na stale rozszerzanej pamięci przykładów, które w przeszłości były dla niego trudne. Dzięki temu końcowy model powinien zachować kompetencję klasyfikacji czystych obrazów, a jednocześnie poprawiać odporność na szeroką rodzinę ataków antagonistycznych.
 
@@ -463,6 +485,6 @@ Metoda działa więc jak aktywne wzmacnianie odporności: model jest uczony na c
 - Generowane są wyłącznie przykłady z obrazów poprawnie sklasyfikowanych przed atakiem.
 - Obrazy kandydackie do ataku są pobierane z loaderów z `shuffle=True`, więc bez kontrolowanych seedów dobór i kolejność próbek nie są deterministyczne.
 - Zbiór antagonistyczny rośnie w pamięci procesu, dlatego koszt pamięci zwiększa się wraz z liczbą iteracji i liczbą ataków.
-- `max_tries_per_attack` jest heurystyką kosztu obliczeniowego: mniejsza wartość przyspiesza eksperyment, ale może zmniejszyć liczbę znalezionych skutecznych przykładów.
+- Cierpliwość Fmax jest heurystyką kosztu obliczeniowego: mniejsza wartość przyspiesza eksperyment, ale może zmniejszyć liczbę znalezionych skutecznych przykładów.
 - Skuteczność treningu zależy od różnorodności ataków w `attacks.names`; zbyt wąski zestaw ataków może prowadzić do odporności wyspecjalizowanej tylko pod konkretne metody.
 - Każda iteracja tworzy nowy optymalizator i scheduler, ale kontynuuje trening tych samych wag modelu.
