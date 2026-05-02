@@ -341,6 +341,8 @@ Jeżeli `save_generated_images` jest włączone, obrazy są zapisywane w struktu
 
 ## Pseudokod algorytmu
 
+### Aktywne progresywne uczenie antagonistyczne
+
 Poniższy pseudokod przedstawia aktywną odmianę progresywnego uczenia antagonistycznego, czyli wariant używany w fazie `progressive_active`.
 
 ```text
@@ -433,6 +435,59 @@ Wyjście:
 ```
 
 Najważniejszą własnością algorytmu jest to, że `D_train_adv` i `D_val_adv` nie są resetowane między iteracjami. Są one rozszerzane o nowe skuteczne przykłady, dzięki czemu model trenuje na historii przypadków, które w kolejnych etapach okazały się dla niego problematyczne.
+
+### Pasywne progresywne uczenie antagonistyczne
+
+Pasywna odmiana korzysta z obrazów antagonistycznych zapisanych wcześniej przez aktywne progresywne uczenie antagonistyczne. W tym wariancie nie powstają nowe ataki względem aktualnie trenowanego modelu. Model uczy się na gotowej mieszaninie danych czystych oraz zaatakowanych, a koszt aktywnego generowania przykładów jest ponoszony wcześniej, w osobnej fazie.
+
+```text
+Wejście:
+    A                  = lista architektur modeli
+    D_train_clean      = czysty zbiór treningowy
+    D_val_clean        = czysty zbiór walidacyjny
+    D_train_adv_saved  = zapisany treningowy zbiór przykładów antagonistycznych
+                         wygenerowany w aktywnej fazie progresywnej
+    D_val_adv_saved    = zapisany walidacyjny zbiór przykładów antagonistycznych
+                         wygenerowany w aktywnej fazie progresywnej
+    E                  = liczba epok treningu pasywnego
+    B                  = rozmiar batcha
+    P                  = parametry treningu pasywnego
+                         learning_rate, scheduler, weight_decay,
+                         early_stopping_patience, gradient_clip_norm
+
+Dla każdej architektury a w A:
+    model <- utwórz nowy model a
+    model <- wczytaj wagi startowe dla standardowego transfer learningu
+
+    D_train_passive <- D_train_clean ∪ D_train_adv_saved
+    D_val_passive   <- D_val_clean ∪ D_val_adv_saved
+
+    Jeżeli konfiguracja wymaga zbalansowania udziału danych czystych:
+        D_train_passive <- zwiększ udział danych czystych względem
+                           liczby przykładów antagonistycznych
+
+    train_loader <- utwórz loader z D_train_passive z batch size B
+    val_loader   <- utwórz loader z D_val_passive z batch size B
+
+    Trenuj model przez maksymalnie E epok na train_loader
+    Po każdej epoce waliduj model na val_loader
+
+    Jeżeli metryka walidacyjna poprawia się:
+        zapisz najlepszy checkpoint modelu
+
+    Jeżeli przez określoną liczbę epok nie ma poprawy:
+        zatrzymaj trening wcześniej
+
+    Zapisz końcowe metryki treningu pasywnego
+
+Wyjście:
+    modele wytrenowane pasywnie na danych czystych i zapisanych
+    przykładach antagonistycznych,
+    metryki walidacyjne,
+    checkpointy modeli pasywnych.
+```
+
+Najważniejszą różnicą względem wariantu aktywnego jest brak sprzężenia zwrotnego pomiędzy trenowanym modelem i generatorem ataków. Pasywny model nie wpływa na to, jakie przykłady antagonistyczne znajdą się w zbiorze. Korzysta z gotowej pamięci przykładów wygenerowanych wcześniej, dzięki czemu można badać, czy aktywnie zebrany zbiór ma wartość treningową również dla nowych modeli.
 
 ## Diagram przepływu
 
