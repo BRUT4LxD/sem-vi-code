@@ -63,6 +63,10 @@ class FullResearchPaths:
         return os.path.join(self.root, "results", "attacks", "progressive", "active")
 
     @property
+    def results_adversarial_training(self) -> str:
+        return os.path.join(self.root, "results", "adversarial_training")
+
+    @property
     def models_progressive_passive(self) -> str:
         return os.path.join(self.root, "models", "progressive", "passive")
 
@@ -102,6 +106,7 @@ class FullResearchPaths:
             self.data_attacks_progressive_active,
             self.results_progressive_active,
             self.results_attacks_progressive_active,
+            self.results_adversarial_training,
             self.models_progressive_passive,
             self.results_progressive_passive,
             self.data_attacks_progressive_passive,

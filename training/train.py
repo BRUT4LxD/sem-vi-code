@@ -680,6 +680,7 @@ class Training:
         training_mode: Optional[str] = None,
         best_label: str = 'Validation',
         include_adv_summary: bool = False,
+        results_dir: str = './results/adversarial_training',
     ) -> dict:
         total_time = (datetime.now() - start_time).total_seconds()
         training_state['total_training_time'] = total_time
@@ -694,6 +695,7 @@ class Training:
                 save_model_path,
                 use_preattacked_images,
                 training_mode=training_mode,
+                results_dir=results_dir,
             )
 
         if verbose:
@@ -1378,6 +1380,7 @@ class Training:
         weight_decay: float = 0.0,
         verbose: bool = True,
         tensorboard_runs_root: Optional[str] = None,
+        results_dir: str = './results/adversarial_training',
     ) -> dict:
         """
         Train ImageNette model with progressive adversarial dataset growth.
@@ -1593,6 +1596,7 @@ class Training:
             training_mode='progressive',
             best_label='Combined Validation',
             include_adv_summary=True,
+            results_dir=results_dir,
         )
     
     @staticmethod
@@ -1601,12 +1605,11 @@ class Training:
         model_path,
         use_preattacked_images,
         training_mode: Optional[str] = None,
+        results_dir: str = './results/adversarial_training',
     ):
         """Save adversarial training summary to CSV file."""
         import csv
         
-        # Create results directory
-        results_dir = './results/adversarial_training'
         os.makedirs(results_dir, exist_ok=True)
         
         # Create model-specific subdirectory
@@ -1630,6 +1633,9 @@ class Training:
                 'total_training_time', 'total_params', 'trainable_params', 'device'
             ])
             writer.writeheader()
+            adv_val_accuracies = training_state.get('adv_val_accuracies', [])
+            train_dataset_sizes = training_state.get('train_dataset_sizes', [])
+            test_dataset_sizes = training_state.get('test_dataset_sizes', [])
             
             writer.writerow({
                 'model_name': model_name,
@@ -1640,6 +1646,9 @@ class Training:
                 'final_train_loss': training_state['train_losses'][-1],
                 'final_train_accuracy': training_state['train_accuracies'][-1] if training_state['train_accuracies'] else '',
                 'final_val_accuracy': training_state['val_accuracies'][-1] if training_state['val_accuracies'] else '',
+                'final_adv_val_accuracy': adv_val_accuracies[-1] if adv_val_accuracies else '',
+                'train_dataset_size': train_dataset_sizes[-1] if train_dataset_sizes else '',
+                'val_dataset_size': test_dataset_sizes[-1] if test_dataset_sizes else '',
                 'total_training_time': training_state['total_training_time'],
                 'total_params': training_state['total_params'],
                 'trainable_params': training_state['trainable_params'],

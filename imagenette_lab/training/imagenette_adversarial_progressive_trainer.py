@@ -39,6 +39,7 @@ class ImageNetteAdversarialProgressiveTrainer(BaseImageNetteTrainer):
         noise_detection_dir: Optional[str] = None,
         adversarial_models_dir: Optional[str] = None,
         tensorboard_runs_root: Optional[str] = None,
+        results_dir: str = "./results/adversarial_training",
     ):
         super().__init__(
             device=device,
@@ -51,6 +52,7 @@ class ImageNetteAdversarialProgressiveTrainer(BaseImageNetteTrainer):
             progressive_adversarial_models_dir
             or "./models/imagenette_adversarial_progressive"
         )
+        self.results_dir = results_dir
         os.makedirs(self.progressive_adversarial_models_dir, exist_ok=True)
 
     @staticmethod
@@ -470,6 +472,7 @@ class ImageNetteAdversarialProgressiveTrainer(BaseImageNetteTrainer):
             weight_decay=weight_decay,
             verbose=verbose,
             tensorboard_runs_root=self.tensorboard_runs_root,
+            results_dir=self.results_dir,
         )
 
         total_time = training_results["total_training_time"]

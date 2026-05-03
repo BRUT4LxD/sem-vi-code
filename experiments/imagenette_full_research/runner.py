@@ -178,6 +178,7 @@ def run(config: FullResearchConfig) -> None:
             models_dir=paths.models_normal,
             progressive_adversarial_models_dir=paths.models_progressive_active,
             tensorboard_runs_root=paths.runs,
+            results_dir=paths.results_adversarial_training,
         )
         models: List = []
         save_paths: List[str] = []
