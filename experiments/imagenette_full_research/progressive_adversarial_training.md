@@ -146,7 +146,7 @@ run:
     - progressive_active
 ```
 
-Zakomentowane etapy w konfiguracji należy traktować jako elementy pełnego protokołu ewaluacyjnego, a nie jako przypadkowe lub nieistotne fragmenty implementacji. Dla badań nad progresywnym uczeniem antagonistycznym pełny protokół obejmuje: trening modeli bazowych, walidację modeli bazowych, bezpośrednie ataki na modele bazowe, aktywne progresywne uczenie antagonistyczne, walidację modeli aktywnie progresywnych, bezpośrednie ataki na modele aktywnie progresywne, pasywne uczenie antagonistyczne, walidację modeli pasywnych, bezpośrednie ataki na modele pasywne oraz badanie przenaszalności ataków.
+Dla badań nad progresywnym uczeniem antagonistycznym pełny protokół obejmuje: trening modeli bazowych, walidację modeli bazowych, bezpośrednie ataki na modele bazowe, aktywne progresywne uczenie antagonistyczne, walidację modeli aktywnie progresywnych, bezpośrednie ataki na modele aktywnie progresywne, pasywne uczenie antagonistyczne, walidację modeli pasywnych, bezpośrednie ataki na modele pasywne oraz badanie przenaszalności ataków.
 
 ### Modele
 
@@ -506,22 +506,6 @@ Badanie przenaszalności ataków (`transferability`) sprawdza, czy zapisane przy
 3. Modele po pasywnym uczeniu antagonistycznym.
 
 Oznacza to, że przenaszalność należy analizować zarówno dla ataków wygenerowanych względem modeli normalnych, jak i względem modeli aktywnie oraz pasywnie progresywnych. Każda grupa pełni wtedy rolę potencjalnego źródła perturbacji, a pozostałe modele mogą pełnić rolę modeli docelowych.
-
-Wyniki powinny być rozdzielane według źródła ataków, na przykład:
-
-```text
-final_research/results/transferability/from_normal/
-final_research/results/transferability/from_active/
-final_research/results/transferability/from_passive/
-```
-
-Źródłowe zbiory zaatakowanych obrazów powinny odpowiadać wariantom modeli użytych do ich wygenerowania:
-
-```text
-final_research/data/attacks/normal/
-final_research/data/attacks/progressive/active/
-final_research/data/attacks/progressive/passive/
-```
 
 Ten etap jest szczególnie istotny dla hipotezy o ograniczeniu przenaszalności ataków. Jeżeli progresywne uczenie antagonistyczne zmniejsza wrażliwość modeli na subtelne, wyinżynierowane perturbacje, to skuteczność przykładów wygenerowanych na modelu źródłowym powinna spadać po przeniesieniu ich na modele docelowe. Najważniejsze jest porównanie, czy ataki skuteczne wobec modeli bazowych tracą skuteczność wobec modeli aktywnie lub pasywnie progresywnych oraz czy ataki wygenerowane wobec modeli progresywnych są mniej uniwersalne między architekturami.
 
