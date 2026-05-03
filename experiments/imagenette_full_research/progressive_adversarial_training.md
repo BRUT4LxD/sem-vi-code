@@ -14,7 +14,7 @@ Można interpretować to jako problem liczby „refleksji” lub poziomów adapt
 
 Metoda może również ograniczać przenaszalność ataków między modelami. Jeżeli model staje się mniej wrażliwy na subtelne, specjalnie zaprojektowane zmiany konkretnych pikseli, to perturbacje wygenerowane dla jednej architektury lub jednej wersji modelu powinny rzadziej zachowywać skuteczność po przeniesieniu na inny model. Innymi słowy, progresywne uczenie antagonistyczne nie tylko wzmacnia odporność wobec ataków generowanych bezpośrednio na dany model, ale może także zmniejszać użyteczność perturbacji jako uniwersalnych lub transferowalnych wzorców błędu.
 
-Implementacja znajduje się w `imagenette_lab/training/imagenette_adversarial_progressive_trainer.py`, a etap eksperymentu uruchamiany jest z fazy `progressive_active` w `experiments/imagenette_full_research/runner.py`.
+Implementacja znajduje się w `imagenette_lab/training/imagenette_adversarial_progressive_trainer.py`, a etap eksperymentu uruchamiany jest przez główny program badawczy `experiments/imagenette_full_research/runner.py`.
 
 ## Wkład metody
 
@@ -138,7 +138,7 @@ Aktualna konfiguracja eksperymentu jest zdefiniowana w `experiments/imagenette_f
 
 ### Faza pipeline'u
 
-Włączona faza:
+Konfiguracja pozwala uruchamiać wybrane etapy procesu badawczego. Aktualnie w pliku konfiguracyjnym aktywnie uruchamiany jest etap aktywnego progresywnego uczenia antagonistycznego:
 
 ```yaml
 run:
@@ -146,7 +146,7 @@ run:
     - progressive_active
 ```
 
-Oznacza to, że runner uruchamia aktywne progresywne uczenie antagonistyczne. Walidacja progresywna, direct attacks, trening pasywny, detekcja szumu i transferability są obecnie zakomentowane.
+Zakomentowane etapy w konfiguracji należy traktować jako elementy pełnego protokołu ewaluacyjnego, a nie jako przypadkowe lub nieistotne fragmenty implementacji. Dla badań nad progresywnym uczeniem antagonistycznym pełny protokół obejmuje: trening modeli bazowych, walidację modeli bazowych, bezpośrednie ataki na modele bazowe, aktywne progresywne uczenie antagonistyczne, walidację modeli aktywnie progresywnych, bezpośrednie ataki na modele aktywnie progresywne, pasywne uczenie antagonistyczne, walidację modeli pasywnych, bezpośrednie ataki na modele pasywne oraz badanie przenaszalności ataków.
 
 ### Modele
 
@@ -165,7 +165,7 @@ training:
     - inception_v3
 ```
 
-Ważne: faza `progressive_active` nie tworzy świeżych modeli ImageNet od zera. Dla każdej architektury ładowany jest wcześniej wytrenowany checkpoint normalny z katalogu `paths.models_normal`, zgodnie ze wzorcem:
+Ważne: faza aktywnego uczenia progresywnego nie tworzy świeżych modeli ImageNet od zera. Dla każdej architektury ładowany jest wcześniej wytrenowany model normalny, zgodnie ze wzorcem:
 
 ```text
 final_research/models/normal/<arch>_advanced.pt
@@ -175,7 +175,7 @@ Dopiero tak załadowany model jest dalej trenowany progresywnie na mieszaninie d
 
 ### Ataki
 
-Lista ataków pochodzi z sekcji `attacks.names`:
+Lista ataków jest zdefiniowana w konfiguracji eksperymentu:
 
 ```yaml
 attacks:
@@ -240,9 +240,9 @@ Znaczenie parametrów:
 - `learning_rate`: współczynnik uczenia używany w każdej iteracji progresywnej.
 - `iterations`: liczba rund progresywnego generowania i trenowania.
 - `epochs_per_iteration`: maksymalna liczba epok fine-tuningu wykonywana po wygenerowaniu nowych przykładów w danej iteracji.
-- `batch_size`: rozmiar batcha dla treningu i walidacji na połączonym zbiorze.
-- `images_per_attack_per_iteration`: docelowa liczba skutecznych przykładów antagonistycznych generowanych dla każdego ataku na split treningowy w jednej iteracji.
-- `validation_images_per_attack_per_iteration`: docelowa liczba skutecznych przykładów antagonistycznych generowanych dla każdego ataku na split walidacyjny w jednej iteracji.
+- `batch_size`: rozmiar porcji danych dla treningu i walidacji na połączonym zbiorze.
+- `images_per_attack_per_iteration`: docelowa liczba skutecznych przykładów antagonistycznych generowanych dla każdego ataku na część treningową w jednej iteracji.
+- `validation_images_per_attack_per_iteration`: docelowa liczba skutecznych przykładów antagonistycznych generowanych dla każdego ataku na część walidacyjną w jednej iteracji.
 - Cierpliwość Fmax (`max_tries_per_attack`): limit kolejnych nieudanych prób dla danego ataku. Jeżeli w ostatnich `X` próbach nie uda się wygenerować skutecznego przykładu, generowanie dla tego ataku jest przerywane.
 - `early_stopping_patience`: liczba epok bez poprawy, po której trening w bieżącej iteracji może zostać zatrzymany.
 - `scheduler_type`: typ scheduler'a uczenia, w tym przypadku `step`.
@@ -256,21 +256,21 @@ Znaczenie parametrów:
 
 Runner dla każdej architektury:
 
-1. Buduje ścieżkę do normalnego checkpointu: `final_research/models/normal/<arch>_advanced.pt`.
+1. Buduje ścieżkę do normalnie wytrenowanego modelu: `final_research/models/normal/<arch>_advanced.pt`.
 2. Ładuje model przez `load_model_imagenette(...)`.
 3. Przekazuje załadowany model do `ImageNetteAdversarialProgressiveTrainer`.
-4. Przygotowuje ścieżkę zapisu wyniku progresywnego: `final_research/models/progressive_active/<arch>_progressive_adv.pt`.
+4. Przygotowuje ścieżkę zapisu wyniku progresywnego: `final_research/models/progressive/active/<arch>_progressive_adv.pt`.
 
 W praktyce oznacza to, że progresywny etap jest kontynuacją normalnego treningu, a nie treningiem od bazowych wag ImageNet.
 
 ### 2. Generowanie przykładów antagonistycznych
 
-Na początku każdej iteracji trainer korzysta z czystych loaderów ImageNette:
+Na początku każdej iteracji procedura korzysta z dwóch rodzajów odczytu danych ImageNette:
 
-- `generation_train_loader` i `generation_test_loader` z `batch_size=1` oraz `shuffle=True` do generowania nowych ataków,
-- `clean_train_loader` i `clean_test_loader` z `batch_size=batch_size` oraz `shuffle=False` do budowania czystej części zbioru treningowego i walidacyjnego.
+- losowego odczytu pojedynczych obrazów do generowania nowych ataków,
+- stabilnego odczytu czystych danych do budowania części treningowej i walidacyjnej.
 
-Oznacza to, że wybór oraz kolejność czystych obrazów używanych do ataku są losowane przez loader generacyjny. Trainer nie atakuje deterministycznie pierwszych `N` obrazów z katalogu. Dla każdego ataku przechodzi po czystym loaderze w losowej kolejności i zbiera skuteczne przykłady do momentu osiągnięcia limitu `images_per_attack_per_iteration` albo przerwania przez cierpliwość Fmax. W praktyce dwa uruchomienia tego samego eksperymentu mogą wygenerować inny zestaw przykładów antagonistycznych, jeżeli nie ustawiono jawnie seedów dla `torch`, `random`, `numpy`, generatorów `DataLoader` oraz losowości samych ataków.
+Oznacza to, że wybór oraz kolejność czystych obrazów używanych do ataku są losowane przez mechanizm odczytu danych. Procedura nie atakuje deterministycznie pierwszych `N` obrazów z katalogu. Dla każdego ataku przechodzi po czystych obrazach w losowej kolejności i zbiera skuteczne przykłady do momentu osiągnięcia założonego limitu albo przerwania przez cierpliwość Fmax. W praktyce dwa uruchomienia tego samego eksperymentu mogą wygenerować inny zestaw przykładów antagonistycznych, jeżeli nie ustawiono jawnie ziaren losowości dla bibliotek używanych przez trening, odczyt danych i same ataki.
 
 Losowość dotyczy przede wszystkim doboru kandydatów do ataku i kolejności ich przetwarzania. Dodatkowo część algorytmów ataku posiada własny komponent stochastyczny, więc nawet dla tego samego obrazu wynik perturbacji może zależeć od stanu generatorów losowych.
 
@@ -310,7 +310,7 @@ W efekcie model w kolejnych iteracjach trenuje na coraz większym zbiorze, któr
 
 Nowo wygenerowane przykłady nie zastępują starszych przykładów antagonistycznych. Są do nich dokładane. Oznacza to, że model w iteracji `k` widzi czyste dane oraz sumę skutecznych ataków wygenerowanych w iteracjach `1..k`. Zbiór antagonistyczny pełni więc rolę pamięci historycznych podatności modelu.
 
-Czysty zbiór danych jest dołączany w całości przez `clean_train_loader.dataset` i `clean_test_loader.dataset`, natomiast część antagonistyczna jest skumulowaną listą tensorów wygenerowanych aktywnie podczas treningu. Przy każdej iteracji tworzony jest nowy `ConcatDataset`, a następnie nowy `DataLoader`. Loader treningowy dla połączonego zbioru używa `shuffle=True`, więc kolejność batchy w trakcie fine-tuningu również jest losowa.
+Czysty zbiór danych jest dołączany w całości, natomiast część antagonistyczna jest skumulowaną listą obrazów wygenerowanych aktywnie podczas treningu. Przy każdej iteracji tworzony jest nowy połączony zbiór danych. Odczyt treningowy dla tego zbioru jest losowany, więc kolejność porcji danych w trakcie dostrajania również nie jest stała.
 
 ### 4. Trening w iteracji
 
@@ -321,23 +321,225 @@ Po przygotowaniu zbioru danych wywoływana jest metoda `Training.train_imagenett
 3. Model jest trenowany przez maksymalnie `epochs_per_iteration` epok.
 4. Walidacja odbywa się na połączonym zbiorze czystym i antagonistycznym.
 5. Osobno monitorowana jest walidacja na skumulowanym zbiorze antagonistycznym.
-6. Najlepszy checkpoint danej iteracji jest zapisywany z sufiksem iteracji.
+6. Najlepszy model danej iteracji jest zapisywany z sufiksem iteracji.
 
 Wagi modelu nie są resetowane pomiędzy iteracjami. Każda kolejna iteracja kontynuuje fine-tuning modelu po poprzedniej iteracji.
 
 ### 5. Zapisywane artefakty
 
-W typowym uruchomieniu runner zapisuje:
+W typowym uruchomieniu program zapisuje:
 
-- progresywne checkpointy modeli: `final_research/models/progressive_active/`,
-- wygenerowane obrazy antagonistyczne: `final_research/data/attacks/progressive_active/`,
-- logi TensorBoard: `final_research/runs/adversarial_training_progressive/`.
+- progresywne modele: `final_research/models/progressive/active/`,
+- wygenerowane obrazy antagonistyczne: `final_research/data/attacks/progressive/active/`,
+- logi TensorBoard pod wspólnym katalogiem `final_research/runs/`.
 
 Jeżeli `save_generated_images` jest włączone, obrazy są zapisywane w strukturze:
 
 ```text
 <attacked_images_folder>/<train|test>/<model_progressive_adv>/<attack>/<label>/progressive_iter<it>_<timestamp>.png
 ```
+
+## Protokół ewaluacji
+
+Protokół ewaluacji obejmuje pełną sekwencję etapów badawczych, nawet jeżeli część z nich jest w danym uruchomieniu zakomentowana w konfiguracji. Zakomentowanie etapu oznacza jedynie, że nie jest wykonywany w bieżącym przebiegu programu. Nie oznacza natomiast, że etap nie należy do protokołu porównawczego.
+
+Pełny protokół dla badań nad progresywnym uczeniem antagonistycznym obejmuje:
+
+1. Trening modeli bazowych na czystych danych (`train_baseline`).
+2. Walidację modeli bazowych na czystych danych (`validate_normal`).
+3. Ewaluację modeli bazowych przez bezpośrednie ataki (`direct_normal`).
+4. Aktywne progresywne uczenie antagonistyczne (`progressive_active`).
+5. Walidację modeli aktywnie progresywnych na czystych danych (`validate_progressive_active`).
+6. Ewaluację modeli aktywnie progresywnych przez bezpośrednie ataki (`direct_progressive_active`).
+7. Pasywne uczenie antagonistyczne na zbiorze wygenerowanym aktywnie (`passive`).
+8. Walidację modeli pasywnie progresywnych na czystych danych (`validate_passive`).
+9. Ewaluację modeli pasywnie progresywnych przez bezpośrednie ataki (`direct_passive`).
+10. Badanie przenaszalności ataków dla wszystkich grup modeli (`transferability`).
+
+Nazwy w nawiasach są roboczymi identyfikatorami etapów w konfiguracji i kodzie. W opisie naukowym należy posługiwać się nazwami merytorycznymi: model bazowy, model aktywnie progresywny, model pasywnie progresywny, walidacja na danych czystych, bezpośrednia ewaluacja antagonistyczna oraz badanie przenaszalności.
+
+### 1. Punkt odniesienia: modele normalne
+
+Pierwszym punktem odniesienia są modele trenowane standardowo na czystym zbiorze ImageNette. Etap treningu bazowego (`train_baseline`) zapisuje wytrenowane modele do:
+
+```text
+final_research/models/normal/
+```
+
+Nazwy zapisanych modeli mają format zależny od architektury i wariantu treningu:
+
+```text
+<architektura>_<wariant_treningu>.pt
+```
+
+W obecnej konfiguracji wariant treningu ma wartość `advanced`, a lista architektur obejmuje `resnet18`, `densenet121`, `efficientnet_b0`, `mobilenet_v2`, `swin_t` oraz `inception_v3`. Faza aktywna nie tworzy nowych modeli od zera, lecz wczytuje właśnie te normalnie wytrenowane modele. Oznacza to, że ewaluacja progresywna jest porównaniem modelu przed i po aktywnym douczaniu antagonistycznym.
+
+### 2. Walidacja na czystych danych
+
+Walidacja czysta mierzy, czy wzmacnianie odporności nie niszczy podstawowej jakości klasyfikacji obrazów bez perturbacji.
+
+Dla modeli normalnych etap walidacji (`validate_normal`):
+
+1. Wczytuje wszystkie zapisane modele z `final_research/models/normal/`.
+2. Rozpoznaje architekturę na podstawie nazwy pliku.
+3. Waliduje modele na czystym zbiorze walidacyjnym ImageNette.
+4. Zapisuje zbiorcze wyniki do:
+
+```text
+final_research/results/normal/clean_validation_summary.csv
+```
+
+5. Dodatkowo zapisuje wyniki per klasa dla każdego modelu.
+
+Dla modeli po aktywnym progresywnym uczeniu antagonistycznym etap walidacji progresywnej (`validate_progressive_active`) wykonuje analogiczną ocenę modeli z:
+
+```text
+final_research/models/progressive/active/
+```
+
+Wyniki trafiają do:
+
+```text
+final_research/results/progressive/active/clean_validation_summary.csv
+```
+
+Dla modeli trenowanych pasywnie etap walidacji pasywnej (`validate_passive`) ocenia modele z:
+
+```text
+final_research/models/progressive/passive/
+```
+
+Wyniki są zapisywane jako:
+
+```text
+final_research/results/progressive/passive/clean_validation_passive_summary.csv
+```
+
+Porównanie tych trzech plików odpowiada na pytanie, jak zmienia się jakość klasyfikacji czystych obrazów pomiędzy modelem normalnym, aktywnie douczonym modelem progresywnym oraz modelem pasywnym trenowanym na zapisanych przykładach antagonistycznych.
+
+### 3. Ewaluacja odporności przez bezpośrednie ataki
+
+Odporność modeli jest oceniana przez ponowne wykonanie tego samego zestawu ataków na zbiorze testowym ImageNette. Lista ataków jest wspólna dla wszystkich porównywanych wariantów, co pozwala zestawiać wyniki między modelami bez zmiany protokołu ataku.
+
+Dla modeli normalnych etap bezpośrednich ataków (`direct_normal`):
+
+1. Ładuje testową część zbioru ImageNette.
+2. Dla każdej architektury wskazuje wytrenowany model z `final_research/models/normal/`.
+3. Uruchamia bezpośrednie ataki antagonistyczne.
+4. Zapisuje wyniki CSV do:
+
+```text
+final_research/results/attacks/normal/
+```
+
+Dla modeli aktywnie progresywnych etap bezpośrednich ataków (`direct_progressive_active`):
+
+1. Ładuje całą testową część zbioru ImageNette.
+2. Wczytuje modele z `final_research/models/progressive/active/` w formacie `<architektura>_progressive_adv.pt`.
+3. Uruchamia ten sam zestaw ataków.
+4. Zapisuje wyniki do:
+
+```text
+final_research/results/attacks/progressive/active/
+```
+
+Dla modeli pasywnych etap bezpośrednich ataków (`direct_passive`):
+
+1. Ładuje całą testową część zbioru ImageNette.
+2. Wczytuje modele z `final_research/models/progressive/passive/` w formacie `<architektura>_adv_passive.pt`.
+3. Uruchamia ten sam zestaw ataków.
+4. Zapisuje wyniki do:
+
+```text
+final_research/results/attacks/progressive/passive/
+```
+
+Najważniejsze porównanie odporności polega na zestawieniu wyników z katalogów `normal`, `progressive/active` oraz `progressive/passive` dla tej samej architektury i tego samego ataku. W szczególności należy analizować spadek skuteczności ataków, zmianę `AD` i `RAD`, metryki jakości po ataku oraz odległości perturbacji `L0_pixels`, `L1`, `L2` i `Linf`.
+
+### 4. Ewaluacja aktywnego treningu progresywnego
+
+Faza aktywnego progresywnego uczenia antagonistycznego (`progressive_active`) jest jednocześnie etapem treningu i źródłem części danych ewaluacyjnych. Dla każdej architektury program:
+
+1. Wczytuje normalnie wytrenowany model z `final_research/models/normal/`.
+2. Generuje skuteczne przykłady antagonistyczne względem aktualnego modelu.
+3. Zapisuje wygenerowane obrazy, jeżeli `save_generated_images` jest włączone.
+4. Trenuje model na mieszaninie danych czystych i skumulowanych danych antagonistycznych.
+5. Zapisuje końcowy model do:
+
+```text
+final_research/models/progressive/active/
+```
+
+Jeżeli zapisywanie obrazów jest aktywne, przykłady antagonistyczne powstające podczas treningu są zapisywane w:
+
+```text
+final_research/data/attacks/progressive/active/
+```
+
+Ten katalog pełni podwójną rolę. Po pierwsze dokumentuje, jakie przykłady zostały uznane za skuteczne w aktywnym procesie. Po drugie stanowi wejście dla pasywnego uczenia antagonistycznego.
+
+### 5. Ewaluacja pasywnej odmiany metody
+
+Faza pasywnego uczenia antagonistycznego (`passive`) sprawdza, czy zbiór wygenerowany aktywnie ma wartość treningową dla nowego modelu, który nie uczestniczył w aktywnym procesie generowania ataków. Program tworzy nowy model danej architektury, konfiguruje go do pełnego dostrajania i trenuje na obrazach czystych oraz wcześniej zaatakowanych obrazach z:
+
+```text
+final_research/data/attacks/progressive/active/
+```
+
+Modele pasywne są zapisywane do:
+
+```text
+final_research/models/progressive/passive/
+```
+
+Ten etap pozwala oddzielić dwie hipotezy:
+
+1. Czy aktywne douczanie poprawia odporność konkretnego modelu, który sam generował swoje trudne przykłady.
+2. Czy zbiór przykładów wygenerowany aktywnie jest użyteczny również jako gotowy materiał treningowy dla innego modelu.
+
+### 6. Ewaluacja przenaszalności ataków
+
+Badanie przenaszalności ataków (`transferability`) sprawdza, czy zapisane przykłady antagonistyczne zachowują skuteczność po przeniesieniu na inne modele. W pełnym protokole ten etap powinien obejmować wszystkie trzy grupy modeli:
+
+1. Modele bazowe trenowane wyłącznie na danych czystych.
+2. Modele po aktywnym progresywnym uczeniu antagonistycznym.
+3. Modele po pasywnym uczeniu antagonistycznym.
+
+Oznacza to, że przenaszalność należy analizować zarówno dla ataków wygenerowanych względem modeli normalnych, jak i względem modeli aktywnie oraz pasywnie progresywnych. Każda grupa pełni wtedy rolę potencjalnego źródła perturbacji, a pozostałe modele mogą pełnić rolę modeli docelowych.
+
+Wyniki powinny być rozdzielane według źródła ataków, na przykład:
+
+```text
+final_research/results/transferability/from_normal/
+final_research/results/transferability/from_active/
+final_research/results/transferability/from_passive/
+```
+
+Źródłowe zbiory zaatakowanych obrazów powinny odpowiadać wariantom modeli użytych do ich wygenerowania:
+
+```text
+final_research/data/attacks/normal/
+final_research/data/attacks/progressive/active/
+final_research/data/attacks/progressive/passive/
+```
+
+Ten etap jest szczególnie istotny dla hipotezy o ograniczeniu przenaszalności ataków. Jeżeli progresywne uczenie antagonistyczne zmniejsza wrażliwość modeli na subtelne, wyinżynierowane perturbacje, to skuteczność przykładów wygenerowanych na modelu źródłowym powinna spadać po przeniesieniu ich na modele docelowe. Najważniejsze jest porównanie, czy ataki skuteczne wobec modeli bazowych tracą skuteczność wobec modeli aktywnie lub pasywnie progresywnych oraz czy ataki wygenerowane wobec modeli progresywnych są mniej uniwersalne między architekturami.
+
+### 7. Zalecany sposób porównywania wyników
+
+Minimalny protokół porównawczy powinien obejmować trzy grupy modeli:
+
+1. **Modele normalne**: modele trenowane standardowo na danych czystych.
+2. **Modele aktywnie progresywne**: te same architektury po aktywnym progresywnym uczeniu antagonistycznym.
+3. **Modele pasywnie progresywne**: nowe modele trenowane pasywnie na danych czystych i przykładach wygenerowanych przez aktywną fazę.
+
+Dla każdej architektury należy porównać:
+
+1. Wyniki walidacji na czystych danych, aby ocenić koszt odporności na obrazach bez perturbacji.
+2. Wyniki bezpośrednich ataków, aby ocenić odporność na ten sam zestaw metod antagonistycznych.
+3. Wyniki przenaszalności, aby sprawdzić, czy perturbacje zachowują skuteczność między modelami.
+
+Interpretacja powinna uwzględniać kompromis między odpornością i jakością klasyfikacji czystych obrazów. Najsilniejszy wynik metody występuje wtedy, gdy model progresywny obniża skuteczność ataków oraz przenaszalność perturbacji, a jednocześnie utrzymuje akceptowalną dokładność na czystym zbiorze walidacyjnym.
 
 ## Pseudokod algorytmu
 
@@ -360,7 +562,7 @@ Wejście:
     D_val_clean    = czysty zbiór walidacyjny
 
 Dla każdej architektury a w A:
-    model <- wczytaj wytrenowany normalnie checkpoint modelu a
+    model <- wczytaj model a wytrenowany wcześniej na danych czystych
 
     D_train_adv <- pusty zbiór przykładów antagonistycznych
     D_val_adv   <- pusty zbiór przykładów antagonistycznych
@@ -424,7 +626,7 @@ Dla każdej architektury a w A:
 
         Trenuj model przez maksymalnie E epok na D_train_combined
         Waliduj model na D_val_combined oraz D_val_adv
-        Zapisz najlepszy checkpoint iteracji
+        Zapisz najlepszy model z bieżącej iteracji
 
     Zapisz wynik końcowy modelu
 
@@ -466,14 +668,16 @@ Dla każdej architektury a w A:
         D_train_passive <- zwiększ udział danych czystych względem
                            liczby przykładów antagonistycznych
 
-    train_loader <- utwórz loader z D_train_passive z batch size B
-    val_loader   <- utwórz loader z D_val_passive z batch size B
+    train_loader <- utwórz odczyt treningowy z D_train_passive
+                    z porcją danych o rozmiarze B
+    val_loader   <- utwórz odczyt walidacyjny z D_val_passive
+                    z porcją danych o rozmiarze B
 
-    Trenuj model przez maksymalnie E epok na train_loader
-    Po każdej epoce waliduj model na val_loader
+    Trenuj model przez maksymalnie E epok na danych treningowych
+    Po każdej epoce waliduj model na danych walidacyjnych
 
     Jeżeli metryka walidacyjna poprawia się:
-        zapisz najlepszy checkpoint modelu
+        zapisz najlepszy model
 
     Jeżeli przez określoną liczbę epok nie ma poprawy:
         zatrzymaj trening wcześniej
@@ -484,7 +688,7 @@ Wyjście:
     modele wytrenowane pasywnie na danych czystych i zapisanych
     przykładach antagonistycznych,
     metryki walidacyjne,
-    checkpointy modeli pasywnych.
+    zapisane modele pasywne.
 ```
 
 Najważniejszą różnicą względem wariantu aktywnego jest brak sprzężenia zwrotnego pomiędzy trenowanym modelem i generatorem ataków. Pasywny model nie wpływa na to, jakie przykłady antagonistyczne znajdą się w zbiorze. Korzysta z gotowej pamięci przykładów wygenerowanych wcześniej, dzięki czemu można badać, czy aktywnie zebrany zbiór ma wartość treningową również dla nowych modeli.
@@ -495,13 +699,13 @@ Najważniejszą różnicą względem wariantu aktywnego jest brak sprzężenia z
 flowchart TD
     A[Start fazy progressive_active] --> B[Wczytaj config.yaml]
     B --> C[Odczytaj architektury, ataki i parametry progressive]
-    C --> D[Załaduj normalne checkpointy z paths.models_normal]
+    C --> D[Załaduj modele wytrenowane normalnie]
     D --> E[Utwórz ImageNetteAdversarialProgressiveTrainer]
     E --> F{Dla każdego modelu}
 
     F --> G[Iteracja progresywna i = 1..N]
-    G --> H[Utwórz clean loadery oraz generation loadery]
-    H --> I[Losowo iteruj po czystych obrazach z generation loader]
+    G --> H[Utwórz odczyt danych czystych i generacyjnych]
+    H --> I[Losowo iteruj po czystych obrazach]
     I --> J{Dla każdego ataku}
 
     J --> K[Odrzuć obrazy błędne na czysto]
@@ -520,7 +724,7 @@ flowchart TD
     R --> T[Połącz clean dataset z progressive dataset]
     T --> U[Trenuj model przez epochs_per_iteration]
     U --> V[Waliduj na combined val oraz zbiorze antagonistycznym]
-    V --> W[Zapisz najlepszy checkpoint iteracji]
+    V --> W[Zapisz najlepszy model iteracji]
     W --> X{Czy są kolejne iteracje?}
     X -- Tak --> G
     X -- Nie --> Y[Zapisz końcowy wynik modelu]
@@ -538,8 +742,8 @@ Metoda działa więc jak aktywne wzmacnianie odporności: model jest uczony na c
 ## Ograniczenia i założenia
 
 - Generowane są wyłącznie przykłady z obrazów poprawnie sklasyfikowanych przed atakiem.
-- Obrazy kandydackie do ataku są pobierane z loaderów z `shuffle=True`, więc bez kontrolowanych seedów dobór i kolejność próbek nie są deterministyczne.
+- Obrazy kandydackie do ataku są pobierane w losowej kolejności, więc bez kontrolowanych ziaren losowości dobór i kolejność próbek nie są deterministyczne.
 - Zbiór antagonistyczny rośnie w pamięci procesu, dlatego koszt pamięci zwiększa się wraz z liczbą iteracji i liczbą ataków.
 - Cierpliwość Fmax jest heurystyką kosztu obliczeniowego: mniejsza wartość przyspiesza eksperyment, ale może zmniejszyć liczbę znalezionych skutecznych przykładów.
-- Skuteczność treningu zależy od różnorodności ataków w `attacks.names`; zbyt wąski zestaw ataków może prowadzić do odporności wyspecjalizowanej tylko pod konkretne metody.
+- Skuteczność treningu zależy od różnorodności ataków wybranych w konfiguracji; zbyt wąski zestaw ataków może prowadzić do odporności wyspecjalizowanej tylko pod konkretne metody.
 - Każda iteracja tworzy nowy optymalizator i scheduler, ale kontynuuje trening tych samych wag modelu.

@@ -24,7 +24,7 @@ training:
   full_finetune: true
   # Baseline models to train (must match ImageNetteTrainingConfigs.AVAILABLE_MODELS)
   architectures:
-    # - resnet18
+    - resnet18
     - densenet121
     - efficientnet_b0
     - mobilenet_v2
