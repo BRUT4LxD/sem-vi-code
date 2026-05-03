@@ -231,13 +231,12 @@ progressive:
   early_stopping_patience: 7
   scheduler_type: step
   weight_decay: 0.0001
-  gradient_clip_norm: 1.0
   save_generated_images: true
 ```
 
 Znaczenie parametrów:
 
-- `learning_rate`: współczynnik uczenia używany w każdej iteracji progresywnej.
+- `learning_rate`: początkowy współczynnik uczenia używany w każdej iteracji progresywnej. W aktualnej konfiguracji wynosi `0.0001`.
 - `iterations`: liczba rund progresywnego generowania i trenowania.
 - `epochs_per_iteration`: maksymalna liczba epok fine-tuningu wykonywana po wygenerowaniu nowych przykładów w danej iteracji.
 - `batch_size`: rozmiar porcji danych dla treningu i walidacji na połączonym zbiorze.
@@ -245,10 +244,15 @@ Znaczenie parametrów:
 - `validation_images_per_attack_per_iteration`: docelowa liczba skutecznych przykładów antagonistycznych generowanych dla każdego ataku na część walidacyjną w jednej iteracji.
 - Cierpliwość Fmax (`max_tries_per_attack`): limit kolejnych nieudanych prób dla danego ataku. Jeżeli w ostatnich `X` próbach nie uda się wygenerować skutecznego przykładu, generowanie dla tego ataku jest przerywane.
 - `early_stopping_patience`: liczba epok bez poprawy, po której trening w bieżącej iteracji może zostać zatrzymany.
-- `scheduler_type`: typ scheduler'a uczenia, w tym przypadku `step`.
+- `scheduler_type`: harmonogram współczynnika uczenia, w tym przypadku `step`.
 - `weight_decay`: regularyzacja L2 w optymalizatorze.
-- `gradient_clip_norm`: maksymalna norma gradientu używana do stabilizacji treningu.
 - `save_generated_images`: zapisuje wygenerowane obrazy antagonistyczne do katalogu eksperymentu.
+
+Parametry uczenia aktywnego są więc ustawione konserwatywnie: model jest dalej dostrajany z niskim początkowym współczynnikiem uczenia `0.0001` oraz regularyzacją wag `0.0001`. Ma to ograniczać ryzyko gwałtownego zniszczenia reprezentacji wyuczonych podczas standardowego treningu na czystych danych.
+
+Harmonogram typu `step` zmniejsza współczynnik uczenia w trakcie epok danej iteracji. Domyślnie co 5 epok wartość jest mnożona przez `0.8`. Przy `epochs_per_iteration: 50` oznacza to, że w obrębie jednej iteracji trening zaczyna się od `0.0001`, po 5 epokach przechodzi do `0.00008`, po kolejnych 5 epokach do `0.000064` itd.
+
+Ważne jest to, że optymalizator i harmonogram są tworzone od nowa na początku każdej iteracji progresywnej. Wagi modelu nie są resetowane, ale współczynnik uczenia w kolejnej iteracji ponownie startuje od wartości `0.0001` i dopiero w trakcie tej iteracji maleje według tego samego harmonogramu. Dzięki temu każda nowa runda, po dodaniu kolejnych przykładów antagonistycznych, rozpoczyna dostrajanie z tą samą początkową intensywnością uczenia.
 
 ## Metoda działania
 
@@ -317,13 +321,13 @@ Czysty zbiór danych jest dołączany w całości, natomiast część antagonist
 Po przygotowaniu zbioru danych wywoływana jest metoda `Training.train_imagenette_adversarial_progressive(...)`. Dla każdej iteracji:
 
 1. Tworzony jest nowy optymalizator `Adam`.
-2. Tworzony jest scheduler zgodny z konfiguracją.
+2. Tworzony jest nowy harmonogram współczynnika uczenia zgodny z konfiguracją.
 3. Model jest trenowany przez maksymalnie `epochs_per_iteration` epok.
 4. Walidacja odbywa się na połączonym zbiorze czystym i antagonistycznym.
 5. Osobno monitorowana jest walidacja na skumulowanym zbiorze antagonistycznym.
 6. Najlepszy model danej iteracji jest zapisywany z sufiksem iteracji.
 
-Wagi modelu nie są resetowane pomiędzy iteracjami. Każda kolejna iteracja kontynuuje fine-tuning modelu po poprzedniej iteracji.
+Wagi modelu nie są resetowane pomiędzy iteracjami. Każda kolejna iteracja kontynuuje dostrajanie modelu po poprzedniej iteracji. Resetowany jest natomiast optymalizator i harmonogram współczynnika uczenia, dlatego każda iteracja rozpoczyna uczenie od początkowej wartości `learning_rate`, a następnie zmniejsza ją w trakcie epok zgodnie z harmonogramem `step`.
 
 ### 5. Zapisywane artefakty
 

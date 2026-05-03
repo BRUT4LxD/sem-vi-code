@@ -1375,7 +1375,6 @@ class Training:
         min_delta: float = 0.001,
         scheduler_type: str = 'step',
         scheduler_params: dict = None,
-        gradient_clip_norm: float = None,
         weight_decay: float = 0.0,
         verbose: bool = True,
         tensorboard_runs_root: Optional[str] = None,

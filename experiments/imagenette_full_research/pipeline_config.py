@@ -44,7 +44,6 @@ class ProgressiveConfig:
     early_stopping_patience: int = 7
     scheduler_type: str = "step"
     weight_decay: float = 0.0001
-    gradient_clip_norm: float = 1.0
     save_generated_images: bool = True
 
 
@@ -168,7 +167,6 @@ def load_full_research_config(path: str) -> FullResearchConfig:
             ),
             scheduler_type=str(progressive.get("scheduler_type", "step")),
             weight_decay=float(progressive.get("weight_decay", 0.0001)),
-            gradient_clip_norm=float(progressive.get("gradient_clip_norm", 1.0)),
             save_generated_images=bool(
                 progressive.get("save_generated_images", True)
             ),

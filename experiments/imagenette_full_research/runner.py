@@ -217,7 +217,6 @@ def run(config: FullResearchConfig) -> None:
             early_stopping_patience=config.progressive.early_stopping_patience,
             scheduler_type=config.progressive.scheduler_type,
             weight_decay=config.progressive.weight_decay,
-            gradient_clip_norm=config.progressive.gradient_clip_norm,
             save_generated_images=config.progressive.save_generated_images,
             attacked_images_folder=paths.data_attacks_progressive_active,
             saved_attack_folder_names=folder_names,

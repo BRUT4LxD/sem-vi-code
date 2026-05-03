@@ -11,13 +11,13 @@ run:
     # - validate_normal
     # - direct_normal
     - progressive_active
-    # - validate_progressive_active
-    # - direct_progressive_active
-    # - passive
-    # - validate_passive
-    # - direct_passive
-    # - noise
-    # - transferability
+    - validate_progressive_active
+    - direct_progressive_active
+    - passive
+    - validate_passive
+    - direct_passive
+    - noise
+    - transferability
 
 training:
   config_name: advanced
@@ -83,7 +83,6 @@ progressive:
   early_stopping_patience: 7
   scheduler_type: step
   weight_decay: 0.0001
-  gradient_clip_norm: 1.0
   # Full-research runner saves PNGs for eval; single-trainer default is false
   save_generated_images: true
 
