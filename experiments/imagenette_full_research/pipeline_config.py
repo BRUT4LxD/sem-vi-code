@@ -80,6 +80,8 @@ class NoiseDetectionConfig:
 @dataclass
 class TransferabilityConfig:
     enabled: bool = True
+    images_per_attack: int = 500
+    batch_size: int = 1
 
 
 @dataclass
@@ -206,6 +208,8 @@ def load_full_research_config(path: str) -> FullResearchConfig:
             gradient_clip_norm=float(noise.get("gradient_clip_norm", 1.0)),
         ),
         transferability=TransferabilityConfig(
-            enabled=bool(transferability.get("enabled", True))
+            enabled=bool(transferability.get("enabled", True)),
+            images_per_attack=int(transferability.get("images_per_attack", 500)),
+            batch_size=int(transferability.get("batch_size", 1)),
         ),
     )

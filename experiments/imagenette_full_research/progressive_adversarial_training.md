@@ -503,7 +503,7 @@ Ten etap pozwala oddzielić dwie hipotezy:
 
 ### 6. Ewaluacja przenaszalności ataków
 
-Badanie przenaszalności ataków (`transferability`) sprawdza, czy zapisane przykłady antagonistyczne zachowują skuteczność po przeniesieniu na inne modele. W pełnym protokole ten etap powinien obejmować wszystkie trzy grupy modeli:
+Badanie przenaszalności ataków (`transferability`) sprawdza, czy perturbacje wygenerowane przy użyciu modelu źródłowego zachowują skuteczność wobec innych modeli docelowych. W implementacji przebiega to **w pamięci**, na próbce obrazów z walidacji ImageNette (liczba przykładów na atak: `transferability.images_per_attack` w `config.yaml`), bez odczytu zapisanych wcześniej obrazów z dysku. Orchestrator scala wszystkie zapisane modele (.pt) z trzech katalogów (normalny trening bazowy, aktywne oraz pasywne uczenie progresywne) do **jednej** analizy model–model; wyniki CSV trafiają do `final_research/results/transferability/combined/`. Logicznie należy interpretować wyniki jako porównanie między trzema grupami modeli:
 
 1. Modele bazowe trenowane wyłącznie na danych czystych.
 2. Modele po aktywnym progresywnym uczeniu antagonistycznym.

@@ -16,7 +16,7 @@ import glob
 import logging
 import os
 import sys
-from typing import List, Tuple
+from typing import List, Set, Tuple
 
 _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if _REPO_ROOT not in sys.path:
@@ -34,7 +34,10 @@ from experiments.imagenette_full_research.pipeline_config import (
     load_full_research_config,
 )
 from imagenette_lab.imagenette_direct_attacks import ImageNetteDirectAttacks
-from imagenette_lab.imagenette_transferability_attacks import imagenette_transferability_model2model_from_files
+from imagenette_lab.imagenette_transferability_attacks import (
+    imagenette_transferability_model2model_in_memory,
+    run_transferability_with_allocation_retry,
+)
 from imagenette_lab.imagenette_validator import ImageNetteValidator
 from imagenette_lab.training.imagenette_adversarial_progressive_trainer import (
     ImageNetteAdversarialProgressiveTrainer,
@@ -76,6 +79,23 @@ def _transfer_tuples_from_dir(models_dir: str) -> List[Tuple[str, str]]:
         stem = _stem(ckpt_path)
         out.append((stem, os.path.abspath(ckpt_path)))
     return out
+
+
+def _transfer_tuples_combined_all_groups(paths) -> List[Tuple[str, str]]:
+    """All ``.pt`` checkpoints from normal, progressive-active, and progressive-passive dirs (dedup by path)."""
+    seen: Set[str] = set()
+    combined: List[Tuple[str, str]] = []
+    for batch in (
+        _transfer_tuples_from_dir(paths.models_normal),
+        _transfer_tuples_from_dir(paths.models_progressive_active),
+        _transfer_tuples_from_dir(paths.models_progressive_passive),
+    ):
+        for label, ckpt in batch:
+            if ckpt in seen:
+                continue
+            seen.add(ckpt)
+            combined.append((label, ckpt))
+    return combined
 
 
 def _validated_attack_names(raw_attack_names: List[str]) -> List[str]:
@@ -364,23 +384,19 @@ def run(config: FullResearchConfig) -> None:
                 save_model_path=save_p,
             )
 
-    # --- Transferability (from files) ---
+    # --- Transferability (in-memory, all checkpoint groups in one pooled run) ---
     if want("transferability") and config.transferability.enabled:
-        models_n = _transfer_tuples_from_dir(paths.models_normal)
-        if models_n:
-            imagenette_transferability_model2model_from_files(
-                models=models_n,
-                attack_names=attack_names,
-                attacked_images_folder=paths.data_attacks_normal,
-                results_folder=paths.results_transferability_normal,
-            )
-        models_p = _transfer_tuples_from_dir(paths.models_progressive_passive)
-        if models_p:
-            imagenette_transferability_model2model_from_files(
-                models=models_p,
-                attack_names=attack_names,
-                attacked_images_folder=paths.data_attacks_progressive_passive,
-                results_folder=paths.results_transferability_passive,
+        tcfg = config.transferability
+        models_all = _transfer_tuples_combined_all_groups(paths)
+        if models_all:
+            run_transferability_with_allocation_retry(
+                lambda ms=models_all: imagenette_transferability_model2model_in_memory(
+                    models=ms,
+                    attack_names=attack_names,
+                    images_per_attack=tcfg.images_per_attack,
+                    batch_size=tcfg.batch_size,
+                    results_folder=paths.results_transferability_combined,
+                ),
             )
 
 

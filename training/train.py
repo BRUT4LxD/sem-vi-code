@@ -1609,12 +1609,27 @@ class Training:
     ):
         """Save adversarial training summary to CSV file."""
         import csv
-        
-        os.makedirs(results_dir, exist_ok=True)
-        
+
+        _default_adv_dir = os.path.normpath("./results/adversarial_training")
+        effective_results_dir = os.path.normpath(results_dir)
+        # If callers still use the legacy default directory but save under
+        # ``…/<research>/models/…``, place CSV summaries next to that research tree.
+        if effective_results_dir == _default_adv_dir and model_path:
+            model_dir = os.path.dirname(os.path.abspath(model_path))
+            parts = os.path.normpath(model_dir).split(os.sep)
+            if "models" in parts:
+                midx = parts.index("models")
+                research_root = os.sep.join(parts[:midx])
+                if research_root:
+                    effective_results_dir = os.path.normpath(
+                        os.path.join(research_root, "results", "adversarial_training")
+                    )
+
+        os.makedirs(effective_results_dir, exist_ok=True)
+
         # Create model-specific subdirectory
         model_name = training_state['model_name']
-        model_results_dir = os.path.join(results_dir, model_name)
+        model_results_dir = os.path.join(effective_results_dir, model_name)
         os.makedirs(model_results_dir, exist_ok=True)
         
         # Generate filename

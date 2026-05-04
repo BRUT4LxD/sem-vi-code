@@ -1,5 +1,12 @@
 """
-Directory layout for the full ImageNette research pipeline (default root: ``final_research/``).
+Directory layout for the full ImageNette research pipeline.
+
+Default ``root`` is ``final_research``: models, on-disk attack caches, validation and attack
+CSV outputs, TensorBoard ``runs``, and transferability results all live under ``root``.
+
+Clean ImageNette splits default to ``./data/imagenette/{train,val}`` (dataset at repository
+root). Override these in ``config.yaml`` under ``paths`` if your data lives elsewhere—they
+are inputs, not artifacts under ``root``.
 """
 
 from __future__ import annotations
@@ -76,6 +83,11 @@ class FullResearchPaths:
 
     @property
     def data_attacks_progressive_passive(self) -> str:
+        """Reserved subtree (e.g. if passive-specific attack dumps are added later).
+
+        Passive training in :mod:`runner` currently reads progressive-active attacks from
+        :attr:`data_attacks_progressive_active`.
+        """
         return os.path.join(self.root, "data", "attacks", "progressive", "passive")
 
     @property
@@ -91,8 +103,17 @@ class FullResearchPaths:
         return os.path.join(self.root, "results", "transferability", "from_normal")
 
     @property
+    def results_transferability_active(self) -> str:
+        return os.path.join(self.root, "results", "transferability", "from_active")
+
+    @property
     def results_transferability_passive(self) -> str:
         return os.path.join(self.root, "results", "transferability", "from_passive")
+
+    @property
+    def results_transferability_combined(self) -> str:
+        """Pooled model2model transferability (normal + progressive active + passive checkpoints)."""
+        return os.path.join(self.root, "results", "transferability", "combined")
 
     def ensure_dirs(self) -> None:
         for p in (
@@ -113,7 +134,9 @@ class FullResearchPaths:
             self.results_attacks_progressive_passive,
             self.models_noise_detection,
             self.results_transferability_normal,
+            self.results_transferability_active,
             self.results_transferability_passive,
+            self.results_transferability_combined,
         ):
             os.makedirs(p, exist_ok=True)
 

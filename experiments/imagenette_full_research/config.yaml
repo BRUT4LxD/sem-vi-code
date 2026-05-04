@@ -10,7 +10,7 @@ run:
     # - train_baseline
     # - validate_normal
     # - direct_normal
-    - progressive_active
+    # - progressive_active
     - validate_progressive_active
     - direct_progressive_active
     - passive
@@ -115,3 +115,5 @@ noise_detection:
 
 transferability:
   enabled: true
+  images_per_attack: 500
+  batch_size: 1
