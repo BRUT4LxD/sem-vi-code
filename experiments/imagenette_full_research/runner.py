@@ -252,7 +252,7 @@ def run(config: FullResearchConfig) -> None:
             device="auto",
         )
         tuples = []
-        for ck in glob.glob(os.path.join(paths.models_progressive_active, "*.pt")):
+        for ck in glob.glob(os.path.join(paths.models_progressive_active, "*_progressive_adv.pt")):
             tuples.append(_checkpoint_tuple(ck))
         if tuples:
             results = val.validate_models_from_tuples(tuples)

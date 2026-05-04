@@ -1,0 +1,7 @@
+model_name,model_path,architecture_hint,accuracy,precision,recall,f1,training_epoch,timestamp
+mobilenet_v2_progressive_adv,final_research/models/progressive/active/mobilenet_v2_progressive_adv.pt,mobilenet_v2,0.9289171695709229,0.9293525218963623,0.9293527603149414,0.9289467334747314,Unknown,2026-05-04 10:17:13
+efficientnet_b0_progressive_adv,final_research/models/progressive/active/efficientnet_b0_progressive_adv.pt,efficientnet_b0,0.9228025674819946,0.9233058094978333,0.9229942560195923,0.9229365587234497,Unknown,2026-05-04 10:16:25
+densenet121_progressive_adv,final_research/models/progressive/active/densenet121_progressive_adv.pt,densenet121,0.909554123878479,0.9127996563911438,0.9093939065933228,0.9097312688827515,Unknown,2026-05-04 10:16:01
+swin_t_progressive_adv,final_research/models/progressive/active/swin_t_progressive_adv.pt,swin_t,0.8822929859161377,0.8834161758422852,0.8828397393226624,0.8823634386062622,Unknown,2026-05-04 10:18:04
+inception_v3_progressive_adv,final_research/models/progressive/active/inception_v3_progressive_adv.pt,inception_v3,0.8774522542953491,0.8780543804168701,0.8772319555282593,0.8764307498931885,Unknown,2026-05-04 10:16:51
+resnet18_progressive_adv,final_research/models/progressive/active/resnet18_progressive_adv.pt,resnet18,0.8478980660438538,0.8470106720924377,0.8479782342910767,0.8469045758247375,Unknown,2026-05-04 10:17:36
