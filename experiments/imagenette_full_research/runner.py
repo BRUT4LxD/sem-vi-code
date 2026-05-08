@@ -259,7 +259,7 @@ def run(config: FullResearchConfig) -> None:
             val.save_models_from_tuples_summary(results, output_filename="clean_validation_summary.csv")
 
     if want("direct_progressive_active"):
-        _, test_loader = load_imagenette(batch_size=8, test_subset_size=-1)
+        _, test_loader = load_imagenette(batch_size=1, test_subset_size=500)
         da = ImageNetteDirectAttacks(device="auto")
 
         def ck_prog(name: str) -> str:
