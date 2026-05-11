@@ -289,6 +289,7 @@ def run(config: FullResearchConfig) -> None:
             model = ImageNetModels.get_model(arch)
             model.__class__.__name__ = arch
             model = SetupPretraining.setup_imagenette(model, full_finetune=True)
+            attacked_model_folder = f"{arch}_progressive_adv"
             log.info("Passive adversarial training: %s", arch)
             adv_trainer.train_adversarial_model(
                 model=model,
@@ -312,6 +313,7 @@ def run(config: FullResearchConfig) -> None:
                 ),
                 train_test_split=config.passive_adversarial.train_test_split,
                 attacked_images_folder=paths.data_attacks_progressive_active,
+                attacked_model_folder_names=[attacked_model_folder],
                 clean_train_root=paths.imagenette_train,
                 clean_val_root=paths.imagenette_val,
                 save_model_path=save_p,

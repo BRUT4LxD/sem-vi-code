@@ -1,7 +1,7 @@
 model_name,model_path,architecture_hint,accuracy,precision,recall,f1,training_epoch,timestamp
-efficientnet_b0_adv_passive,final_research/models/progressive/passive/efficientnet_b0_adv_passive.pt,efficientnet_b0,0.9852229356765747,0.9853085875511169,0.9851036071777344,0.9851657748222351,Unknown,2026-05-11 10:58:21
-swin_t_adv_passive,final_research/models/progressive/passive/swin_t_adv_passive.pt,swin_t,0.981146514415741,0.9815722703933716,0.9809979796409607,0.9811941981315613,Unknown,2026-05-11 11:19:54
-mobilenet_v2_adv_passive,final_research/models/progressive/passive/mobilenet_v2_adv_passive.pt,mobilenet_v2,0.9765605330467224,0.9764652252197266,0.9764845967292786,0.9764457941055298,Unknown,2026-05-11 11:04:48
-resnet18_adv_passive,final_research/models/progressive/passive/resnet18_adv_passive.pt,resnet18,0.9722293019294739,0.972133994102478,0.9723740816116333,0.9721512794494629,Unknown,2026-05-11 11:06:35
-densenet121_adv_passive,final_research/models/progressive/passive/densenet121_adv_passive.pt,densenet121,0.9701910614967346,0.9703761339187622,0.9699814319610596,0.9699751138687134,Unknown,2026-05-11 10:56:16
-inception_v3_adv_passive,final_research/models/progressive/passive/inception_v3_adv_passive.pt,inception_v3,0.9694267511367798,0.9693303108215332,0.9693671464920044,0.9693008661270142,Unknown,2026-05-11 11:03:02
+efficientnet_b0_adv_passive,final_research/models/progressive/passive/efficientnet_b0_adv_passive.pt,efficientnet_b0,0.987515926361084,0.9875240325927734,0.9874776601791382,0.9874730110168457,Unknown,2026-05-11 20:45:25
+mobilenet_v2_adv_passive,final_research/models/progressive/passive/mobilenet_v2_adv_passive.pt,mobilenet_v2,0.9765605330467224,0.976659893989563,0.9765723943710327,0.9765337705612183,Unknown,2026-05-11 20:46:11
+swin_t_adv_passive,final_research/models/progressive/passive/swin_t_adv_passive.pt,swin_t,0.9747770428657532,0.9746538400650024,0.974957287311554,0.9746612310409546,Unknown,2026-05-11 20:47:00
+densenet121_adv_passive,final_research/models/progressive/passive/densenet121_adv_passive.pt,densenet121,0.9701910614967346,0.9702063798904419,0.9704585075378418,0.970033586025238,Unknown,2026-05-11 20:45:02
+resnet18_adv_passive,final_research/models/progressive/passive/resnet18_adv_passive.pt,resnet18,0.9587261080741882,0.958442211151123,0.9588192105293274,0.9585672616958618,Unknown,2026-05-11 20:46:33
+inception_v3_adv_passive,final_research/models/progressive/passive/inception_v3_adv_passive.pt,inception_v3,0.9549044370651245,0.9551559686660767,0.9552748799324036,0.9548885822296143,Unknown,2026-05-11 20:45:49

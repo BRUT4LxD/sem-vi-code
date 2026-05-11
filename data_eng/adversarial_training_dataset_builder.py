@@ -1,5 +1,5 @@
 import random
-from typing import Optional
+from typing import List, Optional
 
 import torchvision.datasets as datasets
 from torch.utils.data import ConcatDataset, DataLoader, Dataset, Subset
@@ -99,6 +99,7 @@ def build_imagenette_adversarial_training_loaders(
     train_test_split: Optional[float] = None,
     random_seed: int = 42,
     attacked_images_folder: str = ATTACKED_IMAGENETTE_FOLDER,
+    attacked_model_folder_names: Optional[List[str]] = None,
     clean_train_root: Optional[str] = None,
     clean_val_root: Optional[str] = None,
 ):
@@ -108,6 +109,7 @@ def build_imagenette_adversarial_training_loaders(
         train_subset_size=attacked_subset_size,
         test_subset_size=attacked_subset_size,
         shuffle=False,
+        model_folder_names=attacked_model_folder_names,
     )
 
     transform = _resolve_dataset_transform(attacked_train_loader.dataset)

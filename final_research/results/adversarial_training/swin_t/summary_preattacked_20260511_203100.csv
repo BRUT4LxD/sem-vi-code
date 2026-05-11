@@ -1,0 +1,2 @@
+model_name,training_mode,it,best_val_accuracy,best_epoch,final_train_loss,final_train_accuracy,final_val_accuracy,final_adv_val_accuracy,train_dataset_size,val_dataset_size,total_training_time,total_params,trainable_params,device
+swin_t,preattacked,,98.50057670126874,3,0.018575998885805564,99.40620315922979,96.71280276816609,,,,1016.633887,27527044,27527044,cuda

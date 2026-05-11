@@ -1,5 +1,5 @@
 import torchvision.datasets as datasets
-from typing import List, Union
+from typing import List, Optional, Set, Union
 
 from torch.utils.data import ConcatDataset, DataLoader, Subset, SubsetRandomSampler, Dataset
 from attacks.attack_names import AttackNames
@@ -146,6 +146,7 @@ def load_attacked_imagenette(
     train_subset_size=-1,
     test_subset_size=-1,
     shuffle=True,
+    model_folder_names: Optional[List[str]] = None,
 ):
     """
     Load attacked ImageNette images from disk, preserving original class labels (0-9).
@@ -170,6 +171,7 @@ def load_attacked_imagenette(
         train_subset_size: Limit training samples (-1 for all)
         test_subset_size: Limit test samples (-1 for all)
         shuffle: Whether to shuffle the data
+        model_folder_names: Optional model folder names to include under train/test
 
     Returns:
         Tuple of (train_loader, test_loader)
@@ -179,9 +181,12 @@ def load_attacked_imagenette(
     roots: List[str] = (
         list(path_to_data) if isinstance(path_to_data, (list, tuple)) else [path_to_data]
     )
+    model_folder_filter = set(model_folder_names) if model_folder_names else None
 
     print("📁 Loading attacked ImageNette images...")
     print(f"   Attacked image root(s): {roots}")
+    if model_folder_filter is not None:
+        print(f"   Model folder filter: {sorted(model_folder_filter)}")
 
     train_parts = []
     test_parts = []
@@ -191,9 +196,21 @@ def load_attacked_imagenette(
         train_folder = os.path.join(root, 'train')
         test_folder = os.path.join(root, 'test')
         if os.path.exists(train_folder):
-            train_parts.append(_load_adversarial_with_labels(train_folder, trans))
+            train_parts.append(
+                _load_adversarial_with_labels(
+                    train_folder,
+                    trans,
+                    model_folder_filter=model_folder_filter,
+                )
+            )
         if os.path.exists(test_folder):
-            test_parts.append(_load_adversarial_with_labels(test_folder, trans))
+            test_parts.append(
+                _load_adversarial_with_labels(
+                    test_folder,
+                    trans,
+                    model_folder_filter=model_folder_filter,
+                )
+            )
 
     train_dataset = (
         ConcatDataset(train_parts) if len(train_parts) > 1
@@ -221,13 +238,18 @@ def load_attacked_imagenette(
     )
 
 
-def _load_adversarial_with_labels(folder_path: str, transform=None):
+def _load_adversarial_with_labels(
+    folder_path: str,
+    transform=None,
+    model_folder_filter: Optional[Set[str]] = None,
+):
     """
     Load adversarial images with their class labels from folder structure.
     
     Args:
         folder_path: Path to folder containing model/attack/class structure
         transform: Transform to apply to images
+        model_folder_filter: Optional model folder names to include
         
     Returns:
         Dataset with (image, label) pairs
@@ -255,6 +277,8 @@ def _load_adversarial_with_labels(folder_path: str, transform=None):
     # Get all model folders
     model_folders = [d for d in os.listdir(folder_path) 
                     if os.path.isdir(os.path.join(folder_path, d))]
+    if model_folder_filter is not None:
+        model_folders = [d for d in model_folders if d in model_folder_filter]
     
     for model_folder in model_folders:
         model_path = os.path.join(folder_path, model_folder)

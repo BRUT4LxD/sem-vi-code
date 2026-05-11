@@ -1,0 +1,6 @@
+model,train_adv,train_clean,test_adv,test_clean
+resnet18,14675,14675,2935,2935
+efficientnet_b0,7520,7520,1504,1504
+mobilenet_v2,7627,7627,1525,1525
+swin_t,8673,8673,1734,1734
+inception_v3,7780,7780,1556,1556

@@ -38,6 +38,7 @@ class ImageNetteAdversarialTrainer(BaseImageNetteTrainer):
         augment_clean_to_match_attacked: bool = True,
         train_test_split: Optional[float] = None,
         attacked_images_folder: Optional[str] = None,
+        attacked_model_folder_names: Optional[List[str]] = None,
         clean_train_root: Optional[str] = None,
         clean_val_root: Optional[str] = None,
         save_model_path: Optional[str] = None,
@@ -111,6 +112,8 @@ class ImageNetteAdversarialTrainer(BaseImageNetteTrainer):
                 )
                 if attacked_images_folder is not None:
                     loader_kwargs["attacked_images_folder"] = attacked_images_folder
+                if attacked_model_folder_names is not None:
+                    loader_kwargs["attacked_model_folder_names"] = attacked_model_folder_names
                 if clean_train_root is not None:
                     loader_kwargs["clean_train_root"] = clean_train_root
                 if clean_val_root is not None:
