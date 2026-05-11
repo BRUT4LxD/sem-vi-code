@@ -11,7 +11,7 @@ run:
     # - validate_normal
     # - direct_normal
     # - progressive_active
-    - validate_progressive_active
+    # - validate_progressive_active
     - direct_progressive_active
     - passive
     - validate_passive
