@@ -87,7 +87,7 @@ def _transfer_tuples_combined_all_groups(paths) -> List[Tuple[str, str]]:
     combined: List[Tuple[str, str]] = []
     for batch in (
         _transfer_tuples_from_dir(paths.models_normal),
-        _transfer_tuples_from_dir(paths.models_progressive_active),
+        # _transfer_tuples_from_dir(paths.models_progressive_active),
         _transfer_tuples_from_dir(paths.models_progressive_passive),
     ):
         for label, ckpt in batch:
@@ -95,6 +95,8 @@ def _transfer_tuples_combined_all_groups(paths) -> List[Tuple[str, str]]:
                 continue
             seen.add(ckpt)
             combined.append((label, ckpt))
+    
+    print(f"Combined: {combined}")
     return combined
 
 
@@ -139,6 +141,9 @@ def run(config: FullResearchConfig) -> None:
 
     def want(phase: str) -> bool:
         return not phases or phase in phases
+
+    def noise_detection_attacked_roots() -> List[str]:
+        return [paths.data_attacks_normal, paths.data_attacks_progressive_active]
 
     # --- Phase 1: baseline training ---
     if want("train_baseline") :
@@ -356,7 +361,7 @@ def run(config: FullResearchConfig) -> None:
             noise_detection_dir=paths.models_noise_detection,
             tensorboard_runs_root=paths.runs,
         )
-        attacked_roots = [paths.data_attacks_normal, paths.data_attacks_progressive_active]
+        attacked_roots = noise_detection_attacked_roots()
         for arch in archs:
             save_p = os.path.join(paths.models_noise_detection, f"{arch}_noise_detector.pt")
             if resume and os.path.isfile(save_p):
@@ -385,6 +390,30 @@ def run(config: FullResearchConfig) -> None:
                 gradient_clip_norm=config.noise_detection.gradient_clip_norm,
                 save_model_path=save_p,
             )
+
+    # --- Validate noise detection ---
+    if want("validate_noise_detection") or want("validate_noise"):
+        noise_results_dir = os.path.join(paths.root, "results", "noise_detection")
+        val = ImageNetteValidator(
+            models_dir=paths.models_noise_detection,
+            results_dir=noise_results_dir,
+            noise_detection_models_dir=paths.models_noise_detection,
+            noise_detection_results_dir=noise_results_dir,
+            device="auto",
+        )
+        attacked_roots = noise_detection_attacked_roots()
+        results = []
+        for arch in archs:
+            results.append(
+                val.validate_noise_detection_model(
+                    model_name=arch,
+                    attacked_images_folder=attacked_roots,
+                    clean_test_folder=paths.imagenette_val,
+                    batch_size=config.noise_detection.batch_size,
+                )
+            )
+        if results:
+            val.save_noise_detection_summary(results)
 
     # --- Transferability (in-memory, all checkpoint groups in one pooled run) ---
     if want("transferability") and config.transferability.enabled:

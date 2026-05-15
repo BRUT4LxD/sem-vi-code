@@ -17,6 +17,7 @@ import torch
 import os
 import sys
 import pandas as pd
+from tqdm import tqdm
 from datetime import datetime
 from typing import List, Dict, Optional, Tuple
 import numpy as np
@@ -729,7 +730,9 @@ class ImageNetteValidator:
             )
             
             # Evaluate model
-            print(f"   Running evaluation...")
+            n_batches = len(test_loader)
+            n_samples = len(test_loader.dataset)
+            print(f"   Running evaluation ({n_samples} samples, {n_batches} batches)...")
             model.eval()
             correct = 0
             total = 0
@@ -739,7 +742,12 @@ class ImageNetteValidator:
             false_negatives = 0
             
             with torch.no_grad():
-                for images, labels in test_loader:
+                for images, labels in tqdm(
+                    test_loader,
+                    desc=f"noise-det {model_name}",
+                    unit="batch",
+                    leave=False,
+                ):
                     images = images.to(self.device)
                     labels = labels.to(self.device).float().unsqueeze(1)
                     

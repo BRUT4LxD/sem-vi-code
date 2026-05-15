@@ -15,8 +15,9 @@ run:
     # - direct_progressive_active
     # - passive
     # - validate_passive
-    - direct_passive
-    - noise
+    # - direct_passive
+    # - noise
+    - validate_noise_detection
     - transferability
 
 training:
