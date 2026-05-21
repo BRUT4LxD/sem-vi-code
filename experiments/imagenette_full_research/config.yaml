@@ -7,8 +7,8 @@
 run:
   resume: false
   phases:
-    # - train_baseline
-    # - validate_normal
+    - train_baseline
+    - validate_normal
     # - direct_normal
     # - progressive_active
     # - validate_progressive_active
@@ -17,8 +17,8 @@ run:
     # - validate_passive
     # - direct_passive
     # - noise
-    - validate_noise_detection
-    - transferability
+    # - validate_noise_detection
+    # - transferability
 
 training:
   config_name: advanced
