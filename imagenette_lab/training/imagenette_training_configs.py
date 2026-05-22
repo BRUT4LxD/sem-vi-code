@@ -59,7 +59,7 @@ class ImageNetteTrainingConfigs:
     # Advanced configuration for maximum performance
     ADVANCED_CONFIG = {
         'num_epochs': 200,
-        'learning_rate': 0.0001,
+        'learning_rate': 0.00001,
         'batch_size': 64,
         'train_subset_size': -1,  # Use full ImageNette dataset
         'test_subset_size': -1,   # Use full ImageNette dataset

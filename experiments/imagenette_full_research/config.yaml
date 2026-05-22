@@ -7,17 +7,17 @@
 run:
   resume: false
   phases:
-    - train_baseline
-    - validate_normal
+    # - train_baseline
+    # - validate_normal
     # - direct_normal
     # - progressive_active
-    # - validate_progressive_active
+    - validate_progressive_active
     # - direct_progressive_active
     # - passive
     # - validate_passive
     # - direct_passive
     # - noise
-    # - validate_noise_detection
+    - validate_noise_detection
     # - transferability
 
 training:
@@ -92,11 +92,11 @@ passive_adversarial:
   attacked_subset_size: -1
   augment_clean_to_match_attacked: true
   train_test_split: 0.2
-  learning_rate: 0.0001
-  num_epochs: 100
+  learning_rate: 0.00001
+  num_epochs: 200
   batch_size: 32
   adversarial_ratio: 0.5
-  early_stopping_patience: 7
+  early_stopping_patience: 20
   scheduler_type: step
   weight_decay: 0.0001
   gradient_clip_norm: 1.0

@@ -262,6 +262,9 @@ def run(config: FullResearchConfig) -> None:
         if tuples:
             results = val.validate_models_from_tuples(tuples)
             val.save_models_from_tuples_summary(results, output_filename="clean_validation_summary.csv")
+            for result in results:
+                val.save_model_per_class_results(result)
+
 
     if want("direct_progressive_active"):
         _, test_loader = load_imagenette(batch_size=1, test_subset_size=500)
@@ -337,6 +340,8 @@ def run(config: FullResearchConfig) -> None:
         if tuples:
             results = val.validate_models_from_tuples(tuples)
             val.save_models_from_tuples_summary(results, output_filename="clean_validation_passive_summary.csv")
+            for result in results:
+                val.save_model_per_class_results(result)
 
     if want("direct_passive"):
         _, test_loader = load_imagenette(batch_size=1, test_subset_size=500)
@@ -414,6 +419,8 @@ def run(config: FullResearchConfig) -> None:
             )
         if results:
             val.save_noise_detection_summary(results)
+            for result in results:
+                val.save_model_per_class_results(result)
 
     # --- Transferability (in-memory, all checkpoint groups in one pooled run) ---
     if want("transferability") and config.transferability.enabled:
