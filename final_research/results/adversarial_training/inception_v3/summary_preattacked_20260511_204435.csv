@@ -1,2 +1,0 @@
-model_name,training_mode,it,best_val_accuracy,best_epoch,final_train_loss,final_train_accuracy,final_val_accuracy,final_adv_val_accuracy,train_dataset_size,val_dataset_size,total_training_time,total_params,trainable_params,device
-inception_v3,preattacked,,94.79434447300771,3,0.02110294644525791,99.33804627249357,93.219794344473,,,,814.142535,21806058,21806058,cuda

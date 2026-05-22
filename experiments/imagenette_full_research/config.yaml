@@ -9,15 +9,15 @@ run:
   phases:
     # - train_baseline
     # - validate_normal
-    # - direct_normal
+    - direct_normal
     # - progressive_active
-    - validate_progressive_active
+    # - validate_progressive_active
     # - direct_progressive_active
     # - passive
     # - validate_passive
     # - direct_passive
     # - noise
-    - validate_noise_detection
+    # - validate_noise_detection
     # - transferability
 
 training:

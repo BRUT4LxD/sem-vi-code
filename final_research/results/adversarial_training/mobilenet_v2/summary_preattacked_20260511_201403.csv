@@ -1,2 +1,0 @@
-model_name,training_mode,it,best_val_accuracy,best_epoch,final_train_loss,final_train_accuracy,final_val_accuracy,final_adv_val_accuracy,train_dataset_size,val_dataset_size,total_training_time,total_params,trainable_params,device
-mobilenet_v2,preattacked,,95.8360655737705,3,0.009256239466779656,99.73777369870199,94.98360655737704,,,,642.847959,2236682,2236682,cuda

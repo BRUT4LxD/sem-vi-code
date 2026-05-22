@@ -1,2 +1,0 @@
-model_name,training_mode,it,best_val_accuracy,best_epoch,final_train_loss,final_train_accuracy,final_val_accuracy,final_adv_val_accuracy,train_dataset_size,val_dataset_size,total_training_time,total_params,trainable_params,device
-densenet121,preattacked,,97.1875,6,0.004340080025039774,99.8925,94.275,,,,14099.243261,6964106,6964106,cuda
