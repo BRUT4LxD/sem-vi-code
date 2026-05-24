@@ -8,8 +8,8 @@ run:
   resume: false
   phases:
     # - train_baseline
-    # - validate_normal
-    - direct_normal
+    - validate_normal
+    # - direct_normal
     # - progressive_active
     # - validate_progressive_active
     # - direct_progressive_active

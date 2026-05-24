@@ -23,6 +23,7 @@ from typing import List, Dict, Optional, Tuple
 import numpy as np
 import torchvision.datasets as datasets
 from torch.utils.data import DataLoader
+from torchmetrics import Accuracy, Precision, Recall, F1Score
 
 from imagenette_lab.training.imagenette_training_configs import ImageNetteTrainingConfigs
 
@@ -185,55 +186,44 @@ class ImageNetteValidator:
         """
         model.eval()
         device = next(model.parameters()).device
-        
-        # Initialize counters
-        class_correct = [0] * 10
-        class_total = [0] * 10
-        class_predictions = [[] for _ in range(10)]
-        class_targets = [[] for _ in range(10)]
-        
+        num_classes = len(self.imagenette_classes)
+
+        accuracy = Accuracy(task='multiclass', num_classes=num_classes, average=None).to(device)
+        precision = Precision(task='multiclass', num_classes=num_classes, average=None).to(device)
+        recall = Recall(task='multiclass', num_classes=num_classes, average=None).to(device)
+        f1 = F1Score(task='multiclass', num_classes=num_classes, average=None).to(device)
+        class_total = torch.zeros(num_classes, dtype=torch.long, device=device)
+
         with torch.no_grad():
             for data, target in test_loader:
                 data, target = data.to(device), target.to(device)
                 output = model(data)
                 pred = output.argmax(dim=1)
-                
-                # Update counters
-                for i in range(len(target)):
-                    label = target[i].item()
-                    prediction = pred[i].item()
-                    
-                    class_total[label] += 1
-                    class_predictions[label].append(prediction)
-                    class_targets[label].append(label)
-                    
-                    if prediction == label:
-                        class_correct[label] += 1
-        
-        # Calculate per-class metrics
+
+                accuracy(pred, target)
+                precision(pred, target)
+                recall(pred, target)
+                f1(pred, target)
+                class_total += torch.bincount(target, minlength=num_classes)
+
+        class_accuracy = accuracy.compute().detach().cpu().tolist()
+        class_precision = precision.compute().detach().cpu().tolist()
+        class_recall = recall.compute().detach().cpu().tolist()
+        class_f1 = f1.compute().detach().cpu().tolist()
+        class_samples = class_total.detach().cpu().tolist()
+
         per_class_metrics = {}
-        for i in range(10):
-            if class_total[i] > 0:
-                accuracy = class_correct[i] / class_total[i]
-                
-                # Calculate precision, recall, F1 for this class
-                true_positives = class_correct[i]
-                false_positives = sum(1 for p in class_predictions[i] if p == i) - true_positives
-                false_negatives = class_total[i] - true_positives
-                
-                precision = true_positives / (true_positives + false_positives) if (true_positives + false_positives) > 0 else 0
-                recall = true_positives / (true_positives + false_negatives) if (true_positives + false_negatives) > 0 else 0
-                f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
-                
-                per_class_metrics[self.imagenette_classes[i]] = {
-                    'accuracy': accuracy,
-                    'precision': precision,
-                    'recall': recall,
-                    'f1': f1,
-                    'samples': class_total[i]
+        for i, class_name in enumerate(self.imagenette_classes):
+            if class_samples[i] > 0:
+                per_class_metrics[class_name] = {
+                    'accuracy': class_accuracy[i],
+                    'precision': class_precision[i],
+                    'recall': class_recall[i],
+                    'f1': class_f1[i],
+                    'samples': class_samples[i]
                 }
             else:
-                per_class_metrics[self.imagenette_classes[i]] = {
+                per_class_metrics[class_name] = {
                     'accuracy': 0,
                     'precision': 0,
                     'recall': 0,
