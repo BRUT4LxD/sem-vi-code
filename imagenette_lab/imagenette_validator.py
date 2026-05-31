@@ -410,6 +410,75 @@ class ImageNetteValidator:
                 "success": False,
             }
 
+    def validate_model_from_path_on_loader(
+        self,
+        model_tuple: Tuple[str, str],
+        test_loader: DataLoader,
+        dataset_label: str,
+    ) -> Dict:
+        """
+        Validate one ImageNette model from explicit tuple on a provided dataloader.
+
+        This is used for validation sets that are not the default clean ImageNette
+        validation split, for example pre-attacked images used by passive training.
+        """
+        architecture_hint, model_path = model_tuple
+        model_label = self._checkpoint_stem(model_path)
+        print(f"\n🔍 Validating {model_label} on {dataset_label}...")
+
+        try:
+            if not os.path.exists(model_path):
+                raise FileNotFoundError(f"Model file not found: {model_path}")
+
+            model_info = load_model_imagenette(
+                model_path=model_path,
+                model_name=architecture_hint,
+                device=str(self.device),
+                verbose=False,
+            )
+            if not model_info.success or model_info.model is None:
+                raise RuntimeError(f"Failed to load model: {model_info.error}")
+
+            model = model_info.model
+
+            print("   Calculating overall metrics...")
+            acc, prec, rec, f1 = Metrics.evaluate_model_torchmetrics(
+                model, test_loader, 10, verbose=False
+            )
+
+            print("   Calculating per-class metrics...")
+            per_class_metrics = self._calculate_per_class_metrics(model, test_loader)
+            checkpoint = model_info.checkpoint or {}
+
+            result = {
+                "model_name": model_label,
+                "source_model_path": model_path,
+                "source_architecture": architecture_hint,
+                "validation_dataset": dataset_label,
+                "accuracy": acc,
+                "precision": prec,
+                "recall": rec,
+                "f1": f1,
+                "per_class_metrics": per_class_metrics,
+                "training_epoch": checkpoint.get("epoch", "Unknown"),
+                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "success": True,
+            }
+            print(f"   ✅ {model_label} on {dataset_label}: Overall Accuracy = {acc:.4f}")
+            return result
+
+        except Exception as e:
+            error_msg = f"Validation failed for {model_label} on {dataset_label}: {str(e)}"
+            print(f"   ❌ {error_msg}")
+            return {
+                "model_name": model_label,
+                "source_model_path": model_path,
+                "source_architecture": architecture_hint,
+                "validation_dataset": dataset_label,
+                "error": error_msg,
+                "success": False,
+            }
+
     def validate_models_from_tuples(
         self,
         models: List[Tuple[str, str]],
@@ -464,21 +533,22 @@ class ImageNetteValidator:
 
         summary_data = []
         for result in successful_results:
-            summary_data.append(
-                {
-                    "model_name": result["model_name"],
-                    "model_path": _path_relative_to_project_for_csv(
-                        result.get("source_model_path", "")
-                    ),
-                    "architecture_hint": result.get("source_architecture", ""),
-                    "accuracy": result["accuracy"],
-                    "precision": result["precision"],
-                    "recall": result["recall"],
-                    "f1": result["f1"],
-                    "training_epoch": result["training_epoch"],
-                    "timestamp": result["timestamp"],
-                }
-            )
+            row = {
+                "model_name": result["model_name"],
+                "model_path": _path_relative_to_project_for_csv(
+                    result.get("source_model_path", "")
+                ),
+                "architecture_hint": result.get("source_architecture", ""),
+                "accuracy": result["accuracy"],
+                "precision": result["precision"],
+                "recall": result["recall"],
+                "f1": result["f1"],
+                "training_epoch": result["training_epoch"],
+                "timestamp": result["timestamp"],
+            }
+            if "validation_dataset" in result:
+                row["validation_dataset"] = result["validation_dataset"]
+            summary_data.append(row)
 
         df = pd.DataFrame(summary_data).sort_values("accuracy", ascending=False)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -552,7 +622,7 @@ class ImageNetteValidator:
         per_class_metrics = result['per_class_metrics']
         
         for class_name, metrics in per_class_metrics.items():
-            per_class_data.append({
+            row = {
                 'model_name': model_name,
                 'class_name': class_name,
                 'accuracy': metrics['accuracy'],
@@ -560,14 +630,25 @@ class ImageNetteValidator:
                 'recall': metrics['recall'],
                 'f1': metrics['f1'],
                 'samples': metrics['samples']
-            })
+            }
+            if "validation_dataset" in result:
+                row["validation_dataset"] = result["validation_dataset"]
+            per_class_data.append(row)
         
         # Create DataFrame and save
         df = pd.DataFrame(per_class_data)
         df = df.sort_values('accuracy', ascending=False)
         
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        filename = f"{result['model_name']}_per_class_{timestamp}.csv"
+        dataset_suffix = ""
+        if "validation_dataset" in result:
+            dataset_slug = "".join(
+                ch if ch.isalnum() or ch in ("-", "_") else "_"
+                for ch in str(result["validation_dataset"])
+            ).strip("_")
+            if dataset_slug:
+                dataset_suffix = f"_{dataset_slug}"
+        filename = f"{result['model_name']}{dataset_suffix}_per_class_{timestamp}.csv"
         filepath = os.path.join(self.results_dir, filename)
         
         df.to_csv(filepath, index=False)

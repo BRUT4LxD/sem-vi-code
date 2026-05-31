@@ -1,0 +1,11 @@
+model_name,class_name,accuracy,precision,recall,f1,samples,validation_dataset
+resnet18_adv_passive,tench,1.0,1.0,1.0,1.0,302,attacked_clean_resnet18_progressive_adv
+resnet18_adv_passive,English springer,1.0,1.0,1.0,1.0,448,attacked_clean_resnet18_progressive_adv
+resnet18_adv_passive,church,0.9976580739021301,0.9616252779960632,0.9976580739021301,0.9793103337287903,427,attacked_clean_resnet18_progressive_adv
+resnet18_adv_passive,golf ball,0.9874476790428162,0.9915966391563416,0.9874476790428162,0.9895178079605103,239,attacked_clean_resnet18_progressive_adv
+resnet18_adv_passive,French horn,0.9692832827568054,0.9594594836235046,0.9692832827568054,0.9643463492393494,293,attacked_clean_resnet18_progressive_adv
+resnet18_adv_passive,chain saw,0.9508771896362305,0.7994100451469421,0.9508771896362305,0.8685897588729858,285,attacked_clean_resnet18_progressive_adv
+resnet18_adv_passive,cassette player,0.9051987528800964,0.9024389982223511,0.9051987528800964,0.903816819190979,327,attacked_clean_resnet18_progressive_adv
+resnet18_adv_passive,parachute,0.8926553726196289,0.9813664555549622,0.8926553726196289,0.9349112510681152,177,attacked_clean_resnet18_progressive_adv
+resnet18_adv_passive,gas pump,0.8892405033111572,0.9006410241127014,0.8892405033111572,0.8949044346809387,316,attacked_clean_resnet18_progressive_adv
+resnet18_adv_passive,garbage truck,0.8148148059844971,0.9918032884597778,0.8148148059844971,0.8946395516395569,297,attacked_clean_resnet18_progressive_adv

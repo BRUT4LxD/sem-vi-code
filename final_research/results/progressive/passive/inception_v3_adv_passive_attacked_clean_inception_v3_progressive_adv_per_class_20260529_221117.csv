@@ -1,0 +1,11 @@
+model_name,class_name,accuracy,precision,recall,f1,samples,validation_dataset
+inception_v3_adv_passive,English springer,1.0,1.0,1.0,1.0,234,attacked_clean_inception_v3_progressive_adv
+inception_v3_adv_passive,parachute,1.0,0.9342105388641357,1.0,0.9659863710403442,71,attacked_clean_inception_v3_progressive_adv
+inception_v3_adv_passive,church,0.9959514141082764,1.0,0.9959514141082764,0.9979715943336487,247,attacked_clean_inception_v3_progressive_adv
+inception_v3_adv_passive,tench,0.9932432174682617,1.0,0.9932432174682617,0.996610164642334,148,attacked_clean_inception_v3_progressive_adv
+inception_v3_adv_passive,golf ball,0.9927536249160767,0.9785714149475098,0.9927536249160767,0.9856114983558655,138,attacked_clean_inception_v3_progressive_adv
+inception_v3_adv_passive,chain saw,0.9809523820877075,0.8691983222961426,0.9809523820877075,0.9217002391815186,210,attacked_clean_inception_v3_progressive_adv
+inception_v3_adv_passive,gas pump,0.9771689772605896,0.9427312612533569,0.9771689772605896,0.9596412777900696,219,attacked_clean_inception_v3_progressive_adv
+inception_v3_adv_passive,French horn,0.9532163739204407,0.9878787994384766,0.9532163739204407,0.9702380895614624,171,attacked_clean_inception_v3_progressive_adv
+inception_v3_adv_passive,garbage truck,0.8983957171440125,0.9767441749572754,0.8983957171440125,0.9359331727027893,187,attacked_clean_inception_v3_progressive_adv
+inception_v3_adv_passive,cassette player,0.894444465637207,1.0,0.894444465637207,0.9442815184593201,180,attacked_clean_inception_v3_progressive_adv

@@ -26,7 +26,7 @@ _CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.yaml")
 
 from attacks.attack_names import AttackNames
 from config.imagenet_models import ImageNetModels
-from data_eng.dataset_loader import load_imagenette
+from data_eng.dataset_loader import load_attacked_imagenette, load_imagenette
 from data_eng.io import load_model_imagenette
 from domain.model.model_names import ModelNames
 from experiments.imagenette_full_research.pipeline_config import (
@@ -341,6 +341,32 @@ def run(config: FullResearchConfig) -> None:
             results = val.validate_models_from_tuples(tuples)
             val.save_models_from_tuples_summary(results, output_filename="clean_validation_passive_summary.csv")
             for result in results:
+                val.save_model_per_class_results(result)
+
+            attacked_results = []
+            for model_tuple in tuples:
+                arch, _ = model_tuple
+                attacked_model_folder = f"{arch}_progressive_adv"
+                _, attacked_test_loader = load_attacked_imagenette(
+                    path_to_data=paths.data_attacks_progressive_active,
+                    batch_size=32,
+                    test_subset_size=-1,
+                    shuffle=False,
+                    model_folder_names=[attacked_model_folder],
+                )
+                dataset_label = f"attacked_clean_{attacked_model_folder}"
+                attacked_results.append(
+                    val.validate_model_from_path_on_loader(
+                        model_tuple=model_tuple,
+                        test_loader=attacked_test_loader,
+                        dataset_label=dataset_label,
+                    )
+                )
+            val.save_models_from_tuples_summary(
+                attacked_results,
+                output_filename="attacked_clean_validation_passive_summary.csv",
+            )
+            for result in attacked_results:
                 val.save_model_per_class_results(result)
 
     if want("direct_passive"):

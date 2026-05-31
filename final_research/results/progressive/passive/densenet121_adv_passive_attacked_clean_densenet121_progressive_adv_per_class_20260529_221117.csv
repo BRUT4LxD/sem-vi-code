@@ -1,0 +1,11 @@
+model_name,class_name,accuracy,precision,recall,f1,samples,validation_dataset
+densenet121_adv_passive,tench,1.0,1.0,1.0,1.0,126,attacked_clean_densenet121_progressive_adv
+densenet121_adv_passive,English springer,1.0,1.0,1.0,1.0,220,attacked_clean_densenet121_progressive_adv
+densenet121_adv_passive,golf ball,1.0,0.9831932783126831,1.0,0.991525411605835,117,attacked_clean_densenet121_progressive_adv
+densenet121_adv_passive,church,0.9849624037742615,0.9924242496490479,0.9849624037742615,0.9886792302131653,266,attacked_clean_densenet121_progressive_adv
+densenet121_adv_passive,gas pump,0.9620853066444397,0.8982300758361816,0.9620853066444397,0.929061770439148,211,attacked_clean_densenet121_progressive_adv
+densenet121_adv_passive,French horn,0.9506173133850098,0.9447852969169617,0.9506173133850098,0.947692334651947,162,attacked_clean_densenet121_progressive_adv
+densenet121_adv_passive,cassette player,0.935960590839386,0.9134615659713745,0.935960590839386,0.9245741963386536,203,attacked_clean_densenet121_progressive_adv
+densenet121_adv_passive,garbage truck,0.9351351261138916,0.9402173757553101,0.9351351261138916,0.9376693964004517,185,attacked_clean_densenet121_progressive_adv
+densenet121_adv_passive,chain saw,0.9112903475761414,0.9535865187644958,0.9112903475761414,0.9319587349891663,248,attacked_clean_densenet121_progressive_adv
+densenet121_adv_passive,parachute,0.8636363744735718,1.0,0.8636363744735718,0.9268292784690857,66,attacked_clean_densenet121_progressive_adv

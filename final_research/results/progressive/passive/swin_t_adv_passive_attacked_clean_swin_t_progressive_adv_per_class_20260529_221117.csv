@@ -1,0 +1,11 @@
+model_name,class_name,accuracy,precision,recall,f1,samples,validation_dataset
+swin_t_adv_passive,tench,1.0,1.0,1.0,1.0,132,attacked_clean_swin_t_progressive_adv
+swin_t_adv_passive,English springer,1.0,1.0,1.0,1.0,305,attacked_clean_swin_t_progressive_adv
+swin_t_adv_passive,French horn,1.0,0.9857142567634583,1.0,0.9928057789802551,138,attacked_clean_swin_t_progressive_adv
+swin_t_adv_passive,church,1.0,1.0,1.0,1.0,271,attacked_clean_swin_t_progressive_adv
+swin_t_adv_passive,gas pump,1.0,0.9650654792785645,1.0,0.9822221994400024,221,attacked_clean_swin_t_progressive_adv
+swin_t_adv_passive,garbage truck,1.0,1.0,1.0,1.0,184,attacked_clean_swin_t_progressive_adv
+swin_t_adv_passive,golf ball,1.0,1.0,1.0,1.0,125,attacked_clean_swin_t_progressive_adv
+swin_t_adv_passive,parachute,1.0,1.0,1.0,1.0,53,attacked_clean_swin_t_progressive_adv
+swin_t_adv_passive,chain saw,0.9907833933830261,1.0,0.9907833933830261,0.9953703880310059,217,attacked_clean_swin_t_progressive_adv
+swin_t_adv_passive,cassette player,0.9515151381492615,1.0,0.9515151381492615,0.9751552939414978,165,attacked_clean_swin_t_progressive_adv

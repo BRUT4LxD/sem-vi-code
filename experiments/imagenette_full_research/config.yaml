@@ -8,13 +8,13 @@ run:
   resume: false
   phases:
     # - train_baseline
-    - validate_normal
+    # - validate_normal
     # - direct_normal
     # - progressive_active
     # - validate_progressive_active
     # - direct_progressive_active
     # - passive
-    # - validate_passive
+    - validate_passive
     # - direct_passive
     # - noise
     # - validate_noise_detection
