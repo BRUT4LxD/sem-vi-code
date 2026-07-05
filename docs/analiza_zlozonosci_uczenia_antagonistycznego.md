@@ -117,6 +117,8 @@ Z tego powodu w dokumencie rozdzielane są:
 
 Standardowy wariant antagonistyczny jest obsługiwany przez `Training.train_imagenette_adversarial(...)` z parametrem `use_preattacked_images=False`. W każdej epoce wykonywana jest funkcja `_train_adversarial_epoch(...)`.
 
+Uwaga metodologiczna: wariant ten jest zaimplementowany w kodzie, ale nie jest uruchamiany w pipeline eksperymentu ImageNette. W `experiments/imagenette_full_research/runner.py` oraz w `config.yaml` (sekcja `run.phases`) nie występuje faza odpowiadająca standardowemu uczeniu on-the-fly; faktycznie wykonywane są jedynie warianty progresywny aktywny (`progressive_active`) oraz progresywny pasywny (`passive`). W konsekwencji parametr `E_s` nie pochodzi z konfiguracji eksperymentu. Wartość `E_s = 200` przyjmowana w dalszej części jest założeniem porównawczym (dla zrównania z `E_p` wariantu pasywnego), a nie wielkością odczytaną z `config.yaml`.
+
 Dla każdego batcha:
 
 1. wybierana jest część próbek o liczności:
@@ -395,6 +397,8 @@ Dla `A = 31`, `I = 30`, `E_i = 50`, `T = 10`, `V = 2`:
 I(I+1)/2 = 465
 ```
 
+Liczby poniżej są nominalne i stanowią górne ograniczenie. W implementacji działa wczesne zatrzymywanie (`early_stopping_patience = 7`, licznik resetowany na początku każdej iteracji), więc rzeczywista liczba epok w iteracji może być mniejsza niż `E_i = 50`. Faktyczny koszt jest więc nie większy niż podany poniżej.
+
 Liczba wygenerowanych przykładów na jeden model:
 
 ```text
@@ -495,14 +499,14 @@ Wariant pasywny nie generuje przykładów antagonistycznych w trakcie treningu. 
 3. buduje zbalansowany zbiór clean+attacked,
 4. wykonuje klasyczne uczenie nadzorowane na tym zbiorze.
 
-Przy aktualnej konfiguracji:
+Przy aktualnej konfiguracji efektywne wartości to:
 
 ```text
-clean_to_attacked_ratio = 1.0
-augment_clean_to_match_attacked = true
+clean_to_attacked_ratio = 1.0   # wartość domyślna; nie występuje jawnie w sekcji passive_adversarial
+augment_clean_to_match_attacked = true   # ustawione jawnie w config.yaml
 ```
 
-oznacza to, że liczba czystych próbek jest dopasowywana do liczby próbek attacked. W rezultacie rozmiar zbioru treningowego jest w przybliżeniu:
+Pole `clean_to_attacked_ratio` nie jest podane w bloku `passive_adversarial` w `config.yaml`; runner nie przekazuje go do `train_adversarial_model(...)`, więc używana jest wartość domyślna `1.0` z `build_imagenette_adversarial_training_loaders(...)`. Oznacza to, że liczba czystych próbek jest dopasowywana do liczby próbek attacked. W rezultacie rozmiar zbioru treningowego jest w przybliżeniu:
 
 ```text
 D_passive_train = 2 * N_att_train
@@ -547,6 +551,8 @@ T_passive ~= (3*S_train_passive + S_val_passive) * C_f
 ```
 
 Nie występuje tu składnik `C_att(a)` w trakcie treningu. Jest to podstawowa różnica względem standardowego uczenia on-the-fly i progresywnego aktywnego wariantu. Koszt ataków został poniesiony wcześniej, w fazie generowania danych przez wariant aktywny.
+
+Podobnie jak w wariancie progresywnym, `E_p = 200` jest górnym ograniczeniem. W konfiguracji pasywnej działa wczesne zatrzymywanie (`early_stopping_patience = 20`), więc rzeczywista liczba epok może być mniejsza, a podane liczby należy traktować jako maksymalne.
 
 ### 6.3. Nominalny koszt pasywny przy pełnej generacji progresywnej
 
